@@ -1,0 +1,85 @@
+package services
+
+import (
+	"context"
+	"crypto/rand"
+	"database/sql"
+	"encoding/hex"
+	"errors"
+	"log"
+	"strings"
+
+	"github.com/google/uuid"
+	"main.go/security"
+)
+
+type AuthResult struct {
+	TenantId uuid.UUID
+}
+
+func TenantReg(ctx context.Context, db *sql.DB, merchantName string) {
+	var TenantId uuid.UUID
+	prefix, ApiKey, err := GenerateApiKey(merchantName)
+	if err != nil {
+		log.Fatal("Failed to generate API Key")
+	}
+
+	hashedKey, err := security.HashApiKey(ApiKey)
+	if err != nil {
+		log.Fatal("Failed to Hash API Key")
+	}
+
+	query := `INSERT INTO tenant_credentials (
+    tenant_name,
+    key_prefix,
+    key_hash
+	)
+	VALUES ($1, $2, $3);
+	RETURNING tenant_id;`
+	db.QueryRowContext(ctx, query, merchantName, prefix, hashedKey).Scan(&TenantId)
+}
+func GenerateApiKey(prefix string) (string, string, error) {
+	secretbytes := make([]byte, 32)
+	_, err := rand.Read(secretbytes)
+	if err != nil {
+		return " ", " ", err
+	}
+	secret := hex.EncodeToString(secretbytes)
+	fullkey := prefix + "." + secret
+	return prefix, fullkey, nil
+
+}
+
+func splitAPIKey(raw string) (string, string, error) {
+	parts := strings.SplitN(raw, ".", 2)
+	if len(parts) != 2 {
+		return "", "", errors.New("Invalid API Key Format")
+	}
+	return parts[0], parts[1], nil
+}
+
+func ValidateApiKey(ctx context.Context, db *sql.DB, rawapikey string) (*AuthResult, error) {
+	prefix, secret, err := splitAPIKey(rawapikey)
+	if err != nil {
+		return nil, err
+	}
+
+	var tenantId uuid.UUID
+	var hash string
+
+	err = db.QueryRowContext(ctx,
+		`SELECT tenant_id,key_hash 
+			 FROM api_keys
+			 WHERE key_prefix=$1 AND is_active=true`, prefix,
+	).Scan(&tenantId, &hash)
+	if err != nil {
+		return nil, errors.New("invalid API Key")
+	}
+	err = security.CompareApiKey(hash, secret)
+	if err != nil {
+		return nil, errors.New("Invalid API Key ")
+	}
+
+	return &AuthResult{TenantId: tenantId}, nil
+
+}
