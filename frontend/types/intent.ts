@@ -1,4 +1,4 @@
-export type IntentStatus = 'RECEIVED' | 'REJECTED_PREACC' | 'QUEUED_ACC'
+export type IntentStatus = 'RECEIVED' | 'REJECTED_PREACC' | 'QUEUED_ACC' | 'CANONICALIZED'
 
 export type IntentSource = 'API' | 'BATCH' | 'WEBHOOK'
 

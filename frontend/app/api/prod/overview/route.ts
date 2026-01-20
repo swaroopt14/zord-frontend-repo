@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { OverviewData } from '@/services/api/receiptService'
 
+// Force dynamic rendering for API routes
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     // Return mock overview data matching the existing structure
@@ -74,7 +77,7 @@ export async function GET(request: NextRequest) {
         hash_chain: 'OK'
       }
     }
-    
+
     return NextResponse.json(overviewData)
   } catch (error) {
     console.error('Error fetching overview:', error)
