@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.arealis.io/incoming_intent.request.v1.json",
+  "title": "IncomingIntentRequestV1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "intent_type",
+    "account_number",
+    "amount",
+    "beneficiary",
+    "idempotency_key",
+    "purpose_code"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Client-declared schema version"
+    },
+    "intent_type": {
+      "type": "string",
+      "enum": [
+        "PAYOUT",
+        "COLLECTION",
+        "REFUND",
+        "FX"
+      ],
+      "description": "High-level intent classification"
+    },
+    "account_number": {
+      "type": "string"
+    },
+    "amount": {
+      "type": "object",
+      "required": [
+        "value",
+        "currency"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "Client-claimed amount (not canonicalized)"
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 3
+        }
+      }
+    },
+    "beneficiary": {
+      "type": "object",
+      "required": [
+        "instrument"
+      ],
+      "additionalProperties": true,
+      "description": "Beneficiary descriptor (loosely validated)",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "PERSON",
+            "BUSINESS"
+          ]
+        },
+        "instrument": {
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "BANK",
+                "UPI",
+                "CARD",
+                "WALLET",
+                "OTHER"
+              ],
+              "description": "Declared instrument kind for routing"
+            },
+            "instrument_token_ref": {
+              "type": "string",
+              "description": "Optional pre-tokenized instrument reference"
+            }
+          }
+        },
+        "name_token_ref": {
+          "type": "string",
+          "description": "Optional token reference for beneficiary name"
+        },
+        "address_token_ref": {
+          "type": "string",
+          "description": "Optional token reference for beneficiary address"
+        },
+        "country": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 2
+        }
+      }
+    },
+    "remitter": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional remitter information"
+    },
+    "purpose_code": {
+      "type": "string",
+      "description": "Client-declared purpose code"
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Client-specified execution constraints"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Free-form client metadata"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Client-provided idempotency key"
+    }
+  }
+}
