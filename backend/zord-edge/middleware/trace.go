@@ -3,20 +3,31 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid" // For generating unique identifiers
+	"github.com/google/uuid"
 )
 
-// TraceMiddleware generates and attaches a unique trace ID to each request
-// This helps with request tracking and debugging across the system
+const TraceIDKey = "trace_id"
+
 func TraceMiddleware() gin.HandlerFunc {
-	return func(context *gin.Context) {
-		// Generate a new UUID for this request
-		traceId := uuid.New().String()
+	return func(c *gin.Context) {
+		traceID := uuid.New().String()
 
-		// Store the trace ID in the Gin context for use in handlers
-		context.Set("trace_id", traceId)
+		// Store trace ID in context
+		c.Set(TraceIDKey, traceID)
 
-		// Continue processing the request
-		context.Next()
+		// Expose trace ID to client
+		c.Header("X-Trace-Id", traceID)
+
+		c.Next()
 	}
+}
+
+// GetTraceID safely fetches trace_id from Gin context
+func GetTraceID(c *gin.Context) string {
+	if v, exists := c.Get(TraceIDKey); exists {
+		if traceID, ok := v.(string); ok {
+			return traceID
+		}
+	}
+	return ""
 }
