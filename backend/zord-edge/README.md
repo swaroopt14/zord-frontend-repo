@@ -45,7 +45,7 @@ go run ./cmd/main.go
 
 The service will start on `http://localhost:8080`
 
-### Docker Deployment
+### Production Deployment
 
 #### Build and Run
 ```bash
@@ -61,6 +61,7 @@ docker-compose logs -f zord-edge
 # Stop services
 docker-compose down
 ```
+The service will start on `http://localhost:8080`
 
 #### Managing Services
 ```bash
@@ -76,10 +77,9 @@ docker-compose down -v
 
 ## API Endpoints
 
-- **Status**: `GET /health` - Service health check
-- **Authentication**: `POST /auth/login` - User login
-- **Intent**: `POST /api/intent` - Submit intent request
-- **Tenant Registration**: `POST /api/tenant/register` - Register tenant
+- **Health Check**: `GET /health` - Service health check
+- **Intent Ingestion**: `POST /v1/ingest` - Submit intent request
+- **Tenant Registration**: `POST /v1/tenantReg` - Register tenant
 
 ## Configuration
 
@@ -90,6 +90,7 @@ DB_PORT=5432
 DB_USER=zord_user
 DB_PASSWORD=zord_password
 DB_NAME=zord_edge_db
+DB_SSLMODE=disable
 ENVIRONMENT=development
 ```
 
@@ -112,16 +113,19 @@ ENVIRONMENT=development
 ## Database
 
 ### Initialization
-The application automatically creates required tables on startup:
-
-```bash
-# Run migrations manually
-psql -U zord_user -d zord_edge_db < db/migration.sql
-```
+The application automatically creates required tables on startup. Currently creates:
+- `tenants` table for tenant management
 
 ### Accessing Database
 ```bash
+# Connect to PostgreSQL inside Docker container
 docker-compose exec postgres psql -U zord_user -d zord_edge_db
+
+# View tables
+\dt
+
+# View table structure
+\d tenants
 ```
 
 ## Development
@@ -178,6 +182,10 @@ docker-compose logs postgres
 
 # Verify credentials in environment variables
 docker-compose exec zord-edge env | grep DB_
+
+# For SSL connection issues, ensure DB_SSLMODE is set to 'disable' in docker-compose.yml
+# Add to environment section:
+# - DB_SSLMODE=disable
 ```
 
 ### Build Failures

@@ -17,6 +17,7 @@ services:  # Define the containers/services to run
       - DB_USER=zord_user  # Database username
       - DB_PASSWORD=zord_password  # Database password
       - DB_NAME=zord_edge_db  # Database name
+      - DB_SSLMODE=disable  # Disable SSL for local Docker connections
       - ENVIRONMENT=production  # Environment setting
     depends_on:  # Service dependencies (start postgres first)
       - postgres

@@ -13,6 +13,9 @@ func Routes(router *gin.Engine) {
 	router.Use(gin.Recovery())              // Panic recovery middleware
 	router.Use(middleware.TraceMiddleware()) // Request tracing middleware
 
+	// Health check endpoint
+	router.GET("/health", handler.HealthCheck) // Service health check
+
 	// API v1 routes
 	router.POST("/v1/ingest", handler.Intent_handler)     // Handle intent ingestion requests
 	router.POST("/v1/tenantReg", handler.Tenant_Registry) // Handle tenant registration
