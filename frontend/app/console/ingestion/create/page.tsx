@@ -1,11 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { isAuthenticated } from '@/services/auth'
 import { createReceipt } from '@/services/api'
 import { TopBar } from '@/components/aws'
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
 
 export default function CreateIntentPage() {
   const router = useRouter()
@@ -42,7 +45,11 @@ export default function CreateIntentPage() {
     }
   }
 
-  const user = getCurrentUser()
+  const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    setUser(getCurrentUser())
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -4,9 +4,16 @@ A fully functional frontend for the Zord Ingestion Console, built with Next.js 1
 
 ## Quick Start
 
+### Local Development
 ```bash
 npm install
 npm run dev
+```
+
+### Production Deployment
+```bash
+# Run in background
+docker-compose up -d --build
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
@@ -55,6 +62,7 @@ All login pages support both **Sign Up** and **Login** modes with social authent
 
 ## Development
 
+### Local Development
 ```bash
 # Development server
 npm run dev
@@ -65,5 +73,59 @@ npm run build
 # Lint code
 npm run lint
 ```
+
+### Production Deployment
+
+#### Docker Production Build
+```bash
+# Build and run production container
+docker-compose up --build
+
+# Run in background
+docker-compose up -d --build
+
+# Stop services
+docker-compose down
+```
+
+#### Docker Management Commands
+```bash
+# View logs
+docker-compose logs frontend
+
+# Rebuild without cache
+docker-compose build --no-cache
+
+# Remove containers and volumes
+docker-compose down -v
+```
+
+### Docker Configuration
+
+The project includes production-ready Docker setup:
+- **Dockerfile**: Multi-stage production build with optimized Next.js standalone output
+- **docker-compose.yml**: Production orchestration
+- **.dockerignore**: Optimized build context
+
+**Production Port:** `3000`
+**Network:** Uses `zord-network` for integration with backend services
+
+#### Dependencies
+
+The project uses `sharp` for image optimization in production mode. This is automatically installed when you run:
+```bash
+npm install
+```
+
+If you add it manually, ensure you update the lock file:
+```bash
+npm install sharp
+```
+
+### Troubleshooting
+
+#### Docker Build Issues
+- **"public folder not found"**: Ensure `.dockerignore` doesn't exclude the `public` directory
+- **"sharp module missing"**: Run `npm install` locally first, then rebuild with `docker-compose up -d --build`
 
 For detailed development guidelines, see [documents/CONTRIBUTING.md](./documents/CONTRIBUTING.md).

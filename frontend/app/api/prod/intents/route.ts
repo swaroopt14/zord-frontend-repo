@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { IntentListResponse, Intent } from '@/types/intent'
 import { getAllMockIntents } from './_mockData'
 
+// Force dynamic rendering for API routes
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const page = parseInt(searchParams.get('page') || '1', 10)
     const pageSize = parseInt(searchParams.get('page_size') || '50', 10)
-    
+
     // Server-side filters
     const status = searchParams.get('status')
     const tenant = searchParams.get('tenant')
@@ -18,32 +21,32 @@ export async function GET(request: NextRequest) {
     const createdFrom = searchParams.get('created_from')
     const createdTo = searchParams.get('created_to')
     const searchQuery = searchParams.get('search') || ''
-    
+
     let allMockIntents = getAllMockIntents()
-    
+
     // Apply server-side filtering
     let filteredIntents = allMockIntents.filter((intent: Intent) => {
       // Status filter
       if (status && intent.status !== status) {
         return false
       }
-      
+
       // Source filter
       if (source && intent.source !== source) {
         return false
       }
-      
+
       // Intent ID filter (exact match or partial)
       if (intentId && !intent.intent_id.toLowerCase().includes(intentId.toLowerCase())) {
         return false
       }
-      
+
       // Envelope ID filter (would need to be added to Intent type or fetched separately)
       // For now, we'll skip this as it requires envelope data
-      
+
       // Fingerprint filter (would need to be added to Intent type)
       // For now, we'll skip this as it requires fingerprint data
-      
+
       // Date range filter
       if (createdFrom) {
         const fromDate = new Date(createdFrom)
@@ -52,7 +55,7 @@ export async function GET(request: NextRequest) {
           return false
         }
       }
-      
+
       if (createdTo) {
         const toDate = new Date(createdTo)
         const intentDate = new Date(intent.created_at)
@@ -62,7 +65,7 @@ export async function GET(request: NextRequest) {
           return false
         }
       }
-      
+
       // Global search (intent ID, envelope ID if available)
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
@@ -72,16 +75,16 @@ export async function GET(request: NextRequest) {
           return false
         }
       }
-      
+
       return true
     })
-    
+
     // Calculate pagination on filtered results
     const total = filteredIntents.length
     const startIndex = (page - 1) * pageSize
     const endIndex = startIndex + pageSize
     const items = filteredIntents.slice(startIndex, endIndex)
-    
+
     const response: IntentListResponse = {
       items,
       pagination: {
@@ -90,7 +93,7 @@ export async function GET(request: NextRequest) {
         total,
       },
     }
-    
+
     return NextResponse.json(response)
   } catch (error) {
     console.error('Error fetching intents:', error)

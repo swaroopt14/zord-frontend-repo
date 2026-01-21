@@ -148,9 +148,8 @@ export default function IntentLedgerPage() {
     }
     return (
       <span
-        className={`inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium ${
-          styles[displayStatus] || styles[status] || 'bg-gray-100 text-gray-800 border-gray-300'
-        }`}
+        className={`inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium ${styles[displayStatus] || styles[status] || 'bg-gray-100 text-gray-800 border-gray-300'
+          }`}
       >
         {displayStatus}
       </span>
@@ -261,8 +260,6 @@ export default function IntentLedgerPage() {
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     placeholder="Search by intent ID, envelope ID, or fingerprint..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
                     className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
                   <svg
@@ -461,13 +458,13 @@ export default function IntentLedgerPage() {
                         <p className="font-medium">No intents found</p>
                         <p className="mt-1">
                           {statusFilter ||
-                          sourceFilter ||
-                          intentIdFilter ||
-                          envelopeIdFilter ||
-                          fingerprintFilter ||
-                          createdFrom ||
-                          createdTo ||
-                          searchQuery
+                            sourceFilter ||
+                            intentIdFilter ||
+                            envelopeIdFilter ||
+                            fingerprintFilter ||
+                            createdFrom ||
+                            createdTo ||
+                            searchQuery
                             ? 'Try adjusting your filters'
                             : 'No intents have been created yet'}
                         </p>
@@ -541,11 +538,10 @@ export default function IntentLedgerPage() {
                         <button
                           key={pageNum}
                           onClick={() => setCurrentPage(pageNum)}
-                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                            currentPage === pageNum
+                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === pageNum
                               ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
                               : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                          }`}
+                            }`}
                         >
                           {pageNum}
                         </button>

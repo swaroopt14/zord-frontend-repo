@@ -61,8 +61,6 @@ export default function ReceiptPage() {
     )
   }
 
-  const user = getCurrentUser()
-
   return (
     <div className="min-h-screen bg-gray-50">
       <TopBar tenant={user?.tenant} serviceName="Ingestion" breadcrumbs={['Inbox', 'Receipt']} />
