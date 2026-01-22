@@ -1,7 +1,22 @@
-// Package model contains data structures and models for the Zord Edge service
 package model
 
-// MerchantRequest represents a request to register a new merchant/tenant
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// request payload
 type MerchantRequest struct {
-	Name string `json:"name"` // The name of the merchant to register
+	Name string `json:"name" binding:"required"`
+}
+
+// DB model
+type Tenant struct {
+	TenantID   uuid.UUID `db:"tenant_id"`
+	TenantName string    `db:"tenant_name"`
+	KeyPrefix  string    `db:"key_prefix"`
+	KeyHash    string    `db:"key_hash"`
+	IsActive   bool      `db:"is_active"`
+	CreatedAt  time.Time `db:"created_at"`
 }

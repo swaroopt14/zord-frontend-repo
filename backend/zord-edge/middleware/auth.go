@@ -1,23 +1,34 @@
 package middleware
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"main.go/db"
+	"main.go/services"
 )
 
-func Authenticate(context *gin.Context) {
-	auth := context.GetHeader("Authorization")
+func Authenticate() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		{
+			auth := context.GetHeader("Authorization")
 
-	if auth == "" || !strings.HasPrefix(auth, "Bearer ") {
-		context.JSON(http.StatusUnauthorized, gin.H{"Error": "Missing API Key"})
+			if auth == "" || !strings.HasPrefix(auth, "Bearer ") {
+				context.JSON(http.StatusUnauthorized, gin.H{"Error": "Missing API Key"})
+			}
+
+			apikey := strings.TrimPrefix(auth, "Bearer ")
+			response, err := services.ValidateApiKey(context.Request.Context(), db.DB, apikey)
+			if err != nil {
+				context.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+					"message": "invalid api key",
+				})
+				return
+			}
+			context.Set("tenant_id", response.TenantId)
+			context.Next()
+
+		}
 	}
-	context.Abort()
-
-	apikey := strings.TrimPrefix(auth, "Bearer ")
-	fmt.Print(apikey)
-
-	//DB Logic to be validated from the database
 }

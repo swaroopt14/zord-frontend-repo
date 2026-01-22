@@ -1,4 +1,3 @@
-// Package db handles database operations and table creation
 package db
 
 import (
@@ -6,12 +5,10 @@ import (
 	"log"
 )
 
-// DB is the global database connection instance
 var DB *sql.DB
 
-// CreateTable creates the necessary database tables if they don't exist
 func CreateTable() error {
-	// SQL statement to create the tenants table
+
 	tenant :=
 		`CREATE TABLE IF NOT EXISTS "tenants" (
     tenant_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- Unique identifier for each tenant
@@ -21,14 +18,11 @@ func CreateTable() error {
     is_active   BOOLEAN NOT NULL DEFAULT true,             -- Whether tenant is active
     created_at  TIMESTAMPTZ DEFAULT now()                  -- Timestamp of creation
 );`
-
-	// Execute the table creation query
 	_, err := DB.Exec(tenant)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Log successful table creation
-	log.Println("Tenant Table Created")
 	return nil
+
 }

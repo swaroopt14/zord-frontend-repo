@@ -15,7 +15,15 @@ var (
 func InitSchemaValidator() error {
 	schemaPath := filepath.Join("..", "schemas", "incoming_intent.request.v1.json")
 
-	schemaLoader := gojsonschema.NewReferenceLoader("file://" + schemaPath)
+	absPath, err := filepath.Abs(schemaPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve schema path: %w", err)
+	}
+
+	// Convert Windows path to valid file URI
+	schemaURI := "file://" + filepath.ToSlash(absPath)
+
+	schemaLoader := gojsonschema.NewReferenceLoader(schemaURI)
 	schema, err := gojsonschema.NewSchema(schemaLoader)
 	if err != nil {
 		return fmt.Errorf("failed to load intent schema: %w", err)
