@@ -33,6 +33,7 @@ This setup uses Kafka's KRaft (Kafka Raft) consensus protocol, which eliminates 
 - **Deployment**: Docker & Docker Compose
 
 #  Complete Architecture Flow
+```bash
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   HTTP Client   │────│  Gin HTTP Server │────│ OutboxPublisher │
 │                 │    │   (Port 8082)    │    │                 │
@@ -44,7 +45,7 @@ This setup uses Kafka's KRaft (Kafka Raft) consensus protocol, which eliminates 
 │   Outbox Table  │    │  (Polling Loop)  │    │  (KRaft Mode)   │
 │                 │    │                  │    │                 │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
-
+```
 
 
 
