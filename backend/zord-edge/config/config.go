@@ -8,6 +8,7 @@ import (
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 	"main.go/db"
 )
 
@@ -31,3 +32,6 @@ func InitDB() {
 		log.Fatalf("Database Ping Error %v", err)
 	}
 }
+
+var RedisClient = redis.NewClient(&redis.Options{
+	Addr: "localhost:6379"}) //Need to change this with ENV

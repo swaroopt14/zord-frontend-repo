@@ -42,6 +42,8 @@ func ValidateIntentRequest() gin.HandlerFunc {
 			return
 		}
 
+		c.Set("raw_payload", body)
+
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
 		c.Next()
 	}
