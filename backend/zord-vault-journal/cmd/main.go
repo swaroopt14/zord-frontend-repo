@@ -1,23 +1,33 @@
-// Package main is the entry point for the Zord Vault Journal microservice
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
+	_ "log"
 
-	"github.com/gin-gonic/gin"
+	_ "github.com/gin-gonic/gin"
+	"main.go/consumer"
+	"main.go/storage"
 )
 
-// main initializes and starts the Zord Vault Journal service
 func main() {
-	// Create a new Gin router instance
-	server := gin.Default()
 
-	// TODO: Add middleware (authentication, logging, etc.)
-	// TODO: Initialize database connection
-	// TODO: Initialize encryption services
-	// TODO: Set up API routes
-	// TODO: Start the HTTP server
+	ctx := context.Background()
 
-	log.Println("Zord Vault Journal service starting...")
-	// server.Run(":8081") // TODO: Uncomment when routes are implemented
+	s3store, err := storage.NewS3Store(ctx,
+		"zord-vault",
+		"eu-north-1",
+	)
+
+	if err != nil {
+		log.Fatal("Failed to init S3", err)
+	}
+
+	go consumer.StartRawIntentWorker(ctx, s3store)
+
+	fmt.Println("Service 2 worker started")
+
+	select {}
+
 }

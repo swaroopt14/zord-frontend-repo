@@ -1,43 +1,39 @@
-// Package config handles configuration management for the Zord Vault Journal service
 package config
 
 import (
+	"database/sql"
+	"fmt"
 	"log"
 	"os"
 
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
+	"main.go/db"
 )
 
-// Config holds all configuration values for the service
-type Config struct {
-	DatabaseURL   string
-	EncryptionKey string
-	StoragePath   string
-	Port          string
-	Environment   string
-}
-
-// LoadConfig loads configuration from environment variables
-func LoadConfig() *Config {
-	// Load environment variables from .env file (if it exists)
+func InitDB() {
+	var err error
 	_ = godotenv.Load()
-
-	config := &Config{
-		DatabaseURL:   getEnv("DATABASE_URL", "postgres://vault_user:vault_password@localhost:5432/zord_vault_journal_db?sslmode=disable"),
-		EncryptionKey: getEnv("ENCRYPTION_KEY", "change-me-in-production"), // TODO: Use strong key in production
-		StoragePath:   getEnv("STORAGE_PATH", "/data/vault"),
-		Port:          getEnv("PORT", "8081"),
-		Environment:   getEnv("ENVIRONMENT", "development"),
+	dsn := fmt.Sprintf("user=%s password=%s host=%s port=%s dbname=%s sslmode=%s",
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_PORT"),
+		os.Getenv("DB_NAME"),
+		os.Getenv("DB_SSLMODE"),
+	)
+	db.DB, err = sql.Open("postgres", dsn)
+	if err != nil {
+		log.Fatalf("Database configuration failed: %v", err)
 	}
-
-	log.Println("Configuration loaded successfully")
-	return config
+	err = db.DB.Ping()
+	if err != nil {
+		log.Fatalf("Database Ping Error %v", err)
+	}
+	log.Println("Database Working")
 }
 
-// getEnv gets an environment variable with a fallback default value
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
+var RedisClient = redis.NewClient(&redis.Options{
+	Addr: "localhost:6379",
+})
