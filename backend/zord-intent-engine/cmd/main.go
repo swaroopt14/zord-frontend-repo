@@ -1,27 +1,47 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log"
 	"net/http"
+	"os"
 
-	"main.go/internal/fetcher"
+	"github.com/google/uuid"
+
+	"main.go/config"
+	"main.go/db"
 	"main.go/internal/persistence"
+	"main.go/internal/pii"
+	"main.go/internal/services"
 	"main.go/internal/validator"
 )
 
 func main() {
-	// -------- Repositories --------
-	rawRepo := fetcher.NewInMemoryRawEnvelopeRepo()
-	dlqRepo := persistence.NewInMemoryDLQRepo()
+	// -------- DB INIT --------
+	config.InitDB()
 
-	// -------- Services --------
-	fetchService := fetcher.NewService(rawRepo)
+	// -------- Repositories (DB MODE) --------
+	ingressRepo := persistence.NewIngressEnvelopeRepo(db.DB)
+	dlqRepo := persistence.NewDLQRepo(db.DB)
+	intentRepo := persistence.NewPaymentIntentRepo(db.DB)
 
-	// NOTE:
-	// Structural validation is skipped in test mode
+	// -------- Validator --------
 	intentValidator := validator.NewValidator(dlqRepo)
+
+	// -------- PII Tokenizer --------
+	tokenizer, err := pii.NewTokenizer(os.Getenv("PII_TOKEN_SECRET"))
+	if err != nil {
+		log.Fatal("failed to init PII tokenizer:", err)
+	}
+
+	// -------- Intent Service --------
+	intentService := services.NewIntentService(
+		intentValidator,
+		tokenizer,
+		intentRepo,
+	)
 
 	// -------- HTTP --------
 	http.HandleFunc("/test/intent", func(w http.ResponseWriter, r *http.Request) {
@@ -36,42 +56,51 @@ func main() {
 			return
 		}
 
-		// STEP 1 — Store RawEnvelope
-		envelope, err := fetchService.StoreRawIntent(payload)
+		// TEMP: test tenant
+		tenantID := "11111111-1111-1111-1111-111111111111"
+
+		// STEP 1 — simulate previous service
+		envelopeID := uuid.NewString()
+		// envelopeID := r.Header.Get("X-Envelope-ID")
+		// or from payload if that’s the contract
+
+		// STEP 2 — insert dummy ingress row (FK safety)
+		err = ingressRepo.InsertDummy(
+			r.Context(),
+			envelopeID,
+			tenantID,
+		)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		// STEP 2–4 — Semantic + Instrument validation
-		intent, dlq := intentValidator.Validate(
-			envelope.EnvelopeID,
+		// STEP 3–7 — validation → canonicalization → tokenization → persist
+		canonical, dlq, err := intentService.Process(
+			context.Background(),
+			tenantID,
+			envelopeID,
 			payload,
 		)
 
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		if dlq != nil {
 			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusUnprocessableEntity)
 
-			pretty, err := json.MarshalIndent(dlq, "", "\t")
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
+			pretty, _ := json.MarshalIndent(dlq, "", "\t")
 			w.Write(pretty)
 			return
 		}
 
-		// SUCCESS
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
-			"status":      "VALIDATED",
-			"envelope_id": envelope.EnvelopeID,
-			"intent_type": intent.IntentType,
-		})
+		json.NewEncoder(w).Encode(canonical)
 	})
 
-	log.Println("🚀 Intent Engine (test mode) running on :8080")
+	log.Println("🚀 Intent Engine (DB mode) running on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

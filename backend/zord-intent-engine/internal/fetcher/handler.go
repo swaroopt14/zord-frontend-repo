@@ -22,7 +22,14 @@ func (h *Handler) Store(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	envelope, err := h.service.StoreRawIntent(raw)
+	// TEMP: hardcoded tenant for testing
+	tenantID := "11111111-1111-1111-1111-111111111111"
+
+	envelope, err := h.service.StoreRawIntent(
+		r.Context(),
+		tenantID,
+		raw,
+	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

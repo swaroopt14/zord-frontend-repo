@@ -1,40 +1,54 @@
 package persistence
 
 import (
-	"sync"
+	"context"
+	"database/sql"
 
 	"github.com/google/uuid"
 	"main.go/internal/models"
 )
 
+// DLQRepository defines how DLQ entries are persisted
 type DLQRepository interface {
-	Save(entry models.DLQEntry) (models.DLQEntry, error)
-	List() []models.DLQEntry
+	Save(ctx context.Context, entry models.DLQEntry) (models.DLQEntry, error)
 }
 
-type InMemoryDLQRepo struct {
-	mu    sync.RWMutex
-	store []models.DLQEntry
+// Concrete Postgres implementation
+type DLQPostgresRepo struct {
+	db *sql.DB
 }
 
-func NewInMemoryDLQRepo() *InMemoryDLQRepo {
-	return &InMemoryDLQRepo{
-		store: make([]models.DLQEntry, 0),
-	}
+// Constructor (returns interface, not pointer-to-interface)
+func NewDLQRepo(db *sql.DB) DLQRepository {
+	return &DLQPostgresRepo{db: db}
 }
 
-func (r *InMemoryDLQRepo) Save(entry models.DLQEntry) (models.DLQEntry, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+// Compile-time guarantee that implementation matches interface
+var _ DLQRepository = (*DLQPostgresRepo)(nil)
+
+func (r *DLQPostgresRepo) Save(
+	ctx context.Context,
+	entry models.DLQEntry,
+) (models.DLQEntry, error) {
 
 	entry.DLQID = uuid.NewString()
-	r.store = append(r.store, entry)
 
-	return entry, nil
-}
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO dlq_items (
+			dlq_id, tenant_id, envelope_id,
+			stage, reason_code, error_detail,
+			replayable, created_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+	`,
+		entry.DLQID,
+		entry.TenantID,
+		entry.EnvelopeID,
+		entry.Stage,
+		entry.ReasonCode,
+		entry.ErrorDetail,
+		entry.Replayable,
+		entry.CreatedAt,
+	)
 
-func (r *InMemoryDLQRepo) List() []models.DLQEntry {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.store
+	return entry, err
 }
