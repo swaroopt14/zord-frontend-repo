@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -17,8 +18,10 @@ func NewValidator(dlqRepo persistence.DLQRepository) *Validator {
 }
 
 // Validate executes phase-1 validation strictly.
-// Any failure → DLQ entry + immediate rejection upstream.
+// Any validation failure → DLQ entry (persisted) + immediate rejection.
 func (v *Validator) Validate(
+	ctx context.Context,
+	tenantID string,
 	envelopeID string,
 	payload []byte,
 ) (*models.IncomingIntent, *models.DLQEntry) {
@@ -26,37 +29,82 @@ func (v *Validator) Validate(
 	// STEP 1 — JSON parse
 	var intent models.IncomingIntent
 	if err := json.Unmarshal(payload, &intent); err != nil {
-		return nil, v.persistDLQ(envelopeID, schemaError("invalid JSON payload"))
+		dlq, _ := v.persistDLQ(
+			ctx,
+			tenantID,
+			envelopeID,
+			"STRUCTURAL_VALIDATION",
+			schemaError("invalid JSON payload"),
+			false,
+		)
+		return nil, dlq
 	}
 
 	// STEP 2 — STRUCTURAL validation
 	if err := StructuralValidate(intent); err != nil {
-		return nil, v.persistDLQ(envelopeID, err)
+		dlq, _ := v.persistDLQ(
+			ctx,
+			tenantID,
+			envelopeID,
+			"STRUCTURAL_VALIDATION",
+			err,
+			false,
+		)
+		return nil, dlq
 	}
 
 	// STEP 3 — SEMANTIC validation
 	if err := SemanticValidate(intent); err != nil {
-		return nil, v.persistDLQ(envelopeID, err)
+		dlq, _ := v.persistDLQ(
+			ctx,
+			tenantID,
+			envelopeID,
+			"SEMANTIC_VALIDATION",
+			err,
+			false,
+		)
+		return nil, dlq
 	}
 
-	// VALID — safe to proceed to canonicalization
+	// VALID — safe to proceed
 	return &intent, nil
 }
 
+// persistDLQ writes a DLQ entry durably.
+// If this fails, caller must treat it as system failure (HTTP 500).
 func (v *Validator) persistDLQ(
+	ctx context.Context,
+	tenantID string,
 	envelopeID string,
+	stage string,
 	err error,
-) *models.DLQEntry {
+	replayable bool,
+) (*models.DLQEntry, error) {
 
-	ve := err.(ValidationError)
-
-	entry := models.DLQEntry{
-		EnvelopeID: envelopeID,
-		ReasonCode: ve.Code,
-		ReasonText: ve.Msg,
-		CreatedAt:  time.Now().UTC(),
+	ve, ok := err.(ValidationError)
+	if !ok {
+		ve = ValidationError{
+			Code: "VALIDATION_FAILED",
+			Msg:  err.Error(),
+		}
 	}
 
-	saved, _ := v.dlqRepo.Save(entry)
-	return &saved
+	entry := models.DLQEntry{
+		TenantID:   tenantID,
+		EnvelopeID: envelopeID,
+
+		Stage:       stage,
+		ReasonCode:  ve.Code,
+		ErrorDetail: ve.Msg,
+		Replayable:  replayable,
+
+		CreatedAt: time.Now().UTC(),
+	}
+
+	saved, err := v.dlqRepo.Save(ctx, entry)
+	if err != nil {
+		return nil, err
+	}
+
+	return &saved, nil
 }

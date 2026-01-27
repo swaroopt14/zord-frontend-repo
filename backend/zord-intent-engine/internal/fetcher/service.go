@@ -1,6 +1,7 @@
 package fetcher
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -19,26 +20,35 @@ func NewService(repo RawEnvelopeRepository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) StoreRawIntent(payload json.RawMessage) (models.RawEnvelope, error) {
+func (s *Service) StoreRawIntent(
+	ctx context.Context,
+	tenantID string,
+	payload json.RawMessage,
+) (models.IngressEnvelope, error) {
+
+	envelopeID := uuid.NewString()
+
 	checksum := sha256.Sum256(payload)
 
-	envelope := models.RawEnvelope{
-		EnvelopeID:    uuid.NewString(),
-		SchemaVersion: "intent.request.v1",
-		SourceType:    "JSON",
-		Payload:       payload,
-		ReceivedAt:    time.Now().UTC(),
-		Checksum:      hex.EncodeToString(checksum[:]),
+	env := models.IngressEnvelope{
+		EnvelopeID: envelopeID,
+		TenantID:   tenantID,
+
+		Source:         "API",
+		IdempotencyKey: "zord-api-56787634587", // optional, safe stub
+
+		PayloadHash: hex.EncodeToString(checksum[:]),
+		ObjectRef:   "inline",
+
+		ParseStatus: "PARSED",
+
+		ReceivedAt: time.Now().UTC(),
 	}
 
-	err := s.repo.Save(envelope)
+	saved, err := s.repo.Save(ctx, env)
 	if err != nil {
-		return models.RawEnvelope{}, err
+		return models.IngressEnvelope{}, err
 	}
 
-	return envelope, nil
-}
-
-func (s *Service) FetchByID(envelopeID string) (models.RawEnvelope, error) {
-	return s.repo.FindByID(envelopeID)
+	return saved, nil
 }

@@ -1,6 +1,7 @@
 package fetcher
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -12,8 +13,8 @@ var (
 )
 
 type RawEnvelopeRepository interface {
-	Save(envelope models.RawEnvelope) error
-	FindByID(id string) (models.RawEnvelope, error)
+	Save(ctx context.Context, env models.IngressEnvelope) (models.IngressEnvelope, error)
+	FindByID(ctx context.Context, envelopeID string) (models.IngressEnvelope, error)
 }
 
 type InMemoryRawEnvelopeRepo struct {
