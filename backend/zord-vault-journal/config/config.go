@@ -31,7 +31,7 @@ func InitDB() {
 	if err != nil {
 		log.Fatalf("Database Ping Error %v", err)
 	}
-	log.Println("Database Working")
+
 }
 
 var RedisClient = redis.NewClient(&redis.Options{

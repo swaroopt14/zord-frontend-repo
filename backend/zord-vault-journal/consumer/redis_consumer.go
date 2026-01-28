@@ -33,6 +33,17 @@ func StartRawIntentWorker(ctx context.Context, s3store *storage.S3Store) {
 			continue
 		}
 
-		services.ProcessRawIntent(ctx, msg, s3store)
+		ack, err := services.ProcessRawIntent(ctx, msg, s3store)
+		if err != nil {
+			log.Fatal("Failed to process raw intent to S3:", err)
+			return
+		}
+
+		err = services.RawIntent(ctx, msg, ack)
+		if err != nil {
+			log.Fatal("Failed to process raw intent DB:", err)
+			return
+		}
+
 	}
 }

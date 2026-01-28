@@ -9,7 +9,7 @@ type IncomingIntentRequestV1 struct {
 	PurposeCode    string                 `json:"purpose_code" binding:"required"`
 	Constraints    map[string]interface{} `json:"constraints,omitempty"`
 	Metadata       map[string]interface{} `json:"metadata,omitempty"`
-	IdempotencyKey string                 `json:"idempotency_key" binding:"required"`
+	IdempotencyKey string                 `json:"idempotency_key"`
 }
 
 type Amount struct {

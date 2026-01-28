@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"log"
-	"time"
 
 	"main.go/config"
 	"main.go/model"
@@ -14,29 +13,32 @@ import (
 
 func ProcessRawIntent(ctx context.Context,
 	msg model.RawIntentMessage,
-	s3store *storage.S3Store) {
-	var receivedAt time.Time
-	envelopeID, receivedAt, err := s3store.StoreRawPayload(ctx,
+	s3store *storage.S3Store) (*model.AckMessage, error) {
+
+	envelopeID, receivedAt, ObjRef, err := s3store.StoreRawPayload(ctx,
 		[]byte(msg.RawPayload),
 		msg.TenantID,
-		receivedAt,
 	)
+	//log.Println("S3 Object Ref:", ObjRef)
 	if err != nil {
 		log.Println("S3 Upload Failed", err)
-		return
+		return nil, err
 	}
 
-	ack := model.AckMessage{
+	ack := &model.AckMessage{
 		TraceID:    msg.TraceID,
 		EnvelopeId: envelopeID,
 		ReceivedAt: receivedAt,
+		ObjectRef:  ObjRef,
 	}
 
 	data, err := json.Marshal(ack)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	config.RedisClient.LPush(ctx, "Ingest:ACK", data)
+
+	return ack, nil
 
 }

@@ -1,9 +1,6 @@
 package main
 
 import (
-	"log"
-	"time"
-
 	"github.com/gin-gonic/gin"
 	"main.go/config"
 	"main.go/db"
@@ -18,12 +15,5 @@ func main() {
 	routes.Routes(server)
 
 	server.Run(":8080")
-
-	start := time.Now()
-
-	// wait for ack
-
-	latency := time.Since(start)
-	log.Printf("ACK latency = %v", latency)
 
 }
