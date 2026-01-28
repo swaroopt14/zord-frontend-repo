@@ -16,11 +16,13 @@ func IntentHandler(context *gin.Context) {
 	rawPayload := context.MustGet("raw_payload").([]byte)
 	traceId := context.MustGet("trace_id").(string)
 	tenantId := context.MustGet("tenant_id").(uuid.UUID)
+	IdempotencyKey := context.MustGet("idempotency_key").(string)
 
 	msg := model.RawIntentMessage{
-		TenantID:   tenantId.String(),
-		TraceID:    traceId,
-		RawPayload: string(rawPayload),
+		TenantID:       tenantId.String(),
+		TraceID:        traceId,
+		RawPayload:     string(rawPayload),
+		IdempotencyKey: IdempotencyKey,
 	}
 
 	data, err := json.Marshal(msg)

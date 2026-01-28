@@ -16,6 +16,7 @@ func Authenticate() gin.HandlerFunc {
 
 			if auth == "" || !strings.HasPrefix(auth, "Bearer ") {
 				context.JSON(http.StatusUnauthorized, gin.H{"Error": "Missing API Key"})
+				context.Abort()
 			}
 
 			apikey := strings.TrimPrefix(auth, "Bearer ")

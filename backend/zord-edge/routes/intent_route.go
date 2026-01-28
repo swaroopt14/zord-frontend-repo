@@ -14,6 +14,7 @@ func Routes(router *gin.Engine) {
 	public := router.Group("/v1")
 	{
 		public.POST("/tenantReg", handler.Tenant_Registry)
+		public.GET("/health", handler.HealthCheck)
 	}
 
 	if err := validator.InitSchemaValidator(); err != nil {
@@ -24,6 +25,7 @@ func Routes(router *gin.Engine) {
 	protected.Use(
 		middleware.Authenticate(),
 		middleware.ValidateIntentRequest(),
+		middleware.GetIdempotencyKey(),
 		middleware.TraceMiddleware(),
 	)
 	{

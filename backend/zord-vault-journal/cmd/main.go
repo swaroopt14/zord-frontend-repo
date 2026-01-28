@@ -7,13 +7,18 @@ import (
 	_ "log"
 
 	_ "github.com/gin-gonic/gin"
+	"main.go/config"
 	"main.go/consumer"
+	"main.go/db"
 	"main.go/storage"
 )
 
 func main() {
 
 	ctx := context.Background()
+
+	config.InitDB()
+	db.CreateTable()
 
 	s3store, err := storage.NewS3Store(ctx,
 		"zord-vault",

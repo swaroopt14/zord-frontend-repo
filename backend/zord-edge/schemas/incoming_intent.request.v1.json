@@ -9,7 +9,7 @@
     "account_number",
     "amount",
     "beneficiary",
-    "idempotency_key",
+    
     "purpose_code"
   ],
   "properties": {
@@ -48,6 +48,12 @@
           "maxLength": 3
         }
       }
+    },
+    "source": {
+      "type": "string"
+    },
+    "source_system": {
+      "type": "string"
     },
     "beneficiary": {
       "type": "object",
@@ -121,12 +127,7 @@
       "type": "object",
       "additionalProperties": true,
       "description": "Free-form client metadata"
-    },
-    "idempotency_key": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 128,
-      "description": "Client-provided idempotency key"
     }
+    
   }
 }

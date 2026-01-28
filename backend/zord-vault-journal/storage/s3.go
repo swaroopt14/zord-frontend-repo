@@ -11,10 +11,10 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *S3Store) StoreRawPayload(ctx context.Context, RawPayload []byte, TenatId string, receivedAt time.Time) (string, time.Time, error) {
+func (s *S3Store) StoreRawPayload(ctx context.Context, RawPayload []byte, TenatId string) (string, time.Time, string, error) {
 	EnvelopeID := uuid.New().String()
 	receivedTime := time.Now().UTC()
-	year, month, day := receivedAt.Date()
+	year, month, day := receivedTime.Date()
 
 	ObjectKey := fmt.Sprintf("raw/%s/%04d/%02d/%02d/%s", TenatId,
 		year,
@@ -29,9 +29,15 @@ func (s *S3Store) StoreRawPayload(ctx context.Context, RawPayload []byte, TenatI
 		ContentType: aws.String("application/json"),
 	})
 	if err != nil {
-		return " ", time.Time{}, err
+		return " ", time.Time{}, "", err
 	}
 
-	return EnvelopeID, receivedTime, nil
+	ObjectRef := buildS3ObjectRef(s.BucketName, ObjectKey)
+	//log.Printf("Stored Raw Payload in S3: %s", ObjectRef)
 
+	return EnvelopeID, receivedTime, ObjectRef, nil
+
+}
+func buildS3ObjectRef(bucket, objectKey string) string {
+	return fmt.Sprintf("s3://%s/%s", bucket, objectKey)
 }
