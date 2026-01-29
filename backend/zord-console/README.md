@@ -1,131 +1,214 @@
-# Zord Ingestion Console
+# Zord Console - Multi-Tenant Ingestion Dashboard
 
-A fully functional frontend for the Zord Ingestion Console, built with Next.js 14, TypeScript, and Tailwind CSS.
+A Next.js 14 application providing role-based dashboards for the Zord financial transaction ingestion platform.
 
-## Quick Start
+## 🚀 Quick Start
 
-### Local Development
+### Docker Deployment (Recommended)
+
 ```bash
-npm install
-npm run dev
-```
-
-### Production Deployment
-```bash
-# Run in background
+# Build and run with Docker
 docker-compose up -d --build
+
+# Check status
+docker-compose ps
+
+# View logs
+docker-compose logs -f zord-console
+
+# Stop
+docker-compose down
 ```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## Documentation
-
-All documentation is available in the [`documents/`](./documents/) folder:
-
-- **[README.md](./documents/README.md)** - Complete project documentation
-- **[ARCHITECTURE.md](./documents/ARCHITECTURE.md)** - Architecture and design principles
-- **[CONTRIBUTING.md](./documents/CONTRIBUTING.md)** - Development workflow and guidelines
-- **[DEBUGGING.md](./documents/DEBUGGING.md)** - Debugging guide and tips
-- **[PROJECT_STRUCTURE.md](./documents/PROJECT_STRUCTURE.md)** - Project structure overview
-
-## Key Features
-
-- **Three Role-Based Consoles**: Customer, Ops, and Admin
-- **Evidence Trail**: Every ingestion creates visible, timestamped evidence
-- **Real-time Updates**: Automatic polling for status updates
-- **Dark Theme Login**: Modern split-screen login with image carousel
-- **Sign Up & Login**: Complete authentication flow
-
-## Project Structure
-
-```
-/app              # Next.js pages (routes)
-/components        # React components (feature-based)
-/services          # Business logic & API services
-/hooks             # Custom React hooks
-/utils             # Utility functions
-/types             # TypeScript types
-/constants         # Application constants
-/config            # Configuration files
-/documents         # Documentation
-```
-
-See [documents/PROJECT_STRUCTURE.md](./documents/PROJECT_STRUCTURE.md) for detailed structure.
-
-## Login Pages
-
-- Customer: `/console/login`
-- Ops: `/ops/login`
-- Admin: `/admin/login`
-
-All login pages support both **Sign Up** and **Login** modes with social authentication options.
-
-## Development
 
 ### Local Development
+
 ```bash
-# Development server
+# Install dependencies
+npm install
+
+# Run development server
 npm run dev
 
 # Build for production
 npm run build
 
-# Lint code
-npm run lint
+# Start production server
+npm start
 ```
 
-### Production Deployment
+## 🌐 Access Points
 
-#### Docker Production Build
-```bash
-# Build and run production container
-docker-compose up --build
+- **Application**: http://localhost:3000
+- **Health Check**: http://localhost:3000/api/health
 
-# Run in background
-docker-compose up -d --build
+## 🏗️ Architecture
 
-# Stop services
-docker-compose down
+### Three Role-Based Consoles
+
+1. **Customer Console** (`/console`)
+   - View ingestion history
+   - Upload transaction batches
+   - Track receipt status with real-time updates
+   - View evidence trails and audit logs
+
+2. **Operations Console** (`/ops`)
+   - Monitor ingestion pipeline health
+   - View dead-letter queue (DLQ)
+   - Track processing metrics and alerts
+
+3. **Admin Console** (`/admin`)
+   - Manage tenant configurations
+   - System settings and user management
+   - View comprehensive audit logs
+
+### Key Features
+
+- **Real-time Status Updates**: Auto-polling every 3 seconds
+- **Evidence Trail Visualization**: Complete audit trail for compliance
+- **Multi-tenant Architecture**: Isolated data and permissions
+- **Responsive Design**: AWS-inspired UI components
+- **Health Monitoring**: Built-in health checks and metrics
+
+## 🛠️ Technology Stack
+
+- **Framework**: Next.js 14 with App Router
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **State Management**: React Hooks + Context
+- **Build**: Docker multi-stage builds
+- **Health Checks**: Built-in API endpoints
+
+## 📁 Project Structure
+
+```
+zord-console/
+├── app/                    # Next.js App Router pages
+│   ├── console/           # Customer console routes
+│   ├── ops/               # Operations console routes
+│   ├── admin/             # Admin console routes
+│   └── api/               # API routes
+├── components/            # Reusable UI components
+│   ├── auth/             # Authentication components
+│   ├── aws/              # AWS-style UI components
+│   └── ingestion/        # Ingestion-specific components
+├── services/             # API services and data fetching
+├── types/                # TypeScript type definitions
+├── utils/                # Utility functions
+├── constants/            # Application constants
+└── config/               # Configuration files
 ```
 
-#### Docker Management Commands
+## 🔧 Configuration
+
+### Environment Variables
+
 ```bash
-# View logs
-docker-compose logs frontend
+# Application
+NODE_ENV=production
+PORT=3000
+NEXT_TELEMETRY_DISABLED=1
 
-# Rebuild without cache
-docker-compose build --no-cache
-
-# Remove containers and volumes
-docker-compose down -v
+# API Configuration
+NEXT_PUBLIC_API_BASE_URL=/api/v1
 ```
 
 ### Docker Configuration
 
-The project includes production-ready Docker setup:
-- **Dockerfile**: Multi-stage production build with optimized Next.js standalone output
-- **docker-compose.yml**: Production orchestration
-- **.dockerignore**: Optimized build context
+- **Port**: 3000
+- **Health Check**: `/api/health`
+- **Build**: Multi-stage with standalone output
+- **Base Image**: node:18-alpine
 
-**Production Port:** `3000`
-**Network:** Uses `zord-network` for integration with backend services
+## 🚀 Deployment
 
-#### Dependencies
+### Docker Compose
 
-The project uses `sharp` for image optimization in production mode. This is automatically installed when you run:
-```bash
-npm install
+```yaml
+services:
+  zord-console:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 ```
 
-If you add it manually, ensure you update the lock file:
+### Scripts
+
+- `npm run deploy` - Build and deploy with Docker
+- `npm run docker:build` - Build Docker image
+- `npm run docker:up` - Start containers
+- `npm run docker:logs` - View container logs
+
+## 🔍 Monitoring
+
+### Health Checks
+
+- **Endpoint**: `GET /api/health`
+- **Response**: Service status, uptime, version
+- **Docker**: Automated health monitoring
+
+### Logging
+
+- Structured JSON logging
+- Request/response tracking
+- Error monitoring and alerting
+
+## 🔐 Security
+
+- **Authentication**: API key-based with role validation
+- **Authorization**: Role-based access control (RBAC)
+- **Input Validation**: Comprehensive request validation
+- **HTTPS**: TLS encryption for all communications
+
+## 📊 Performance
+
+- **Build Optimization**: Next.js standalone output
+- **Caching**: Efficient asset caching strategies
+- **Bundle Size**: Optimized with tree shaking
+- **Loading**: Progressive loading with suspense
+
+## 🧪 Development
+
+### Code Quality
+
+- **TypeScript**: Full type safety
+- **ESLint**: Code linting and formatting
+- **Prettier**: Code formatting
+- **Path Aliases**: Clean import statements
+
+### Hot Reload
+
 ```bash
-npm install sharp
+npm run dev
+# Application available at http://localhost:3000
+# Auto-reloads on file changes
 ```
 
-### Troubleshooting
+## 📈 Scaling
 
-#### Docker Build Issues
-- **"public folder not found"**: Ensure `.dockerignore` doesn't exclude the `public` directory
-- **"sharp module missing"**: Run `npm install` locally first, then rebuild with `docker-compose up -d --build`
+- **Horizontal**: Stateless design for easy scaling
+- **Load Balancing**: Ready for multiple instances
+- **CDN**: Static asset optimization
+- **Database**: Connection pooling and optimization
 
-For detailed development guidelines, see [documents/CONTRIBUTING.md](./documents/CONTRIBUTING.md).
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## 📄 License
+
+Private - Arealis Zord Platform
+
+---
+
+**Built with ❤️ for financial transaction processing**

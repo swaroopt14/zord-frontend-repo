@@ -1,12 +1,18 @@
 {
-  "name": "zord-ingestion-console",
-  "version": "0.1.0",
+  "name": "zord-console",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f zord-console",
+    "deploy": "npm run docker:build && npm run docker:up",
+    "health": "curl -f http://localhost:3000/api/health"
   },
   "dependencies": {
     "next": "14.2.0",

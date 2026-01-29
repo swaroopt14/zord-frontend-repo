@@ -12,6 +12,19 @@ const nextConfig = {
     // your project has TypeScript errors.
     ignoreBuildErrors: true,
   },
+  // Add webpack configuration for path aliases
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@/constants': require('path').resolve(__dirname, 'constants'),
+      '@/components': require('path').resolve(__dirname, 'components'),
+      '@/types': require('path').resolve(__dirname, 'types'),
+      '@/utils': require('path').resolve(__dirname, 'utils'),
+      '@/services': require('path').resolve(__dirname, 'services'),
+      '@/config': require('path').resolve(__dirname, 'config'),
+    }
+    return config
+  },
 }
 
 module.exports = nextConfig
