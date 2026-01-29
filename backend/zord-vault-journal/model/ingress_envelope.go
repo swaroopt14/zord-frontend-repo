@@ -17,6 +17,7 @@ const (
 //Signature Part need to update
 
 type IngressEnvolope struct {
+	Trace_id        uuid.UUID `db:"trace_id"`
 	Envolope_id     uuid.UUID `db:"envelope_id"`
 	Tenant_id       uuid.UUID `db:"tenant_id"`
 	Source          string    `db:"source"`

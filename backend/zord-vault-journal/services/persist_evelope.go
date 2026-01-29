@@ -29,10 +29,16 @@ func RawIntent(ctx context.Context,
 		log.Printf("Invalid EnvelopeId: %s", ack.EnvelopeId)
 		return err
 	}
+	trace_id, err := uuid.Parse(msg.TraceID)
+	if err != nil {
+		log.Printf("Invalid TraceID: %s", msg.TraceID)
+		return err
+	}
 	ObjRef := ack.ObjectRef
 
 	// Build IngressEnvolope model
 	envelope := model.IngressEnvolope{
+		Trace_id:       trace_id,
 		Envolope_id:    envelopeID,
 		Tenant_id:      req.Tenant_id,
 		Source:         req.Source,

@@ -37,7 +37,7 @@ func ProcessRawIntent(ctx context.Context,
 		return nil, err
 	}
 
-	config.RedisClient.LPush(ctx, "Ingest:ACK", data)
+	config.RedisClient.LPush(ctx, "Zord_Ingest:ACK", data)
 
 	return ack, nil
 

@@ -9,7 +9,6 @@ var DB *sql.DB
 
 func CreateTables() error {
 
-	// PAYMENT INTENTS (OWNED)
 	paymentIntents := `
 	CREATE TABLE IF NOT EXISTS payment_intents (
 		intent_id UUID PRIMARY KEY,
@@ -38,7 +37,47 @@ func CreateTables() error {
 	if _, err := DB.Exec(paymentIntents); err != nil {
 		return err
 	}
+	//Outbox (OWNED)
+	outbox := `
+	CREATE TABLE IF NOT EXISTS outbox (
+    outbox_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
+    tenant_id UUID NOT NULL,
+
+    -- intent-specific outbox
+    aggregate_type TEXT NOT NULL DEFAULT 'intent',
+    aggregate_id UUID NOT NULL, -- payment_intents.intent_id
+
+    event_type TEXT NOT NULL,   -- intent.created.v1, intent.updated.v1
+    payload JSONB NOT NULL,     -- downstream message body (no raw PII)
+
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    attempts INT NOT NULL DEFAULT 0,
+    next_attempt_at TIMESTAMPTZ,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    sent_at TIMESTAMPTZ,
+
+    -- tracing / observability
+    trace_id VARCHAR(255),
+    envelope_id VARCHAR(255),
+
+    CONSTRAINT fk_outbox_intent
+        FOREIGN KEY (aggregate_id)
+        REFERENCES payment_intents(intent_id)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT chk_outbox_status
+        CHECK (status IN ('PENDING', 'SENT', 'FAILED')),
+
+    CONSTRAINT chk_outbox_aggregate_type
+        CHECK (aggregate_type = 'intent')
+);
+`
+
+	if _, err := DB.Exec(outbox); err != nil {
+		return err
+	}
 	// DLQ ITEMS (OWNED)
 	dlqItems := `
 	CREATE TABLE IF NOT EXISTS dlq_items (
