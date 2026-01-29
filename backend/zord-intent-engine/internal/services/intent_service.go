@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/google/uuid"
 	"main.go/internal/canonicalizer"
 	"main.go/internal/models"
 	"main.go/internal/pii"
@@ -21,7 +22,7 @@ type IntentService struct {
 
 // Repository abstraction
 type CanonicalIntentRepository interface {
-	Save(ctx context.Context, intent models.CanonicalIntent) (models.CanonicalIntent, error)
+	Save(ctx context.Context, intent models.CanonicalIntent, outbox models.OutboxEvent) (models.CanonicalIntent, error)
 }
 
 func NewIntentService(
@@ -58,14 +59,25 @@ func (s *IntentService) Process(
 ) (*models.CanonicalIntent, *models.DLQEntry, error) {
 
 	// STEP 1–4: VALIDATION (ctx PASSED CORRECTLY)
-	intent, dlq := s.validator.Validate(
+	intent, dlq, err := s.validator.Validate(
 		ctx,
 		tenantID,
 		envelopeID,
 		payload,
 	)
+	// if dlq != nil {
+	// 	return nil, dlq, nil
+	// }
+	if err != nil {
+		return nil, nil, err
+	}
+
 	if dlq != nil {
 		return nil, dlq, nil
+	}
+
+	if intent == nil {
+		return nil, nil, errors.New("validator returned nil intent")
 	}
 
 	// STEP 5: CANONICALIZATION
@@ -105,7 +117,7 @@ func (s *IntentService) Process(
 
 	// ---- BUILD CANONICAL INTENT ----
 	canonical := models.CanonicalIntent{
-		IntentID:   "",
+		IntentID:   uuid.NewString(),
 		EnvelopeID: envelopeID,
 		TenantID:   tenantID,
 
@@ -126,8 +138,14 @@ func (s *IntentService) Process(
 		CreatedAt: time.Now().UTC(),
 	}
 
+	//Call Outbox Initialization here
+	Outbox, err := CanonicalIntentToOutboxEvent(canonical, payload)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	// STEP 7 — PERSIST
-	saved, err := s.repo.Save(ctx, canonical)
+	saved, err := s.repo.Save(ctx, canonical, Outbox)
 	if err != nil {
 		return nil, nil, err
 	}

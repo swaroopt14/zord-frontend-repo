@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/google/uuid"
 	"main.go/internal/models"
 )
 
@@ -18,10 +17,21 @@ func NewPaymentIntentRepo(db *sql.DB) *PaymentIntentRepo {
 
 func (r *PaymentIntentRepo) Save(
 	ctx context.Context,
-	intent models.CanonicalIntent,
+	intent models.CanonicalIntent, outbox models.OutboxEvent,
 ) (models.CanonicalIntent, error) {
 
-	intent.IntentID = uuid.NewString()
+	// intent.IntentID = uuid.NewString()
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return intent, err
+	}
+
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
 
 	query := `
 	INSERT INTO payment_intents (
@@ -38,7 +48,7 @@ func (r *PaymentIntentRepo) Save(
 		$14,$15,$16
 	)`
 
-	_, err := r.db.ExecContext(
+	_, err = tx.ExecContext(
 		ctx,
 		query,
 		intent.IntentID,
@@ -59,5 +69,44 @@ func (r *PaymentIntentRepo) Save(
 		intent.CreatedAt,
 	)
 
-	return intent, err
+	if err != nil {
+		return intent, err
+	}
+
+	outboxQuery := `
+	INSERT INTO outbox (
+		tenant_id,
+		aggregate_type,
+		aggregate_id,
+		event_type,
+		payload,
+		status,
+		created_at,
+		envelope_id
+	) VALUES (
+		$1,$2,$3,$4,$5,$6,$7,$8
+	)`
+
+	_, err = tx.ExecContext(
+		ctx,
+		outboxQuery,
+		outbox.TenantID,
+		outbox.AggregateType,
+		outbox.AggregateID,
+		outbox.EventType,
+		outbox.Payload,
+		outbox.Status,
+		outbox.CreatedAt,
+		outbox.EnvelopeID,
+	)
+	if err != nil {
+		return intent, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return intent, err
+	}
+
+	return intent, nil
 }

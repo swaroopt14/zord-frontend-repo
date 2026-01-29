@@ -33,3 +33,7 @@ type Instrument struct {
 	// UPI
 	VPA string `json:"vpa,omitempty"`
 }
+
+type RawIncomingIntent struct {
+	Payload []byte `json:"payload"`
+}

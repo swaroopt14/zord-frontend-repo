@@ -12,6 +12,7 @@ func CreateTable() error {
 	ingress_envelope :=
 
 		`CREATE TABLE IF NOT EXISTS "ingress_envelopes"(
+			trace_id UUID NOT NULL,
 			envelope_id UUID PRIMARY KEY,
 			tenant_id UUID NOT NULL,
 			source TEXT NOT NULL,
