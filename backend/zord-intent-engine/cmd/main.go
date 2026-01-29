@@ -12,6 +12,7 @@ import (
 
 	"main.go/config"
 	"main.go/db"
+	"main.go/internal/models"
 	"main.go/internal/persistence"
 	"main.go/internal/pii"
 	"main.go/internal/services"
@@ -49,8 +50,8 @@ func main() {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-
-		payload, err := io.ReadAll(r.Body)
+		var rawIncomingIntent models.RawIncomingIntent
+		rawIncomingIntent.Payload, err = io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
@@ -80,7 +81,7 @@ func main() {
 			context.Background(),
 			tenantID,
 			envelopeID,
-			payload,
+			rawIncomingIntent.Payload,
 		)
 
 		if err != nil {

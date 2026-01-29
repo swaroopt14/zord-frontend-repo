@@ -24,12 +24,12 @@ func (v *Validator) Validate(
 	tenantID string,
 	envelopeID string,
 	payload []byte,
-) (*models.IncomingIntent, *models.DLQEntry) {
+) (*models.IncomingIntent, *models.DLQEntry, error) {
 
 	// STEP 1 — JSON parse
 	var intent models.IncomingIntent
 	if err := json.Unmarshal(payload, &intent); err != nil {
-		dlq, _ := v.persistDLQ(
+		dlq, perr := v.persistDLQ(
 			ctx,
 			tenantID,
 			envelopeID,
@@ -37,7 +37,10 @@ func (v *Validator) Validate(
 			schemaError("invalid JSON payload"),
 			false,
 		)
-		return nil, dlq
+		if perr != nil {
+			return nil, nil, perr // system failure
+		}
+		return nil, dlq, nil
 	}
 
 	// STEP 2 — STRUCTURAL validation
@@ -50,12 +53,12 @@ func (v *Validator) Validate(
 			err,
 			false,
 		)
-		return nil, dlq
+		return nil, dlq, err
 	}
 
 	// STEP 3 — SEMANTIC validation
 	if err := SemanticValidate(intent); err != nil {
-		dlq, _ := v.persistDLQ(
+		dlq, perr := v.persistDLQ(
 			ctx,
 			tenantID,
 			envelopeID,
@@ -63,11 +66,14 @@ func (v *Validator) Validate(
 			err,
 			false,
 		)
-		return nil, dlq
+		if perr != nil {
+			return nil, nil, perr
+		}
+		return nil, dlq, nil
 	}
 
 	// VALID — safe to proceed
-	return &intent, nil
+	return &intent, nil, nil
 }
 
 // persistDLQ writes a DLQ entry durably.

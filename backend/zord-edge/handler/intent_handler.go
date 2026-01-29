@@ -1,13 +1,11 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"main.go/config"
+	"main.go/messaging"
 	"main.go/model"
 )
 
@@ -25,26 +23,18 @@ func IntentHandler(context *gin.Context) {
 		IdempotencyKey: IdempotencyKey,
 	}
 
-	data, err := json.Marshal(msg)
+	err := messaging.ProduceIntentMessage(context.Request.Context(), msg)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"Message": "Marshal Failed"})
-		return
-	}
-	err = config.RedisClient.LPush(context.Request.Context(), "Intent_Data", data).Err()
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"Message": "Reddis Push Failed"})
-		return
-	}
-
-	result, err := config.RedisClient.BRPop(context.Request.Context(), 30*time.Second, "Ingest:ACK").Result()
-	if err != nil {
-		context.JSON(http.StatusGatewayTimeout, gin.H{
-			"error": "timeout waiting for storage ack",
+		context.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to enqueue intent message service 1",
 		})
 		return
 	}
-	var ack model.AckMessage
-	_ = json.Unmarshal([]byte(result[1]), &ack)
+	ack, err := messaging.ConsumeAckMessage(context.Request.Context())
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "failed to consume ack message from service 2"})
+		return
+	}
 
 	context.JSON(http.StatusAccepted, gin.H{
 		"EnvelopeID":  ack.EnvelopeId,
