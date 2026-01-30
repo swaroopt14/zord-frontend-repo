@@ -1,36 +1,26 @@
 package validator
 
-import (
-	"strings"
+import "main.go/internal/models"
 
-	"main.go/internal/models"
-)
+func StructuralValidate(intent models.ParsedIncomingIntent) error {
+	if intent.SchemaVersion == "" {
+		return schemaError("schema_version is required")
+	}
 
-// StructuralValidate enforces request shape and required fields.
-// This replaces JSON Schema for phase-1.
-func StructuralValidate(intent models.IncomingIntent) error {
-	if strings.TrimSpace(intent.IntentType) == "" {
+	if intent.IntentType == "" {
 		return schemaError("intent_type is required")
 	}
 
-	if strings.TrimSpace(intent.AccountNumber) == "" {
+	if intent.AccountNumber == "" {
 		return schemaError("account_number is required")
 	}
 
-	if strings.TrimSpace(intent.Amount.Value) == "" {
-		return schemaError("amount.value is required")
+	if intent.Amount.Value == "" || intent.Amount.Currency == "" {
+		return schemaError("amount.value and amount.currency are required")
 	}
 
-	if strings.TrimSpace(intent.Amount.Currency) == "" {
-		return schemaError("amount.currency is required")
-	}
-
-	if strings.TrimSpace(intent.Beneficiary.Instrument.Kind) == "" {
+	if intent.Beneficiary.Instrument.Kind == "" {
 		return schemaError("beneficiary.instrument.kind is required")
-	}
-
-	if strings.TrimSpace(intent.IdempotencyKey) == "" {
-		return schemaError("idempotency_key is required")
 	}
 
 	return nil

@@ -2,7 +2,6 @@ package validator
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"main.go/internal/models"
@@ -17,31 +16,13 @@ func NewValidator(dlqRepo persistence.DLQRepository) *Validator {
 	return &Validator{dlqRepo: dlqRepo}
 }
 
-// Validate executes phase-1 validation strictly.
-// Any validation failure → DLQ entry (persisted) + immediate rejection.
-func (v *Validator) Validate(
+// ValidateParsed executes validation on already-parsed payload (STEP 5 → STEP 6)
+func (v *Validator) ValidateParsed(
 	ctx context.Context,
 	tenantID string,
 	envelopeID string,
-	payload []byte,
-) (*models.IncomingIntent, *models.DLQEntry, error) {
-
-	// STEP 1 — JSON parse
-	var intent models.IncomingIntent
-	if err := json.Unmarshal(payload, &intent); err != nil {
-		dlq, perr := v.persistDLQ(
-			ctx,
-			tenantID,
-			envelopeID,
-			"STRUCTURAL_VALIDATION",
-			schemaError("invalid JSON payload"),
-			false,
-		)
-		if perr != nil {
-			return nil, nil, perr // system failure
-		}
-		return nil, dlq, nil
-	}
+	intent models.ParsedIncomingIntent,
+) (*models.ParsedIncomingIntent, *models.DLQEntry, error) {
 
 	// STEP 2 — STRUCTURAL validation
 	if err := StructuralValidate(intent); err != nil {
@@ -53,7 +34,7 @@ func (v *Validator) Validate(
 			err,
 			false,
 		)
-		return nil, dlq, err
+		return nil, dlq, nil
 	}
 
 	// STEP 3 — SEMANTIC validation
@@ -72,12 +53,9 @@ func (v *Validator) Validate(
 		return nil, dlq, nil
 	}
 
-	// VALID — safe to proceed
 	return &intent, nil, nil
 }
 
-// persistDLQ writes a DLQ entry durably.
-// If this fails, caller must treat it as system failure (HTTP 500).
 func (v *Validator) persistDLQ(
 	ctx context.Context,
 	tenantID string,
