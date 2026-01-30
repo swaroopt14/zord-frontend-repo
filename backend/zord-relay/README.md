@@ -21,6 +21,7 @@ This setup uses Kafka's KRaft (Kafka Raft) consensus protocol, which eliminates 
 - **Transactional Outbox Pattern**: Guaranteed message delivery with database transactions
 - **HTTP API**: RESTful endpoints for message publishing and topic management
 - **PostgreSQL Storage**: Reliable persistence for outbox messages
+- **OpenTelemetry Tracing**: Distributed request tracking and observability
 - **Health Monitoring**: Built-in health checks and service monitoring
 - **Docker Ready**: Complete containerized setup with KRaft-based Kafka
 
@@ -30,6 +31,7 @@ This setup uses Kafka's KRaft (Kafka Raft) consensus protocol, which eliminates 
 - **Message Broker**: Apache Kafka 7.4.0 (KRaft mode)
 - **Database**: PostgreSQL 16
 - **Web Framework**: Gin Gonic
+- **Tracing**: OpenTelemetry integration
 - **Deployment**: Docker & Docker Compose
 
 #  Complete Architecture Flow
@@ -616,6 +618,42 @@ docker-compose exec kafka kafka-console-consumer \
 2. Add tests for new features
 3. Update documentation
 4. Ensure Docker compatibility
+
+## Observability & Monitoring
+
+### OpenTelemetry Integration
+- **Distributed Tracing**: End-to-end request tracking
+- **Jaeger Export**: Traces visible at http://localhost:16686
+- **Span Creation**: Detailed operation tracking for message processing
+- **Context Propagation**: Trace context across Kafka operations
+
+### Metrics Collection
+- **Prometheus Metrics**: Available at `/metrics` endpoint
+- **Kafka Metrics**: Producer/consumer performance metrics
+- **Database Metrics**: Outbox processing statistics
+- **Health Checks**: Service and dependency monitoring
+
+### Key Metrics to Monitor
+- `kafka_messages_published_total`: Total messages published to Kafka
+- `outbox_messages_processed_total`: Outbox pattern processing metrics
+- `database_connections_active`: Active PostgreSQL connections
+- `http_requests_total`: HTTP API request metrics
+- `message_processing_duration_seconds`: Message processing latency
+
+### Health Monitoring
+```bash
+# Check service health
+curl http://localhost:8082/health
+
+# View Prometheus metrics
+curl http://localhost:8082/metrics
+
+# Check traces in Jaeger
+# Open http://localhost:16686 and select 'zord-relay' service
+
+# Monitor Kafka topics
+curl http://localhost:8082/api/v1/topics
+```
 
 ## License
 

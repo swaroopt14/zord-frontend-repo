@@ -35,5 +35,13 @@ func InitDB() {
 }
 
 var RedisClient = redis.NewClient(&redis.Options{
-	Addr: "localhost:6379",
+	Addr: getRedisAddr(),
 })
+
+func getRedisAddr() string {
+	addr := os.Getenv("REDIS_ADDR")
+	if addr == "" {
+		addr = "localhost:6379" // fallback to default
+	}
+	return addr
+}

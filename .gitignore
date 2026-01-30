@@ -13,3 +13,8 @@ backend/*.exe
 
 # --- OS ---
 .DS_Store
+.yaswanth
+
+# --- Personal/Development folders ---
+.yaswanth
+yaswanth/

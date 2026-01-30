@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"main.go/internal/models"
+	"zord-intent-engine/internal/models"
 )
 
 var ifscRegex = regexp.MustCompile(`^[A-Z]{4}0[A-Z0-9]{6}$`)

@@ -9,14 +9,14 @@ import (
 
 	"github.com/google/uuid"
 
-	"main.go/config"
-	"main.go/db"
-	"main.go/internal/handlers"
-	"main.go/internal/models"
-	"main.go/internal/persistence"
-	"main.go/internal/pii"
-	"main.go/internal/services"
-	"main.go/internal/validator"
+	"zord-intent-engine/config"
+	"zord-intent-engine/db"
+	"zord-intent-engine/internal/handlers"
+	"zord-intent-engine/internal/models"
+	"zord-intent-engine/internal/persistence"
+	"zord-intent-engine/internal/pii"
+	"zord-intent-engine/internal/services"
+	"zord-intent-engine/internal/validator"
 )
 
 func main() {
@@ -113,6 +113,6 @@ func main() {
 		json.NewEncoder(w).Encode(canonical)
 	})
 
-	log.Println("🚀 Intent Engine (DB mode) running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Println("🚀 Intent Engine (DB mode) running on :8083")
+	log.Fatal(http.ListenAndServe(":8083", nil))
 }

@@ -1,6 +1,6 @@
 # Zord Edge Microservice
 
-A high-performance edge microservice for the Zord platform, built with Go and Gin framework.
+A high-performance API gateway and ingestion service for the Zord platform, built with Go and Gin framework with comprehensive observability and tracing capabilities.
 
 ## Overview
 
@@ -12,15 +12,19 @@ The Zord Edge service handles request processing, authentication, and routing fo
 - **Database Integration**: PostgreSQL for persistent storage
 - **Authentication & Security**: JWT-based auth with encryption support
 - **Rate Limiting**: Request throttling and traffic management
-- **Request Tracing**: Distributed tracing for debugging
+- **Distributed Tracing**: OpenTelemetry integration with Jaeger
 - **Middleware Support**: Tenant isolation, request logging, and more
+- **Health Monitoring**: Built-in health checks and metrics
 - **Docker Ready**: Production-ready Docker setup
+- **Observability**: Comprehensive monitoring with Prometheus metrics
 
 ## Technology Stack
 
 - **Language**: Go 1.24.1
 - **Framework**: Gin Gonic
 - **Database**: PostgreSQL 16
+- **Tracing**: OpenTelemetry + Jaeger
+- **Metrics**: Prometheus integration
 - **Deployment**: Docker & Docker Compose
 
 ## Quick Start
@@ -212,8 +216,44 @@ This service integrates with:
 - **Zord Vault Journal**: For secure journal storage
 - **Frontend Console**: Provides APIs for the dashboard
 - **PostgreSQL**: Primary data store
+- **OpenTelemetry Collector**: For distributed tracing
+- **Prometheus**: For metrics collection
+- **Jaeger**: For trace visualization
 
 See the main project README for full architecture details.
+
+## Observability & Monitoring
+
+### Distributed Tracing
+- **OpenTelemetry Integration**: Automatic request tracing
+- **Jaeger Export**: Traces visible at http://localhost:16686
+- **Span Creation**: Detailed operation tracking
+- **Context Propagation**: Trace context across services
+
+### Metrics Collection
+- **Prometheus Metrics**: Available at `/metrics` endpoint
+- **Health Checks**: Service status monitoring
+- **Performance Metrics**: Request duration, throughput, error rates
+- **Custom Business Metrics**: Transaction processing metrics
+
+### Health Monitoring
+```bash
+# Check service health
+curl http://localhost:8080/health
+
+# View Prometheus metrics
+curl http://localhost:8080/metrics
+
+# Check traces in Jaeger
+# Open http://localhost:16686 and select 'zord-edge' service
+```
+
+### Key Metrics
+- `http_requests_total`: Total HTTP requests
+- `http_request_duration_seconds`: Request duration histogram
+- `database_connections_active`: Active database connections
+- `auth_requests_total`: Authentication requests
+- `rate_limit_exceeded_total`: Rate limiting events
 
 ## Support
 

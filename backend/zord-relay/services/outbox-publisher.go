@@ -19,10 +19,10 @@ import (
 
 // OutboxPublisher handles publishing messages from the outbox table to Kafka
 type OutboxPublisher struct {
-	producer   *kafka.Producer
-	config     *config.Config
-	db         *sql.DB
-	isRunning  bool
+	producer  *kafka.Producer
+	config    *config.Config
+	db        *sql.DB
+	isRunning bool
 }
 
 // OutboxMessage represents a message in the outbox table
@@ -142,20 +142,23 @@ func (op *OutboxPublisher) processOutboxMessages(ctx context.Context) error {
 	}
 
 	// Process each message
+	processedCount := 0
 	for _, msg := range messages {
 		if err := op.publishMessage(ctx, &msg); err != nil {
 			log.Printf("Failed to publish message %s: %v", msg.ID, err)
 			continue
 		}
+		processedCount++
 	}
 
+	log.Printf("Processed %d/%d messages", processedCount, len(messages))
 	return nil
 }
 
 // publishMessage publishes a single message to Kafka and updates its status
 func (op *OutboxPublisher) publishMessage(ctx context.Context, msg *OutboxMessage) error {
-	// Publish to Kafka
-	err := op.producer.Publish(msg.Topic, msg.Key, msg.Value)
+	// Publish to Kafka with context
+	err := op.producer.PublishWithContext(ctx, msg.Topic, msg.Key, msg.Value)
 	if err != nil {
 		return err
 	}
@@ -184,7 +187,7 @@ func (op *OutboxPublisher) HandlePublish(c *gin.Context) {
 	var req PublishRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request format",
+			"error":   "Invalid request format",
 			"details": err.Error(),
 		})
 		return

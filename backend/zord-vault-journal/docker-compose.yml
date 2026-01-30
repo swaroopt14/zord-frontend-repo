@@ -5,7 +5,7 @@ services: # Define the containers/services to run
   zord-vault-journal: # Main vault journal service
     build: # Build configuration
       context: . # Build context (current directory)
-      dockerfile: DockerFile # Dockerfile to use for building
+      dockerfile: Dockerfile # Dockerfile to use for building
     container_name: zord-vault-journal-service # Name of the running container
     ports: # Port mapping (host:container)
       - "8081:8081" # Map host port 8081 to container port 8081
@@ -15,11 +15,17 @@ services: # Define the containers/services to run
       - DB_USER=vault_user # Database username
       - DB_PASSWORD=vault_password # Database password
       - DB_NAME=zord_vault_journal_db # Database name
+      - DB_SSLMODE=disable # Disable SSL for local development
       - ENVIRONMENT=production # Environment setting
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-change-me-in-production} # Encryption key (use strong key in production)
       - STORAGE_PATH=/data/vault # Path for encrypted data storage
+      - S3_BUCKET=zord-vault-bucket # S3 bucket name
+      - S3_REGION=us-east-1 # S3 region
+      - REDIS_ADDR=redis-vault:6379 # Redis address
+      - JAEGER_ENDPOINT=http://host.docker.internal:14268/api/traces # Jaeger tracing endpoint
     depends_on: # Service dependencies (start postgres first)
       - postgres
+      - redis-vault
     volumes: # Volume mounts for data persistence
       - vault_data:/data/vault # Mount encrypted data directory
     networks: # Networks this service connects to
@@ -54,9 +60,23 @@ services: # Define the containers/services to run
       - zord-network
     restart: unless-stopped # Restart policy
 
+  redis-vault: # Redis service for vault journal message queuing
+    image: redis:7-alpine # Docker image to use
+    container_name: zord-vault-redis # Container name
+    ports: # External access port
+      - "6379:6379" # Map host port 6379 to container port 6379
+    networks: # Networks this service connects to
+      - zord-network
+    restart: unless-stopped # Restart policy
+    command: redis-server --appendonly yes # Enable persistence
+    volumes: # Volume mounts for data persistence
+      - redis_vault_data:/data # Mount data directory
+
 volumes: # Named volumes for data persistence
   vault_data: # Volume for encrypted vault data
   postgres_vault_data: # Volume for PostgreSQL data
+  redis_vault_data: # Volume for Redis vault data
+  redis_intent_data: # Volume for Redis intent data
 
 networks: # Custom networks for service communication
   zord-network: # Isolated network for Zord services

@@ -68,6 +68,7 @@ npm start
 - **Multi-tenant Architecture**: Isolated data and permissions
 - **Responsive Design**: AWS-inspired UI components
 - **Health Monitoring**: Built-in health checks and metrics
+- **Observability Integration**: Connects to monitoring stack
 
 ## 🛠️ Technology Stack
 

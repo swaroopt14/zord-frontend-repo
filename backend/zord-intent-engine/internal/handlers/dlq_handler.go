@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"main.go/internal/models"
-	"main.go/internal/persistence"
+	"zord-intent-engine/internal/models"
+	"zord-intent-engine/internal/persistence"
 )
 
 type DLQHandler struct {

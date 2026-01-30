@@ -8,7 +8,7 @@ import (
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
-	"main.go/db"
+	"zord-intent-engine/db"
 )
 
 func InitDB() {

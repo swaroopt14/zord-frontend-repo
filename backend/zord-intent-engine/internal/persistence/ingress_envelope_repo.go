@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"main.go/internal/fetcher"
-	"main.go/internal/models"
+	"zord-intent-engine/internal/fetcher"
+	"zord-intent-engine/internal/models"
 )
 
 type IngressEnvelopePostgresRepo struct {
