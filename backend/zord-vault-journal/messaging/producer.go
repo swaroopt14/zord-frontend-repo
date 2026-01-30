@@ -9,19 +9,26 @@ import (
 	"main.go/model"
 )
 
-func SendMessage(ctx context.Context, msg model.RawIntentMessage) error {
+func SendACKMessage(ctx context.Context, ack model.AckMessage) error {
+	data, err := json.Marshal(ack)
+	if err != nil {
+		return err
+	}
+
+	config.RedisClient.LPush(ctx, ack.TraceID, data)
+
+	return nil
+}
+func SendRawIntentMessage(ctx context.Context, msg model.IngressEnvolope) error {
 	data, err := json.Marshal(msg)
 	if err != nil {
-		log.Printf("Failed to marshal message: %v", err)
 		return err
-	}
 
-	err = config.RedisClient.LPush(ctx, "Intent_Data", data).Err()
+	}
+	err = config.RedisClient.LPush(ctx, "vault.envelope.stored.v1", data).Err()
 	if err != nil {
-		log.Printf("Failed to send message to Redis: %v", err)
 		return err
 	}
-
-	log.Printf("Message sent successfully: trace_id=%s", msg.TraceID)
+	log.Println("Pushed IngressEnvelope to Redis")
 	return nil
 }

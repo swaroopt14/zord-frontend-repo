@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log"
@@ -9,22 +10,39 @@ import (
 
 	"github.com/google/uuid"
 
-	"zord-intent-engine/config"
-	"zord-intent-engine/db"
-	"zord-intent-engine/internal/handlers"
-	"zord-intent-engine/internal/models"
-	"zord-intent-engine/internal/persistence"
-	"zord-intent-engine/internal/pii"
-	"zord-intent-engine/internal/services"
-	"zord-intent-engine/internal/validator"
+	"main.go/config"
+	"main.go/db"
+	"main.go/internal/handlers"
+	"main.go/internal/models"
+	"main.go/internal/persistence"
+	"main.go/internal/pii"
+	"main.go/internal/services"
+	"main.go/internal/validator"
+	"main.go/messaging"
 )
 
 func main() {
 	// -------- DB INIT --------
 	config.InitDB()
+	config.InitRedis()
+	ctx := context.Background()
+	// Consume the intent message from Redis Need to change this and process intent logic
+	go func() {
+		log.Println("Ingress consumer started")
 
-	// -------- Repositories --------
-	ingressRepo := persistence.NewIngressEnvelopeRepo(db.DB)
+		for {
+			intent, err := messaging.ConsumeIngressMessage(ctx)
+			if err != nil {
+				log.Printf("Error consuming intent: %v\n", err)
+				continue
+			}
+
+			log.Printf("Consumed ingress message from Redis: %+v\n", intent)
+		}
+	}()
+
+	// -------- Repositories (DB MODE) --------
+	ingressRepo := persistence.NewIngressEnvelopeRepo(db.DB) //Need to remove this
 	dlqRepo := persistence.NewDLQRepo(db.DB)
 	intentRepo := persistence.NewPaymentIntentRepo(db.DB)
 
@@ -36,8 +54,7 @@ func main() {
 	if err != nil {
 		log.Fatal("failed to init PII tokenizer:", err)
 	}
-
-	// -------- Services --------
+	// -------- Intent Service --------
 	intentService := services.NewIntentService(
 		intentValidator,
 		tokenizer,
@@ -87,7 +104,9 @@ func main() {
 			return
 		}
 
-		// Full pipeline
+		// STEP 3–7 — validation → canonicalization → tokenization → persist
+
+		//Envelope and Tenant IDs passed along
 		canonical, dlq, err := intentService.Process(
 			r.Context(), // ✅ use request context
 			tenantID,
@@ -113,6 +132,6 @@ func main() {
 		json.NewEncoder(w).Encode(canonical)
 	})
 
-	log.Println("🚀 Intent Engine (DB mode) running on :8083")
-	log.Fatal(http.ListenAndServe(":8083", nil))
+	log.Println("🚀 Intent Engine (DB mode) running on :8080")
+	log.Fatal(http.ListenAndServe(":8081", nil))
 }

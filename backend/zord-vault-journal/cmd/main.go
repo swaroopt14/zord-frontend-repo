@@ -15,6 +15,8 @@ import (
 	"main.go/config"
 	"main.go/db"
 	"main.go/messaging"
+	"main.go/model"
+	"main.go/services"
 	"main.go/storage"
 	"main.go/tracing"
 )
@@ -52,6 +54,7 @@ func main() {
 	ctx := context.Background()
 
 	config.InitDB()
+	config.InitRedis()
 	db.CreateTable()
 	
 	err := godotenv.Load()
@@ -72,7 +75,16 @@ func main() {
 	}
 
 	// Start message processing worker
-	go messaging.StartRawIntentWorker(ctx, s3store)
+	go messaging.StartRawIntentWorker(ctx, func(ctx context.Context, msg model.RawIntentMessage) error {
+		ack, err := services.ProcessRawIntent(ctx, msg, s3store)
+		if err != nil {
+			return err
+		}
+		if err := services.RawIntent(ctx, msg, ack); err != nil {
+			return err
+		}
+		return messaging.SendACKMessage(ctx, *ack)
+	})
 
 	// Start HTTP server for metrics and health checks
 	go startHTTPServer()

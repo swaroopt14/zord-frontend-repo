@@ -36,7 +36,7 @@ func SaveRawIntent(
 		amount_value     = EXCLUDED.amount_value,
 		amount_currency  = EXCLUDED.amount_currency;
 	`
-	_, err = tx.ExecContext(ctx, query, envelope.Trace_id, envelope.Envolope_id, envelope.Tenant_id, envelope.Source, envelope.SourceSystem, envelope.IdempotencyKey, envelope.PayloadHash, envelope.ObjectRef, envelope.ParseStatus, envelope.AmountValue, envelope.AmountCurrency)
+	_, err = tx.ExecContext(ctx, query, envelope.TraceID, envelope.EnvelopeID, envelope.TenantID, envelope.Source, envelope.SourceSystem, envelope.IdempotencyKey, envelope.PayloadHash, envelope.ObjectRef, envelope.ParseStatus, envelope.AmountValue, envelope.AmountCurrency)
 	if err != nil {
 		log.Fatalf("SaveRawIntent error: %v", err)
 		return err
