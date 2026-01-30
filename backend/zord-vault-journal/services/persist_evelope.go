@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"main.go/db"
 	"main.go/dto"
+	"main.go/messaging"
 	"main.go/model"
 )
 
@@ -38,9 +39,9 @@ func RawIntent(ctx context.Context,
 
 	// Build IngressEnvolope model
 	envelope := model.IngressEnvolope{
-		Trace_id:       trace_id,
-		Envolope_id:    envelopeID,
-		Tenant_id:      req.Tenant_id,
+		TraceID:        trace_id,
+		EnvelopeID:     envelopeID,
+		TenantID:       req.Tenant_id,
 		Source:         req.Source,
 		SourceSystem:   req.SourceSystem,
 		IdempotencyKey: msg.IdempotencyKey,
@@ -52,10 +53,22 @@ func RawIntent(ctx context.Context,
 	}
 
 	// Envolope.SaveRawIntent()
-	SaveRawIntent(ctx,
+	err = SaveRawIntent(ctx,
 		db.DB,
 		&envelope,
 	)
+	if err != nil {
+		log.Printf("Failed to save raw intent: %v", err)
+		return err
+	}
+
+	envelope.Payload = json.RawMessage(msg.RawPayload)
+	// Send to Intent Engine via Redis
+	err = messaging.SendRawIntentMessage(ctx, envelope)
+	if err != nil {
+		log.Printf("Failed to send raw intent message: %v", err)
+		return err
+	}
 	return nil
 
 }

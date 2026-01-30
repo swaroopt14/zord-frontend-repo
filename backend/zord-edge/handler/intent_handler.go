@@ -30,7 +30,7 @@ func IntentHandler(context *gin.Context) {
 		})
 		return
 	}
-	ack, err := messaging.ConsumeAckMessage(context.Request.Context())
+	ack, err := messaging.ConsumeAckMessage(context.Request.Context(), msg.TraceID)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"error": "failed to consume ack message from service 2"})
 		return

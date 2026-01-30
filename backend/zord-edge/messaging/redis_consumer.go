@@ -9,8 +9,8 @@ import (
 	"main.go/model"
 )
 
-func ConsumeAckMessage(ctx context.Context) (*model.AckMessage, error) {
-	result, err := config.RedisClient.BRPop(ctx, 30*time.Second, "Zord_Ingest:ACK").Result()
+func ConsumeAckMessage(ctx context.Context, TraceId string) (*model.AckMessage, error) {
+	result, err := config.RedisClient.BRPop(ctx, 30*time.Second, TraceId).Result()
 	if err != nil {
 		return nil, err
 	}

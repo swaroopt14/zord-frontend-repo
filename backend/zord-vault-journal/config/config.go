@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -11,6 +12,8 @@ import (
 	"github.com/redis/go-redis/v9"
 	"main.go/db"
 )
+
+var RedisClient *redis.Client
 
 func InitDB() {
 	var err error
@@ -34,6 +37,15 @@ func InitDB() {
 
 }
 
-var RedisClient = redis.NewClient(&redis.Options{
-	Addr: "localhost:6379",
-})
+func InitRedis() {
+	RedisClient = redis.NewClient(&redis.Options{
+		Addr: os.Getenv("localhost:6379"), // "localhost:6379"
+		DB:   0,
+	})
+
+	if err := RedisClient.Ping(context.Background()).Err(); err != nil {
+		log.Fatalf("Redis init failed: %v", err)
+	}
+
+	log.Println("Redis connected")
+}
