@@ -25,7 +25,7 @@ func (h *Handler) Store(w http.ResponseWriter, r *http.Request) {
 	// TEMP: hardcoded tenant for testing
 	tenantID := "11111111-1111-1111-1111-111111111111"
 
-	envelope, err := h.service.StoreRawIntent(
+	envelope, err := h.service.StoreRawIntent( //Raw intent along with Tenant ID
 		r.Context(),
 		tenantID,
 		raw,
