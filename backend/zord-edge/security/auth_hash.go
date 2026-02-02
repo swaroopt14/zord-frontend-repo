@@ -1,16 +1,25 @@
 package security
 
-import "golang.org/x/crypto/bcrypt"
+import (
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
+	"errors"
+)
 
 func HashApiKey(key string) (string, error) {
-	hashed, err := bcrypt.GenerateFromPassword([]byte(key), bcrypt.DefaultCost)
-	if err != nil {
-		return " ", err
-	}
-	return string(hashed), nil
+	h := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(h[:]), nil
 }
+
 func CompareApiKey(hash string, rawkey string) error {
-	return bcrypt.CompareHashAndPassword([]byte(hash),
-		[]byte(rawkey),
-	)
+	expected, err := hex.DecodeString(hash)
+	if err != nil {
+		return err
+	}
+	actual := sha256.Sum256([]byte(rawkey))
+	if subtle.ConstantTimeCompare(expected, actual[:]) != 1 {
+		return errors.New("api key mismatch")
+	}
+	return nil
 }
