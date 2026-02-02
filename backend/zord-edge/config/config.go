@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -33,5 +34,17 @@ func InitDB() {
 	}
 }
 
-var RedisClient = redis.NewClient(&redis.Options{
-	Addr: "localhost:6379"}) //Need to change this with ENV
+func InitRedisClient() *redis.Client {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379", // or from env
+		Password: "",
+		DB:       0,
+	})
+
+	// optional health check
+	if err := rdb.Ping(context.Background()).Err(); err != nil {
+		log.Fatal("failed to connect to redis:", err)
+	}
+
+	return rdb
+}

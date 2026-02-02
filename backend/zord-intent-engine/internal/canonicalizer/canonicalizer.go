@@ -3,10 +3,10 @@ package canonicalizer
 import (
 	"strings"
 
-	"main.go/internal/models"
+	"zord-intent-engine/internal/models"
 )
 
-func CanonicalizeIntent(input models.IncomingIntent) models.IncomingIntent {
+func CanonicalizeIntent(input models.ParsedIncomingIntent) models.ParsedIncomingIntent {
 
 	out := input // copy
 

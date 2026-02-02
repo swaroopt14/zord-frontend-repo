@@ -4,14 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"math/big"
 	"time"
 
 	"github.com/google/uuid"
+
 	"main.go/internal/canonicalizer"
 	"main.go/internal/models"
 	"main.go/internal/pii"
 	"main.go/internal/validator"
+	"zord-intent-engine/internal/canonicalizer"
+	"zord-intent-engine/internal/models"
+	"zord-intent-engine/internal/pii"
+	"zord-intent-engine/internal/validator"
 )
 
 type IntentService struct {
@@ -22,7 +28,17 @@ type IntentService struct {
 
 // Repository abstraction
 type CanonicalIntentRepository interface {
-	Save(ctx context.Context, intent models.CanonicalIntent, outbox models.OutboxEvent) (models.CanonicalIntent, error)
+	Save(
+		ctx context.Context,
+		intent models.CanonicalIntent,
+		outbox models.OutboxEvent,
+	) (models.CanonicalIntent, error)
+
+	FindByEnvelope(
+		ctx context.Context,
+		tenantID string,
+		envelopeID string,
+	) (*models.CanonicalIntent, error)
 }
 
 func NewIntentService(
@@ -51,23 +67,100 @@ func parseAmount(value string) (float64, error) {
 
 /* ---------------- Pipeline ---------------- */
 
-func (s *IntentService) Process(
+// ProcessIncomingIntent is the ONLY entrypoint.
+// It consumes ingress output from Service-1 (via Redis).
+func (s *IntentService) ProcessIncomingIntent(
 	ctx context.Context,
-	tenantID string,
-	envelopeID string,
-	payload []byte,
+	in *models.IncomingIntent,
 ) (*models.CanonicalIntent, *models.DLQEntry, error) {
 
-	// STEP 1–4: VALIDATION (ctx PASSED CORRECTLY)
-	intent, dlq, err := s.validator.Validate(
-		ctx,
-		tenantID,
-		envelopeID,
-		payload,
-	)
-	// if dlq != nil {
-	// 	return nil, dlq, nil
+	// -------- STEP 0: Transport guards --------
+
+	if len(in.Payload) == 0 {
+		return nil, &models.DLQEntry{ReasonCode: "EMPTY_PAYLOAD"}, nil
+	}
+
+	if in.TraceID == uuid.Nil {
+		return nil, &models.DLQEntry{ReasonCode: "MISSING_TRACE_ID"}, nil
+	}
+
+	if in.EnvelopeID == uuid.Nil {
+		return nil, &models.DLQEntry{ReasonCode: "MISSING_ENVELOPE_ID"}, nil
+	}
+
+	if in.TenantID == uuid.Nil {
+		return nil, &models.DLQEntry{ReasonCode: "MISSING_TENANT_ID"}, nil
+	}
+
+	switch in.ParseStatus {
+	case "PARSED":
+		// OK — normal path
+
+	case "RECEIVED":
+		// Compatibility mode (temporary)
+		// Service-1 hasn’t upgraded yet
+		log.Printf(
+			"⚠️ COMPAT: parse_status=RECEIVED treated as PARSED [envelope=%s]",
+			in.EnvelopeID,
+		)
+
+	default:
+		return nil, &models.DLQEntry{
+			ReasonCode: "NOT_PARSED",
+		}, nil
+	}
+
+	// if in.SignatureStatus == nil || *in.SignatureStatus != "VERIFIED" {
+	// 	return nil, &models.DLQEntry{ReasonCode: "SIGNATURE_NOT_VERIFIED"}, nil
 	// }
+
+	// if in.PayloadHash == "" {
+	// 	return nil, &models.DLQEntry{ReasonCode: "MISSING_PAYLOAD_HASH"}, nil
+	// }
+
+	if in.ObjectRef == "" {
+		return nil, &models.DLQEntry{ReasonCode: "MISSING_OBJECT_REF"}, nil
+	}
+
+	// -------- STEP 4: Payload integrity verification --------
+
+	// computedHash := sha256.Sum256(in.Payload)
+	// if hex.EncodeToString(computedHash[:]) != in.PayloadHash {
+	// 	return nil, &models.DLQEntry{ReasonCode: "PAYLOAD_HASH_MISMATCH"}, nil
+	// }
+
+	// -------- STEP 5: Parse raw payload into domain model --------
+
+	var parsed models.ParsedIncomingIntent
+	if err := json.Unmarshal(in.Payload, &parsed); err != nil {
+		return nil, &models.DLQEntry{
+			ReasonCode: "INVALID_JSON_PAYLOAD",
+		}, nil
+	}
+
+	// -------- STEP 5.5: Idempotency guard --------
+
+	existing, err := s.repo.FindByEnvelope(
+		ctx,
+		in.TenantID.String(),
+		in.EnvelopeID.String(),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if existing != nil {
+		return existing, nil, nil
+	}
+
+	// -------- STEP 6: VALIDATION --------
+
+	intent, dlq, err := s.validator.ValidateParsed(
+		ctx,
+		in.TenantID.String(),
+		in.EnvelopeID.String(),
+		parsed,
+	)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -80,10 +173,12 @@ func (s *IntentService) Process(
 		return nil, nil, errors.New("validator returned nil intent")
 	}
 
-	// STEP 5: CANONICALIZATION
+	// -------- STEP 7: CANONICALIZATION --------
+
 	canonicalInput := canonicalizer.CanonicalizeIntent(*intent)
 
-	// STEP 6: TOKENIZATION
+	// -------- STEP 8: TOKENIZATION --------
+
 	accountTokenRef, err := s.tokenizer.TokenizeAccountNumber(
 		canonicalInput.AccountNumber,
 	)
@@ -91,7 +186,7 @@ func (s *IntentService) Process(
 		return nil, nil, err
 	}
 
-	// ---- JSONB PREP ----
+	// -------- JSONB PREP --------
 
 	beneficiaryJSON, err := json.Marshal(canonicalInput.Beneficiary)
 	if err != nil {
@@ -115,11 +210,12 @@ func (s *IntentService) Process(
 		return nil, nil, err
 	}
 
-	// ---- BUILD CANONICAL INTENT ----
+	// -------- STEP 9: BUILD CANONICAL INTENT --------
+
 	canonical := models.CanonicalIntent{
 		IntentID:   uuid.NewString(),
-		EnvelopeID: envelopeID,
-		TenantID:   tenantID,
+		EnvelopeID: in.EnvelopeID.String(),
+		TenantID:   in.TenantID.String(),
 
 		IntentType:       canonicalInput.IntentType,
 		CanonicalVersion: "v1",
@@ -138,14 +234,14 @@ func (s *IntentService) Process(
 		CreatedAt: time.Now().UTC(),
 	}
 
-	//Call Outbox Initialization here
-	Outbox, err := CanonicalIntentToOutboxEvent(canonical, payload)
+	// -------- STEP 10: OUTBOX + PERSISTENCE --------
+
+	outbox, err := CanonicalIntentToOutboxEvent(canonical, in.Payload)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// STEP 7 — PERSIST
-	saved, err := s.repo.Save(ctx, canonical, Outbox)
+	saved, err := s.repo.Save(ctx, canonical, outbox)
 	if err != nil {
 		return nil, nil, err
 	}

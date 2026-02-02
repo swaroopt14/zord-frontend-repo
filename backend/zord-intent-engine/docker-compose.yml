@@ -1,0 +1,72 @@
+# Docker Compose configuration for Zord Intent Engine microservice
+# This service handles intent canonicalization, validation, and processing
+
+services:
+  zord-intent-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zord-intent-engine-service
+    ports:
+      - "8083:8083"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=intent_user
+      - DB_PASSWORD=intent_password
+      - DB_NAME=zord_intent_engine_db
+      - DB_SSLMODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - VAULT_JOURNAL_URL=http://host.docker.internal:8081
+      - PII_ENCLAVE_URL=http://host.docker.internal:8084
+      - PII_TOKEN_SECRET=your-secret-key-for-pii-tokenization-change-in-production
+      - ENVIRONMENT=production
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - zord-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: zord-intent-postgres
+    environment:
+      - POSTGRES_USER=intent_user
+      - POSTGRES_PASSWORD=intent_password
+      - POSTGRES_DB=zord_intent_engine_db
+    volumes:
+      - postgres_intent_data:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+    networks:
+      - zord-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: zord-intent-redis
+    ports:
+      - "6380:6379"
+    networks:
+      - zord-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_intent_data:
+
+networks:
+  zord-network:
+    driver: bridge

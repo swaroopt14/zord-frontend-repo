@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"main.go/internal/models"
+	"zord-intent-engine/internal/models"
 )
 
 func CanonicalIntentToOutboxEvent(

@@ -17,6 +17,7 @@ services: # Define the containers/services to run
       - DB_NAME=zord_edge_db # Database name
       - DB_SSLMODE=disable # Disable SSL for local Docker connections
       - ENVIRONMENT=production # Environment setting
+      - JAEGER_ENDPOINT=http://host.docker.internal:14268/api/traces # Jaeger tracing endpoint
     depends_on: # Service dependencies (start postgres first)
       - postgres
     networks: # Networks this service connects to

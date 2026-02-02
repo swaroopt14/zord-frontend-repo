@@ -5,13 +5,17 @@ import (
 	"encoding/json"
 	"time"
 
-	"main.go/config"
+	"github.com/redis/go-redis/v9"
 	"main.go/model"
 )
 
-func ConsumeAckMessage(ctx context.Context) (*model.AckMessage, error) {
-	result, err := config.RedisClient.BRPop(ctx, 30*time.Second, "Zord_Ingest:ACK").Result()
+func ConsumeAckMessage(ctx context.Context, TraceId string, rdb *redis.Client) (*model.AckMessage, error) {
+	result, err := rdb.BRPop(ctx, 2*time.Second, TraceId).Result()
 	if err != nil {
+		if err == redis.Nil {
+			// ⏳ no ACK yet (timeout)
+			return nil, nil
+		}
 		return nil, err
 	}
 	var ack model.AckMessage

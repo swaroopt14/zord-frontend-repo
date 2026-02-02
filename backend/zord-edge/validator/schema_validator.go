@@ -13,7 +13,7 @@ var (
 )
 
 func InitSchemaValidator() error {
-	schemaPath := filepath.Join("..", "incoming_intent.request.v1.json")
+	schemaPath := filepath.Join("..", "schemas", "incoming_intent.request.v1.json")
 
 	absPath, err := filepath.Abs(schemaPath)
 	if err != nil {

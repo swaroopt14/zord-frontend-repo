@@ -2,6 +2,7 @@
 package kafka
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 
@@ -15,12 +16,12 @@ type Producer struct {
 
 // Message represents a Kafka message structure
 type Message struct {
-	ID        string                 `json:"id"`
-	Topic     string                 `json:"topic"`
-	Key       string                 `json:"key,omitempty"`
-	Value     interface{}            `json:"value"`
-	Timestamp int64                  `json:"timestamp"`
-	Headers   map[string]string      `json:"headers,omitempty"`
+	ID        string            `json:"id"`
+	Topic     string            `json:"topic"`
+	Key       string            `json:"key,omitempty"`
+	Value     interface{}       `json:"value"`
+	Timestamp int64             `json:"timestamp"`
+	Headers   map[string]string `json:"headers,omitempty"`
 }
 
 // NewProducer creates a new Kafka producer
@@ -40,8 +41,13 @@ func NewProducer(brokers []string) *Producer {
 	return &Producer{producer: producer}
 }
 
-// Publish sends a message to a Kafka topic
+// Publish sends a message to a Kafka topic with distributed tracing
 func (p *Producer) Publish(topic string, key string, value interface{}) error {
+	return p.PublishWithContext(context.Background(), topic, key, value)
+}
+
+// PublishWithContext sends a message to a Kafka topic with context
+func (p *Producer) PublishWithContext(ctx context.Context, topic string, key string, value interface{}) error {
 	// Convert value to JSON bytes
 	valueBytes, err := json.Marshal(value)
 	if err != nil {
@@ -66,9 +72,14 @@ func (p *Producer) Publish(topic string, key string, value interface{}) error {
 	return nil
 }
 
-// PublishMessage sends a structured Message to Kafka
+// PublishMessage sends a structured Message to Kafka with context
 func (p *Producer) PublishMessage(msg *Message) error {
-	return p.Publish(msg.Topic, msg.Key, msg.Value)
+	return p.PublishMessageWithContext(context.Background(), msg)
+}
+
+// PublishMessageWithContext sends a structured Message to Kafka with context
+func (p *Producer) PublishMessageWithContext(ctx context.Context, msg *Message) error {
+	return p.PublishWithContext(ctx, msg.Topic, msg.Key, msg.Value)
 }
 
 // Close closes the Kafka producer
