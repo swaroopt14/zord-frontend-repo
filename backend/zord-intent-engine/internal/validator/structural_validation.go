@@ -3,7 +3,7 @@ package validator
 import (
 	"strings"
 
-	"main.go/internal/models"
+	"zord-intent-engine/internal/models"
 )
 
 // StructuralValidate enforces request shape and required fields.

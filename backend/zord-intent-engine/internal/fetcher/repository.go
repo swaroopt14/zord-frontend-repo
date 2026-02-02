@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"main.go/internal/models"
+	"zord-intent-engine/internal/models"
 )
 
 var (

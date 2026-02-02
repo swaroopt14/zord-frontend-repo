@@ -12,11 +12,44 @@ import (
 	"zord-relay/config"
 	"zord-relay/kafka"
 	"zord-relay/services"
+	"zord-relay/tracing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
+var (
+	// Prometheus metrics
+	outboxMessagesTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "outbox_messages_total",
+			Help: "Total number of outbox messages processed",
+		},
+		[]string{"status"},
+	)
+	
+	kafkaPublishTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "kafka_publish_total",
+			Help: "Total number of Kafka messages published",
+		},
+		[]string{"topic", "status"},
+	)
+)
+
+func init() {
+	// Register Prometheus metrics
+	prometheus.MustRegister(outboxMessagesTotal)
+	prometheus.MustRegister(kafkaPublishTotal)
+}
+
 func main() {
+	// Initialize tracing
+	cleanup := tracing.InitTracing("zord-relay")
+	defer cleanup()
+
 	// Load configuration
 	cfg := config.LoadConfig()
 
@@ -41,7 +74,7 @@ func main() {
 
 	// Start HTTP server in background
 	go func() {
-		log.Printf("Starting HTTP server on port %s", cfg.HTTPPort)
+		log.Printf("Starting Zord Relay HTTP server on port %s with tracing enabled", cfg.HTTPPort)
 		if err := router.Run(":" + cfg.HTTPPort); err != nil {
 			log.Fatalf("Failed to start HTTP server: %v", err)
 		}
@@ -63,6 +96,9 @@ func main() {
 func setupRouter(publisher *services.OutboxPublisher) *gin.Engine {
 	router := gin.Default()
 
+	// Add OpenTelemetry middleware
+	router.Use(otelgin.Middleware("zord-relay"))
+
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -78,6 +114,9 @@ func setupRouter(publisher *services.OutboxPublisher) *gin.Engine {
 			"time": time.Now().UTC(),
 		})
 	})
+
+	// Metrics endpoint
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// API endpoints for message publishing
 	v1 := router.Group("/api/v1")
