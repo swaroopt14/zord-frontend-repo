@@ -6,10 +6,11 @@ import (
 	"log"
 	"os"
 
+	"zord-intent-engine/db"
+
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
-	"main.go/db"
 )
 
 var RedisClient *redis.Client

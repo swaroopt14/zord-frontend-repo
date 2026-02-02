@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"main.go/config"
-	"main.go/internal/models"
+	"zord-intent-engine/config"
+	"zord-intent-engine/internal/models"
 )
 
 func ConsumeIngressMessage(ctx context.Context) (*models.IncomingIntent, error) {
