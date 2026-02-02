@@ -30,7 +30,7 @@ var (
 		},
 		[]string{"status"},
 	)
-	
+
 	s3OperationsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "s3_operations_total",
@@ -56,12 +56,12 @@ func main() {
 	config.InitDB()
 	config.InitRedis()
 	db.CreateTable()
-	
+
 	err := godotenv.Load()
 	if err != nil {
 		log.Println("No .env file found")
 	}
-	
+
 	bucket := os.Getenv("S3_BUCKET")
 	region := os.Getenv("S3_REGION")
 
@@ -98,22 +98,22 @@ func main() {
 // startHTTPServer starts the HTTP server for metrics and health checks
 func startHTTPServer() {
 	router := gin.Default()
-	
+
 	// Add OpenTelemetry middleware
 	router.Use(otelgin.Middleware("zord-vault-journal"))
-	
+
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"status": "healthy",
+			"status":  "healthy",
 			"service": "zord-vault-journal",
-			"time": time.Now().UTC(),
+			"time":    time.Now().UTC(),
 		})
 	})
-	
+
 	// Metrics endpoint
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
-	
+
 	log.Println("Starting Zord Vault Journal HTTP server on port 8081")
 	if err := router.Run(":8081"); err != nil {
 		log.Fatalf("Failed to start HTTP server: %v", err)
