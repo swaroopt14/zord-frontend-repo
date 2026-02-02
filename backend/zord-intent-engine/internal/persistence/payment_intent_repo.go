@@ -110,3 +110,69 @@ func (r *PaymentIntentRepo) Save(
 
 	return intent, nil
 }
+
+func (r *PaymentIntentRepo) FindByEnvelope(
+	ctx context.Context,
+	tenantID string,
+	envelopeID string,
+) (*models.CanonicalIntent, error) {
+
+	query := `
+	SELECT
+		intent_id,
+		envelope_id,
+		tenant_id,
+		intent_type,
+		canonical_version,
+		schema_version,
+		amount,
+		currency,
+		deadline_at,
+		constraints,
+		beneficiary_type,
+		pii_tokens,
+		beneficiary,
+		status,
+		confidence_score,
+		created_at
+	FROM payment_intents
+	WHERE tenant_id = $1
+	  AND envelope_id = $2
+	LIMIT 1
+	`
+
+	var intent models.CanonicalIntent
+
+	err := r.db.QueryRowContext(
+		ctx,
+		query,
+		tenantID,
+		envelopeID,
+	).Scan(
+		&intent.IntentID,
+		&intent.EnvelopeID,
+		&intent.TenantID,
+		&intent.IntentType,
+		&intent.CanonicalVersion,
+		&intent.SchemaVersion,
+		&intent.Amount,
+		&intent.Currency,
+		&intent.DeadlineAt,
+		&intent.Constraints,
+		&intent.BeneficiaryType,
+		&intent.PIITokens,
+		&intent.Beneficiary,
+		&intent.Status,
+		&intent.ConfidenceScore,
+		&intent.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &intent, nil
+}

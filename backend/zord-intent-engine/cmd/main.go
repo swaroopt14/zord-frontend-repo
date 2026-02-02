@@ -2,18 +2,13 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"io"
 	"log"
 	"net/http"
 	"os"
 
-	"github.com/google/uuid"
-
 	"main.go/config"
 	"main.go/db"
 	"main.go/internal/handlers"
-	"main.go/internal/models"
 	"main.go/internal/persistence"
 	"main.go/internal/pii"
 	"main.go/internal/services"
@@ -22,27 +17,13 @@ import (
 )
 
 func main() {
-	// -------- DB INIT --------
+	// -------- INIT --------
 	config.InitDB()
 	config.InitRedis()
+
 	ctx := context.Background()
-	// Consume the intent message from Redis Need to change this and process intent logic
-	go func() {
-		log.Println("Ingress consumer started")
 
-		for {
-			intent, err := messaging.ConsumeIngressMessage(ctx)
-			if err != nil {
-				log.Printf("Error consuming intent: %v\n", err)
-				continue
-			}
-
-			log.Printf("Consumed ingress message from Redis: %+v\n", intent)
-		}
-	}()
-
-	// -------- Repositories (DB MODE) --------
-	ingressRepo := persistence.NewIngressEnvelopeRepo(db.DB) //Need to remove this
+	// -------- Repositories --------
 	dlqRepo := persistence.NewDLQRepo(db.DB)
 	intentRepo := persistence.NewPaymentIntentRepo(db.DB)
 
@@ -54,6 +35,7 @@ func main() {
 	if err != nil {
 		log.Fatal("failed to init PII tokenizer:", err)
 	}
+
 	// -------- Intent Service --------
 	intentService := services.NewIntentService(
 		intentValidator,
@@ -61,77 +43,62 @@ func main() {
 		intentRepo,
 	)
 
-	// -------- Handlers --------
+	// -------- DLQ HTTP (READ-ONLY) --------
 	dlqHandler := handlers.NewDLQHandler(dlqRepo)
 
-	// -------- HTTP --------
-
-	// Health check
 	http.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 	})
 
-	// DLQ listing API (for frontend)
 	http.HandleFunc("/v1/dlq", dlqHandler.List)
 
-	// Intent ingestion (test mode)
-	http.HandleFunc("/test/intent", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
+	// -------- REDIS CONSUMER (PRIMARY ENTRYPOINT) --------
+	go func() {
+		log.Println("🚀 Ingress consumer started")
+
+		for {
+			incoming, err := messaging.ConsumeIngressMessage(ctx)
+			if err != nil {
+				log.Printf("❌ Error consuming ingress message: %v\n", err)
+				continue
+			}
+
+			canonical, dlq, err := intentService.ProcessIncomingIntent(
+				ctx,
+				incoming,
+			)
+
+			if err != nil {
+				// System failure → retry (do NOT ack yet)
+				log.Printf("❌ System error processing intent: %v\n", err)
+				continue
+			}
+
+			if dlq != nil {
+				// Business failure → DLQ already persisted
+				log.Printf(
+					"⚠️ Intent rejected [tenant=%s envelope=%s reason=%s]",
+					incoming.TenantID,
+					incoming.EnvelopeID,
+					dlq.ReasonCode,
+				)
+				// STEP 11 (ACK) will still happen
+				continue
+			}
+
+			log.Printf(
+				"✅ Intent processed successfully [intent_id=%s envelope=%s]",
+				canonical.IntentID,
+				incoming.EnvelopeID,
+			)
+
+			// STEP 11 — ACK Redis message
+			// (to be implemented inside messaging layer)
 		}
-		var rawIncomingIntent models.RawIncomingIntent
-		rawIncomingIntent.Payload, err = io.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
-			return
-		}
+	}()
 
-		// TEMP: hardcoded tenant (replace with auth later)
-		tenantID := "11111111-1111-1111-1111-111111111111"
-
-		// TEMP: simulate previous service
-		envelopeID := uuid.NewString()
-
-		// Insert ingress row (FK safety)
-		if err := ingressRepo.InsertDummy(
-			r.Context(),
-			envelopeID,
-			tenantID,
-		); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// STEP 3–7 — validation → canonicalization → tokenization → persist
-
-		//Envelope and Tenant IDs passed along
-		canonical, dlq, err := intentService.Process(
-			r.Context(), // ✅ use request context
-			tenantID,
-			envelopeID,
-			rawIncomingIntent.Payload,
-		)
-
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		if dlq != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnprocessableEntity)
-
-			pretty, _ := json.MarshalIndent(dlq, "", "\t")
-			w.Write(pretty)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(canonical)
-	})
-
-	log.Println("🚀 Intent Engine (DB mode) running on :8080")
+	// -------- HTTP SERVER --------
+	log.Println("🧠 Intent Engine (Service-2) running on :8081")
 	log.Fatal(http.ListenAndServe(":8081", nil))
 }

@@ -24,6 +24,18 @@ type IncomingIntent struct {
 	Payload         json.RawMessage
 }
 
+type ParsedIncomingIntent struct {
+	SchemaVersion  string         `json:"schema_version"`
+	IntentType     string         `json:"intent_type"`
+	AccountNumber  string         `json:"account_number"`
+	Amount         Amount         `json:"amount"`
+	Beneficiary    Beneficiary    `json:"beneficiary"`
+	Remitter       map[string]any `json:"remitter,omitempty"`
+	Constraints    map[string]any `json:"constraints,omitempty"`
+	PurposeCode    string         `json:"purpose_code"`
+	IdempotencyKey string         `json:"idempotency_key"`
+}
+
 // type IncomingIntent struct {
 // 	SchemaVersion  string         `json:"schema_version"`
 // 	IntentType     string         `json:"intent_type"`
@@ -56,8 +68,4 @@ type Instrument struct {
 
 	// UPI
 	VPA string `json:"vpa,omitempty"`
-}
-
-type RawIncomingIntent struct {
-	Payload []byte `json:"payload"`
 }
