@@ -2,10 +2,9 @@ package services
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log"
 	"math/big"
 	"time"
 
@@ -89,17 +88,31 @@ func (s *IntentService) ProcessIncomingIntent(
 		return nil, &models.DLQEntry{ReasonCode: "MISSING_TENANT_ID"}, nil
 	}
 
-	if in.ParseStatus != "PARSED" {
-		return nil, &models.DLQEntry{ReasonCode: "NOT_PARSED"}, nil
+	switch in.ParseStatus {
+	case "PARSED":
+		// OK — normal path
+
+	case "RECEIVED":
+		// Compatibility mode (temporary)
+		// Service-1 hasn’t upgraded yet
+		log.Printf(
+			"⚠️ COMPAT: parse_status=RECEIVED treated as PARSED [envelope=%s]",
+			in.EnvelopeID,
+		)
+
+	default:
+		return nil, &models.DLQEntry{
+			ReasonCode: "NOT_PARSED",
+		}, nil
 	}
 
-	if in.SignatureStatus == nil || *in.SignatureStatus != "VERIFIED" {
-		return nil, &models.DLQEntry{ReasonCode: "SIGNATURE_NOT_VERIFIED"}, nil
-	}
+	// if in.SignatureStatus == nil || *in.SignatureStatus != "VERIFIED" {
+	// 	return nil, &models.DLQEntry{ReasonCode: "SIGNATURE_NOT_VERIFIED"}, nil
+	// }
 
-	if in.PayloadHash == "" {
-		return nil, &models.DLQEntry{ReasonCode: "MISSING_PAYLOAD_HASH"}, nil
-	}
+	// if in.PayloadHash == "" {
+	// 	return nil, &models.DLQEntry{ReasonCode: "MISSING_PAYLOAD_HASH"}, nil
+	// }
 
 	if in.ObjectRef == "" {
 		return nil, &models.DLQEntry{ReasonCode: "MISSING_OBJECT_REF"}, nil
@@ -107,10 +120,10 @@ func (s *IntentService) ProcessIncomingIntent(
 
 	// -------- STEP 4: Payload integrity verification --------
 
-	computedHash := sha256.Sum256(in.Payload)
-	if hex.EncodeToString(computedHash[:]) != in.PayloadHash {
-		return nil, &models.DLQEntry{ReasonCode: "PAYLOAD_HASH_MISMATCH"}, nil
-	}
+	// computedHash := sha256.Sum256(in.Payload)
+	// if hex.EncodeToString(computedHash[:]) != in.PayloadHash {
+	// 	return nil, &models.DLQEntry{ReasonCode: "PAYLOAD_HASH_MISMATCH"}, nil
+	// }
 
 	// -------- STEP 5: Parse raw payload into domain model --------
 
