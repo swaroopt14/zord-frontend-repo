@@ -1,129 +1,189 @@
-// Package main is the entry point for the Zord Relay service
 package main
 
 import (
 	"context"
-	"log"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
+	"encoding/json"
+	"github.com/google/uuid"
+	_ "github.com/lib/pq"
+	"go.uber.org/zap"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"zord-relay/config"
+	"zord-relay/db"
 	"zord-relay/kafka"
 	"zord-relay/services"
-	"zord-relay/tracing"
-
-	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"zord-relay/utils"
 )
 
-var (
-	// Prometheus metrics
-	outboxMessagesTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "outbox_messages_total",
-			Help: "Total number of outbox messages processed",
-		},
-		[]string{"status"},
-	)
-	
-	kafkaPublishTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "kafka_publish_total",
-			Help: "Total number of Kafka messages published",
-		},
-		[]string{"topic", "status"},
-	)
-)
+type DummyProviderHandler struct {
+	db       *sql.DB
+	producer *kafka.Producer
+	dlqTopic string
+}
 
-func init() {
-	// Register Prometheus metrics
-	prometheus.MustRegister(outboxMessagesTotal)
-	prometheus.MustRegister(kafkaPublishTotal)
+type intentPayload struct{}
+
+type payoutContract struct {
+	ContractID   string `json:"contract_id"`
+	IntentID     string `json:"intent_id"`
+	EnvelopeID   string `json:"envelope_id"`
+	CreatedAt    string `json:"created_at"`
+	ContractHash     string `json:"contract_hash"`
+	TraceID          string `json:"trace_id"`
+}
+
+func (h *DummyProviderHandler) HandleMessage(ctx context.Context, topic string, key string, value []byte, headers map[string]string, timestamp time.Time) error {
+	var p map[string]interface{}
+	if err := json.Unmarshal(value, &p); err != nil {
+		envelopeID := uuid.New().String()
+		tenantID := uuid.New().String()
+		traceID := headers["trace_id"]
+		dlq := map[string]interface{}{
+			"reason_code":        "SCHEMA_INVALID",
+			"error_message":      err.Error(),
+			"original_event_type": topic,
+			"tenant_id":          tenantID,
+			"trace_id":           traceID,
+			"envelope_id":        envelopeID,
+		}
+		h.producer.Publish(h.dlqTopic, key, dlq, map[string]string{
+			"trace_id":    traceID,
+			"tenant_id":   tenantID,
+			"envelope_id": envelopeID,
+		})
+		_, _ = h.db.Exec(`INSERT INTO dlq_events (id, aggregate_id, event_type, payload, reason_code, error_message, tenant_id, trace_id, envelope_id, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())`,
+			uuid.New(), key, topic, value, "SCHEMA_INVALID", err.Error(), tenantID, traceID, envelopeID)
+
+		return nil
+	}
+	envelopeID := headers["envelope_id"]
+	tenantID := headers["tenant_id"]
+	intentID := key
+	traceID := headers["trace_id"]
+	contractID := uuid.New().String()
+	contractHashBytes := sha256.Sum256(value)
+	contractHash := hex.EncodeToString(contractHashBytes[:])
+	payloadObj := payoutContract{
+		ContractID:       contractID,
+		IntentID:         intentID,
+		EnvelopeID:       envelopeID,
+		CreatedAt:        timestamp.UTC().Format(time.RFC3339Nano),
+		ContractHash:     contractHash,
+		TraceID:          traceID,
+	}
+	_, err := json.Marshal(payloadObj)
+	if err != nil {
+		return err
+	}
+	_, _ = h.db.Exec(`INSERT INTO tenants (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING`, uuid.MustParse(tenantID))
+	_, _ = h.db.Exec(`INSERT INTO payment_intents (intent_id) VALUES ($1) ON CONFLICT (intent_id) DO NOTHING`, uuid.MustParse(intentID))
+	_, _ = h.db.Exec(`INSERT INTO ingress_envelopes (envelope_id) VALUES ($1) ON CONFLICT (envelope_id) DO NOTHING`, uuid.MustParse(envelopeID))
+	_, err = h.db.Exec(`INSERT INTO payout_contracts (contract_id, tenant_id, intent_id, envelope_id, contract_payload, contract_hash, status, created_at, trace_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		ON CONFLICT (intent_id) DO NOTHING`,
+		uuid.MustParse(contractID),
+		uuid.MustParse(tenantID),
+		uuid.MustParse(intentID),
+		uuid.MustParse(envelopeID),
+		value,
+		contractHash,
+		"ISSUED",
+		timestamp.UTC(),
+		traceID,
+	)
+	return err
 }
 
 func main() {
-	// Initialize tracing
-	cleanup := tracing.InitTracing("zord-relay")
-	defer cleanup()
+	utils.InitLogger()
+	defer utils.SyncLogger()
 
-	// Load configuration
-	cfg := config.LoadConfig()
+	cfg := config.Load()
 
-	// Initialize Kafka producer and consumer
-	producer := kafka.NewProducer(cfg.KafkaBrokers)
-	defer producer.Close()
+	// Health check server
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
 
-	consumer := kafka.NewConsumer(cfg.KafkaBrokers, cfg.ConsumerGroup)
-	defer consumer.Close()
-
-	// Initialize outbox publisher service
-	outboxPublisher := services.NewOutboxPublisher(producer, cfg)
-
-	// Start outbox publisher in background
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go outboxPublisher.Start(ctx)
-
-	// Set up HTTP server for health checks and API endpoints
-	router := setupRouter(outboxPublisher)
-
-	// Start HTTP server in background
+		port := os.Getenv("HEALTH_PORT")
+		if port == "" {
+			port = "8082"
+		}
+		server := &http.Server{Addr: ":" + port}
 	go func() {
-		log.Printf("Starting Zord Relay HTTP server on port %s with tracing enabled", cfg.HTTPPort)
-		if err := router.Run(":" + cfg.HTTPPort); err != nil {
-			log.Fatalf("Failed to start HTTP server: %v", err)
+		utils.Logger.Info("Starting health check server on :" + port)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			utils.Logger.Error("Health check server failed", zap.Error(err))
 		}
 	}()
 
-	// Wait for interrupt signal to gracefully shutdown
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	database := db.Connect(cfg.DBURL)
+	producer := kafka.NewProducer(cfg.KafkaBrokers)
+	consumer := kafka.NewConsumer(cfg.KafkaBrokers, cfg.KafkaConsumerGroup)
 
-	log.Println("Shutting down Zord Relay service...")
-
-	// Give services time to cleanup
-	time.Sleep(2 * time.Second)
-	log.Println("Zord Relay service stopped")
-}
-
-// setupRouter configures the HTTP routes
-func setupRouter(publisher *services.OutboxPublisher) *gin.Engine {
-	router := gin.Default()
-
-	// Add OpenTelemetry middleware
-	router.Use(otelgin.Middleware("zord-relay"))
-
-	// Health check endpoint
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status": "healthy",
-			"service": "zord-relay",
-			"time": time.Now().UTC(),
-		})
-	})
-	router.HEAD("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status": "healthy",
-			"service": "zord-relay",
-			"time": time.Now().UTC(),
-		})
-	})
-
-	// Metrics endpoint
-	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
-
-	// API endpoints for message publishing
-	v1 := router.Group("/api/v1")
-	{
-		v1.POST("/publish/:topic", publisher.HandlePublish)
-		v1.GET("/topics", publisher.HandleListTopics)
+	pubCfg := &services.Config{
+		ReadyTopic:   cfg.ReadyTopic,
+		DLQTopic:     cfg.DLQTopic,
+		WorkerCount:  cfg.WorkerCount,
+		BatchSize:    cfg.BatchSize,
+		MaxRetries:   cfg.MaxRetries,
+		RetryBackoff: cfg.RetryBackoff,
+		PollInterval: cfg.PollInterval,
 	}
 
-	return router
+	publisher := services.NewPublisher(database, producer, pubCfg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	publisher.Start(ctx)
+	consumer.Consume(ctx, []string{cfg.ReadyTopic}, &DummyProviderHandler{db: database, producer: producer, dlqTopic: cfg.DLQTopic})
+
+	http.HandleFunc("/admin/replay", func(w http.ResponseWriter, r *http.Request) {
+		token := r.Header.Get("Authorization")
+		expected := "Bearer " + os.Getenv("REPLAY_ADMIN_TOKEN")
+		if expected == "Bearer " || token != expected {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		envelopeID := r.URL.Query().Get("envelope_id")
+		if envelopeID == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		var aggID, evType, tenantID, traceID, envID string
+		var payload []byte
+		err := database.QueryRow(`SELECT aggregate_id, event_type, payload, tenant_id, trace_id, envelope_id FROM dlq_events WHERE envelope_id=$1 ORDER BY created_at DESC LIMIT 1`, envelopeID).Scan(&aggID, &evType, &payload, &tenantID, &traceID, &envID)
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_, err = database.Exec(`INSERT INTO outbox (id, aggregate_id, event_type, payload, status, retry_count, tenant_id, trace_id, envelope_id, created_at) VALUES ($1,$2,$3,$4,'PENDING',0,$5,$6,$7,NOW()) ON CONFLICT (envelope_id) DO NOTHING`,
+			uuid.New(), aggID, evType, payload, tenantID, traceID, envID)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// graceful shutdown
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	<-stop
+
+	// Shutdown http server
+	if err := server.Shutdown(context.Background()); err != nil {
+		utils.Logger.Error("Server shutdown failed", zap.Error(err))
+	}
+
+	cancel()
+	consumer.Close()
+	producer.Close()
 }

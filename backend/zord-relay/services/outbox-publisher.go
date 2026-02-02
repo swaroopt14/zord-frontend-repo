@@ -1,265 +1,122 @@
-// Package services contains business logic for the Zord Relay service
 package services
 
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
-	"log"
-	"net/http"
 	"time"
-
-	"zord-relay/config"
-	"zord-relay/kafka"
-
-	"github.com/gin-gonic/gin"
+	"math/rand"
 	"github.com/google/uuid"
-	_ "github.com/lib/pq"
+	"go.uber.org/zap"
+	"zord-relay/kafka"
+	"zord-relay/model"
+	"zord-relay/utils"
 )
 
-// OutboxPublisher handles publishing messages from the outbox table to Kafka
-type OutboxPublisher struct {
-	producer  *kafka.Producer
-	config    *config.Config
-	db        *sql.DB
-	isRunning bool
+type Publisher struct {
+	db       *sql.DB
+	producer *kafka.Producer
+	cfg      *Config
 }
 
-// OutboxMessage represents a message in the outbox table
-type OutboxMessage struct {
-	ID        string    `json:"id" db:"id"`
-	Topic     string    `json:"topic" db:"topic"`
-	Key       string    `json:"key" db:"key"`
-	Value     string    `json:"value" db:"value"`
-	Status    string    `json:"status" db:"status"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
+type Config struct {
+	ReadyTopic   string
+	DLQTopic     string
+	WorkerCount  int
+	BatchSize    int
+	MaxRetries   int
+	RetryBackoff time.Duration
+	PollInterval time.Duration
 }
 
-// PublishRequest represents a request to publish a message
-type PublishRequest struct {
-	Key   string      `json:"key"`
-	Value interface{} `json:"value"`
+func NewPublisher(db *sql.DB, producer *kafka.Producer, cfg *Config) *Publisher {
+	return &Publisher{db: db, producer: producer, cfg: cfg}
 }
 
-// NewOutboxPublisher creates a new outbox publisher
-func NewOutboxPublisher(producer *kafka.Producer, cfg *config.Config) *OutboxPublisher {
-	// Initialize database connection
-	db, err := sql.Open("postgres", cfg.DatabaseURL)
-	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
-	}
-
-	// Test database connection
-	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
-	}
-
-	// Create outbox table if it doesn't exist
-	if err := createOutboxTable(db); err != nil {
-		log.Fatalf("Failed to create outbox table: %v", err)
-	}
-
-	return &OutboxPublisher{
-		producer: producer,
-		config:   cfg,
-		db:       db,
+func (p *Publisher) Start(ctx context.Context) {
+	for i := 0; i < p.cfg.WorkerCount; i++ {
+		go p.worker(ctx, i)
 	}
 }
 
-// createOutboxTable creates the outbox table if it doesn't exist
-func createOutboxTable(db *sql.DB) error {
-	query := `
-		CREATE TABLE IF NOT EXISTS outbox (
-			id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			topic      TEXT NOT NULL,
-			key        TEXT,
-			value      TEXT NOT NULL,
-			status     TEXT NOT NULL DEFAULT 'pending',
-			created_at TIMESTAMPTZ DEFAULT now(),
-			processed_at TIMESTAMPTZ
-		);
-
-		CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox(status);
-		CREATE INDEX IF NOT EXISTS idx_outbox_created_at ON outbox(created_at);
-	`
-
-	_, err := db.Exec(query)
-	if err != nil {
-		return err
-	}
-
-	log.Println("Outbox table created successfully")
-	return nil
-}
-
-// Start begins the outbox polling process
-func (op *OutboxPublisher) Start(ctx context.Context) {
-	op.isRunning = true
-	log.Printf("Starting outbox publisher with poll interval: %v", op.config.OutboxPollInterval)
-
-	ticker := time.NewTicker(op.config.OutboxPollInterval)
-	defer ticker.Stop()
-
+func (p *Publisher) worker(ctx context.Context, id int) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Stopping outbox publisher...")
-			op.isRunning = false
 			return
-		case <-ticker.C:
-			if err := op.processOutboxMessages(ctx); err != nil {
-				log.Printf("Error processing outbox messages: %v", err)
+		default:
+		}
+
+		tx, err := p.db.BeginTx(ctx, nil)
+		if err != nil {
+			utils.Logger.Error("begin tx failed", zap.Error(err))
+			time.Sleep(p.cfg.PollInterval)
+			continue
+		}
+
+		rows, err := tx.QueryContext(ctx, `
+			SELECT outbox_id, aggregate_id, event_type, payload, attempts, tenant_id, trace_id, envelope_id
+			FROM outbox
+			WHERE status='PENDING' AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
+			FOR UPDATE SKIP LOCKED
+			LIMIT $1
+		`, p.cfg.BatchSize)
+		if err != nil {
+			utils.Logger.Error("fetch pending failed", zap.Error(err))
+			tx.Rollback()
+			time.Sleep(p.cfg.PollInterval)
+			continue
+		}
+
+		events := []model.OutboxEvent{}
+		for rows.Next() {
+			var e model.OutboxEvent
+			if err := rows.Scan(&e.ID, &e.AggregateID, &e.EventType, &e.Payload, &e.RetryCount, &e.TenantID, &e.TraceID, &e.EnvelopeID); err != nil {
+				utils.Logger.Error("row scan failed", zap.Error(err))
+				continue
+			}
+			events = append(events, e)
+		}
+		rows.Close()
+
+		for _, e := range events {
+			headers := map[string]string{
+				"trace_id":    e.TraceID,
+				"tenant_id":   e.TenantID,
+				"envelope_id": e.EnvelopeID,
+			}
+
+			err := p.producer.Publish(p.cfg.ReadyTopic, e.AggregateID, e.Payload, headers)
+			if err != nil {
+				retries := e.RetryCount + 1
+				if retries >= p.cfg.MaxRetries {
+					dlq := map[string]interface{}{
+						"reason_code":        "PUBLISH_FAILED",
+						"error_message":      err.Error(),
+						"original_event_type": e.EventType,
+						"tenant_id":          e.TenantID,
+						"trace_id":           e.TraceID,
+						"envelope_id":        e.EnvelopeID,
+						"schema_subject": "z.intent.ready",
+						"schema_version": "v1",
+					}
+					_ = p.producer.Publish(p.cfg.DLQTopic, e.AggregateID, dlq, headers)
+					_, _ = tx.ExecContext(ctx, `INSERT INTO dlq_items (dlq_id, tenant_id, envelope_id, stage, reason_code, error_detail, replayable, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())`,
+						uuid.New().String(), e.TenantID, e.EnvelopeID, "OUTBOX_PUBLISH", "PUBLISH_FAILED", err.Error(), true)
+					_, _ = tx.ExecContext(ctx, `UPDATE outbox SET status='FAILED' WHERE outbox_id=$1`, e.ID)
+				} else {
+					backoff := p.cfg.RetryBackoff * time.Duration(1<<retries)
+					backoff += time.Duration(rand.Intn(100)) * time.Millisecond
+					ms := int(backoff / time.Millisecond)
+					_, _ = tx.ExecContext(ctx, `UPDATE outbox SET attempts=$1, next_attempt_at=NOW() + ($2::int * interval '1 millisecond') WHERE outbox_id=$3`, retries, ms, e.ID)
+				}
+			} else {
+				_, _ = tx.ExecContext(ctx, `UPDATE outbox SET status='SENT', sent_at=NOW() WHERE outbox_id=$1`, e.ID)
 			}
 		}
-	}
-}
 
-// processOutboxMessages processes pending messages from the outbox table
-func (op *OutboxPublisher) processOutboxMessages(ctx context.Context) error {
-	// Get pending messages
-	query := `
-		SELECT id, topic, key, value, status, created_at
-		FROM outbox
-		WHERE status = 'pending'
-		ORDER BY created_at ASC
-		LIMIT $1
-	`
-
-	rows, err := op.db.QueryContext(ctx, query, op.config.OutboxBatchSize)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	var messages []OutboxMessage
-	for rows.Next() {
-		var msg OutboxMessage
-		err := rows.Scan(&msg.ID, &msg.Topic, &msg.Key, &msg.Value, &msg.Status, &msg.CreatedAt)
-		if err != nil {
-			return err
+		tx.Commit()
+		if len(events) == 0 {
+			time.Sleep(p.cfg.PollInterval)
 		}
-		messages = append(messages, msg)
 	}
-
-	// Process each message
-	processedCount := 0
-	for _, msg := range messages {
-		if err := op.publishMessage(ctx, &msg); err != nil {
-			log.Printf("Failed to publish message %s: %v", msg.ID, err)
-			continue
-		}
-		processedCount++
-	}
-
-	log.Printf("Processed %d/%d messages", processedCount, len(messages))
-	return nil
-}
-
-// publishMessage publishes a single message to Kafka and updates its status
-func (op *OutboxPublisher) publishMessage(ctx context.Context, msg *OutboxMessage) error {
-	// Publish to Kafka with context
-	err := op.producer.PublishWithContext(ctx, msg.Topic, msg.Key, msg.Value)
-	if err != nil {
-		return err
-	}
-
-	// Update message status to processed
-	updateQuery := `
-		UPDATE outbox
-		SET status = 'processed', processed_at = now()
-		WHERE id = $1
-	`
-
-	_, err = op.db.ExecContext(ctx, updateQuery, msg.ID)
-	if err != nil {
-		log.Printf("Failed to update message status for %s: %v", msg.ID, err)
-		return err
-	}
-
-	log.Printf("Successfully published message %s to topic %s", msg.ID, msg.Topic)
-	return nil
-}
-
-// HandlePublish handles HTTP requests to publish messages
-func (op *OutboxPublisher) HandlePublish(c *gin.Context) {
-	topic := c.Param("topic")
-
-	var req PublishRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request format",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	// Generate unique ID for the message
-	messageID := uuid.New().String()
-
-	// Store message in outbox
-	insertQuery := `
-		INSERT INTO outbox (id, topic, key, value, status)
-		VALUES ($1, $2, $3, $4, 'pending')
-	`
-
-	valueBytes, err := json.Marshal(req.Value)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to marshal message value",
-		})
-		return
-	}
-
-	_, err = op.db.Exec(insertQuery, messageID, topic, req.Key, string(valueBytes))
-	if err != nil {
-		log.Printf("Failed to insert message into outbox: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to queue message",
-		})
-		return
-	}
-
-	c.JSON(http.StatusAccepted, gin.H{
-		"message_id": messageID,
-		"topic":      topic,
-		"status":     "queued",
-		"message":    "Message queued for publishing",
-	})
-}
-
-// HandleListTopics returns information about available topics
-func (op *OutboxPublisher) HandleListTopics(c *gin.Context) {
-	// Get distinct topics from outbox
-	query := `SELECT DISTINCT topic FROM outbox ORDER BY topic`
-
-	rows, err := op.db.Query(query)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to fetch topics",
-		})
-		return
-	}
-	defer rows.Close()
-
-	var topics []string
-	for rows.Next() {
-		var topic string
-		if err := rows.Scan(&topic); err != nil {
-			continue
-		}
-		topics = append(topics, topic)
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"topics": topics,
-		"count":  len(topics),
-	})
-}
-
-// Close closes the database connection
-func (op *OutboxPublisher) Close() error {
-	if op.db != nil {
-		return op.db.Close()
-	}
-	return nil
 }
