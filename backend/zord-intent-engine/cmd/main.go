@@ -6,14 +6,17 @@ import (
 	"net/http"
 	"os"
 
-	"main.go/config"
-	"main.go/db"
-	"main.go/internal/handlers"
-	"main.go/internal/persistence"
-	"main.go/internal/pii"
-	"main.go/internal/services"
-	"main.go/internal/validator"
-	"main.go/messaging"
+	"zord-intent-engine/internal/services"
+	"zord-intent-engine/internal/validator"
+	"zord-intent-engine/messaging"
+
+	"zord-intent-engine/config"
+	"zord-intent-engine/db"
+	"zord-intent-engine/internal/handlers"
+
+	"zord-intent-engine/internal/persistence"
+
+	"zord-intent-engine/internal/pii"
 )
 
 func main() {
@@ -100,5 +103,5 @@ func main() {
 
 	// -------- HTTP SERVER --------
 	log.Println("🧠 Intent Engine (Service-2) running on :8081")
-	log.Fatal(http.ListenAndServe(":8081", nil))
+	log.Fatal(http.ListenAndServe(":8082", nil))
 }

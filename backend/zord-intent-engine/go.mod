@@ -1,4 +1,4 @@
-module main.go
+module zord-intent-engine
 
 go 1.25.6
 
