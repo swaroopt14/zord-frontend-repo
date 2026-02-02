@@ -5,6 +5,7 @@ import (
 	"context"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/IBM/sarama"
 )
@@ -20,7 +21,7 @@ type Consumer struct {
 
 // MessageHandler defines the interface for handling consumed messages
 type MessageHandler interface {
-	HandleMessage(ctx context.Context, topic string, key string, value []byte) error
+	HandleMessage(ctx context.Context, topic string, key string, value []byte, headers map[string]string, timestamp time.Time) error
 }
 
 // ConsumerHandler implements sarama.ConsumerGroupHandler
@@ -31,7 +32,7 @@ type ConsumerHandler struct {
 // NewConsumer creates a new Kafka consumer
 func NewConsumer(brokers []string, groupID string) *Consumer {
 	config := sarama.NewConfig()
-	config.Consumer.Group.Rebalance.Strategy = sarama.BalanceStrategyRoundRobin
+	config.Consumer.Group.Rebalance.Strategy = sarama.NewBalanceStrategyRoundRobin()
 	config.Consumer.Offsets.Initial = sarama.OffsetNewest
 	config.Version = sarama.V2_8_0_0
 
@@ -93,8 +94,14 @@ func (h *ConsumerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, clai
 				return nil
 			}
 
-			// Handle the message
-			err := h.handler.HandleMessage(session.Context(), message.Topic, string(message.Key), message.Value)
+			headers := map[string]string{}
+			for _, header := range message.Headers {
+				if header == nil {
+					continue
+				}
+				headers[string(header.Key)] = string(header.Value)
+			}
+			err := h.handler.HandleMessage(session.Context(), message.Topic, string(message.Key), message.Value, headers, message.Timestamp)
 			if err != nil {
 				log.Printf("Error handling message from topic %s: %v", message.Topic, err)
 				continue

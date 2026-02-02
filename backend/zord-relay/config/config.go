@@ -1,4 +1,3 @@
-// Package config handles configuration management for the Zord Relay service
 package config
 
 import (
@@ -7,97 +6,80 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/joho/godotenv"
 )
 
-// Config holds all configuration values for the Zord Relay service
 type Config struct {
-	// Kafka configuration
-	KafkaBrokers   []string // List of Kafka broker addresses
-	ConsumerGroup  string   // Consumer group ID for this service
-
-	// HTTP server configuration
-	HTTPPort       string   // Port for HTTP server
-
-	// Database configuration (for outbox pattern)
-	DatabaseURL    string   // PostgreSQL connection string
-
-	// Service configuration
-	Environment    string   // Environment (development, production)
-	ServiceName    string   // Service name for logging
-
-	// Outbox configuration
-	OutboxPollInterval time.Duration // How often to check for new outbox messages
-	OutboxBatchSize    int          // Number of messages to process in each batch
+	KafkaBrokers       []string
+	KafkaConsumerGroup string
+	ReadyTopic         string
+	DLQTopic           string
+	PayoutTopic        string
+	DBURL              string
+	WorkerCount        int
+	BatchSize          int
+	MaxRetries         int
+	RetryBackoff       time.Duration
+	PollInterval       time.Duration
+	ServiceName        string
 }
 
-// LoadConfig loads configuration from environment variables
-func LoadConfig() *Config {
-	// Load environment variables from .env file (if it exists)
-	_ = godotenv.Load()
-
-	config := &Config{
-		// Kafka brokers (comma-separated list)
-		KafkaBrokers:   getEnvAsSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
-
-		// Consumer group for this service
-		ConsumerGroup:  getEnv("KAFKA_CONSUMER_GROUP", "zord-relay-group"),
-
-		// HTTP server port
-		HTTPPort:       getEnv("HTTP_PORT", "8082"),
-
-		// Database connection
-		DatabaseURL:    getEnv("DATABASE_URL", "postgres://relay_user:relay_password@localhost:5432/zord_relay_db?sslmode=disable"),
-
-		// Environment settings
-		Environment:    getEnv("ENVIRONMENT", "development"),
-		ServiceName:    getEnv("SERVICE_NAME", "zord-relay"),
-
-		// Outbox polling settings
-		OutboxPollInterval: getEnvAsDuration("OUTBOX_POLL_INTERVAL", 5*time.Second),
-		OutboxBatchSize:    getEnvAsInt("OUTBOX_BATCH_SIZE", 10),
+func Load() *Config {
+	workerCount, err := strconv.Atoi(getEnv("OUTBOX_WORKER_COUNT", "5"))
+	if err != nil {
+		log.Fatalf("Invalid OUTBOX_WORKER_COUNT: %v", err)
 	}
 
-	log.Printf("Configuration loaded for environment: %s", config.Environment)
-	log.Printf("Kafka brokers: %v", config.KafkaBrokers)
-	log.Printf("HTTP server port: %s", config.HTTPPort)
+	batchSize, err := strconv.Atoi(getEnv("OUTBOX_BATCH_SIZE", "10"))
+	if err != nil {
+		log.Fatalf("Invalid OUTBOX_BATCH_SIZE: %v", err)
+	}
 
-	return config
+	maxRetries, err := strconv.Atoi(getEnv("OUTBOX_MAX_RETRIES", "5"))
+	if err != nil {
+		log.Fatalf("Invalid OUTBOX_MAX_RETRIES: %v", err)
+	}
+
+	retryBackoffMs, err := strconv.Atoi(getEnv("OUTBOX_RETRY_BACKOFF_MS", "50"))
+	if err != nil {
+		log.Fatalf("Invalid OUTBOX_RETRY_BACKOFF_MS: %v", err)
+	}
+
+	pollIntervalSec, err := strconv.Atoi(getEnv("OUTBOX_POLL_INTERVAL_SEC", "5"))
+	if err != nil {
+		log.Fatalf("Invalid OUTBOX_POLL_INTERVAL_SEC: %v", err)
+	}
+
+	return &Config{
+		KafkaBrokers:       splitCSV(getEnv("KAFKA_BROKERS", "broker1:9092")),
+		KafkaConsumerGroup: getEnv("KAFKA_CONSUMER_GROUP", "zord-relay-group"),
+		ReadyTopic:         getEnv("KAFKA_READY_TOPIC", "z.intent.ready.v1"),
+		DLQTopic:           getEnv("KAFKA_DLQ_TOPIC", "z.intent.dlq.v1"),
+		PayoutTopic:        getEnv("KAFKA_PAYOUT_TOPIC", "payout_contract.v1"),
+		DBURL:              getEnv("DATABASE_URL", ""),
+		WorkerCount:        workerCount,
+		BatchSize:          batchSize,
+		MaxRetries:         maxRetries,
+		RetryBackoff:       time.Duration(retryBackoffMs) * time.Millisecond,
+		PollInterval:       time.Duration(pollIntervalSec) * time.Second,
+		ServiceName:        getEnv("SERVICE_NAME", "outbox-relay"),
+	}
 }
 
-// getEnv gets an environment variable with a fallback default value
 func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
+	if val, ok := os.LookupEnv(key); ok {
+		return val
 	}
 	return defaultValue
 }
 
-// getEnvAsSlice gets an environment variable as a string slice (comma-separated)
-func getEnvAsSlice(key string, defaultValue []string) []string {
-	if value := os.Getenv(key); value != "" {
-		return strings.Split(value, ",")
-	}
-	return defaultValue
-}
-
-// getEnvAsInt gets an environment variable as an integer
-func getEnvAsInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if intValue, err := strconv.Atoi(value); err == nil {
-			return intValue
+func splitCSV(s string) []string {
+	parts := strings.Split(s, ",")
+	var brokers []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			brokers = append(brokers, p)
 		}
 	}
-	return defaultValue
-}
-
-// getEnvAsDuration gets an environment variable as a time.Duration
-func getEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
-	if value := os.Getenv(key); value != "" {
-		if duration, err := time.ParseDuration(value); err == nil {
-			return duration
-		}
-	}
-	return defaultValue
+	return brokers
 }
