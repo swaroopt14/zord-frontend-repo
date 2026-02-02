@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"main.go/internal/models"
+	"zord-intent-engine/internal/models"
 )
 
 type InMemoryCanonicalIntentRepo struct {

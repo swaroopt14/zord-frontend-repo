@@ -1,1 +1,3 @@
+package models
+
 // Template models

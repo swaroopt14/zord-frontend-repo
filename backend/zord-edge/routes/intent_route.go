@@ -8,7 +8,7 @@ import (
 	"main.go/validator"
 )
 
-func Routes(router *gin.Engine) {
+func Routes(router *gin.Engine, h *handler.Handler) {
 
 	router.Use(gin.Recovery())
 	public := router.Group("/v1")
@@ -29,7 +29,7 @@ func Routes(router *gin.Engine) {
 		middleware.TraceMiddleware(),
 	)
 	{
-		protected.POST("/ingest", handler.IntentHandler)
+		protected.POST("/ingest", h.IntentHandler)
 	}
 
 }

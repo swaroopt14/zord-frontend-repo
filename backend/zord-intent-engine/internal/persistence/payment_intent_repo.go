@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"main.go/internal/models"
+	"zord-intent-engine/internal/models"
 )
 
 type PaymentIntentRepo struct {

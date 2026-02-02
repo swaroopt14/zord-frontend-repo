@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"main.go/internal/models"
+	"zord-intent-engine/internal/models"
 
 	"github.com/google/uuid"
 )

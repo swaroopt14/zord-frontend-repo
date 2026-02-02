@@ -14,6 +14,10 @@ import (
 	"main.go/internal/models"
 	"main.go/internal/pii"
 	"main.go/internal/validator"
+	"zord-intent-engine/internal/canonicalizer"
+	"zord-intent-engine/internal/models"
+	"zord-intent-engine/internal/pii"
+	"zord-intent-engine/internal/validator"
 )
 
 type IntentService struct {

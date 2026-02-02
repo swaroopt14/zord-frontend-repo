@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"main.go/internal/models"
-	"main.go/internal/persistence"
+	"zord-intent-engine/internal/models"
+	"zord-intent-engine/internal/persistence"
 )
 
 type Validator struct {

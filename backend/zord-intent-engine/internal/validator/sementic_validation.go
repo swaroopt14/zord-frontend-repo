@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"main.go/internal/models"
+	"zord-intent-engine/internal/models"
 )
 
 /* ---------- Semantic helpers ---------- */

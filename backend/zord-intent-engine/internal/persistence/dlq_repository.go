@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/google/uuid"
-	"main.go/internal/models"
+	"zord-intent-engine/internal/models"
 )
 
 // DLQRepository defines how DLQ entries are persisted

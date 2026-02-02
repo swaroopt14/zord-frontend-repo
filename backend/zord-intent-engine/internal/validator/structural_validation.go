@@ -2,10 +2,8 @@ package validator
 
 import "main.go/internal/models"
 
-func StructuralValidate(intent models.ParsedIncomingIntent) error {
-	if intent.SchemaVersion == "" {
-		return schemaError("schema_version is required")
-	}
+	"zord-intent-engine/internal/models"
+)
 
 	if intent.IntentType == "" {
 		return schemaError("intent_type is required")
