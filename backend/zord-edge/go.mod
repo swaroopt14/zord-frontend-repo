@@ -3,6 +3,7 @@ module main.go
 go 1.24.1
 
 require (
+	github.com/alicebob/miniredis/v2 v2.36.1
 	github.com/gin-gonic/gin v1.11.0
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
@@ -14,6 +15,8 @@ require (
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0
 	go.opentelemetry.io/otel/sdk v1.24.0
 )
+
+require github.com/yuin/gopher-lua v1.1.1 // indirect
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
