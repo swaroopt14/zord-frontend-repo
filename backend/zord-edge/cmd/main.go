@@ -1,15 +1,16 @@
 package main
 
 import (
+	"context"
 	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"main.go/config"
 	"main.go/db"
+	"main.go/handler"
 	"main.go/routes"
 	"main.go/tracing"
 )
@@ -46,15 +47,20 @@ func main() {
 
 	server := gin.Default()
 
-	// Add OpenTelemetry middleware
-	server.Use(otelgin.Middleware("zord-edge"))
-
-	// Add Prometheus metrics middleware
-	server.Use(prometheusMiddleware())
-
 	config.InitDB()
 	db.CreateTable()
-	routes.Routes(server)
+
+	Rdb := config.InitRedisClient()
+	//Need to remove this
+	t := time.Now()
+	if err := Rdb.Ping(context.Background()).Err(); err != nil {
+		log.Fatal("Redis ping failed:", err)
+	}
+	log.Println("Redis ping latency:", time.Since(t))
+
+	h := &handler.Handler{Redis: Rdb}
+
+	routes.Routes(server, h)
 
 	// Add metrics endpoint
 	server.GET("/metrics", gin.WrapH(promhttp.Handler()))
