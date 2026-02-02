@@ -22,6 +22,9 @@ import (
 func main() {
 	// -------- INIT --------
 	config.InitDB()
+	if err := db.CreateTables(); err != nil {
+		log.Fatal("failed to create tables:", err)
+	}
 	config.InitRedis()
 
 	ctx := context.Background()
@@ -58,12 +61,12 @@ func main() {
 
 	// -------- REDIS CONSUMER (PRIMARY ENTRYPOINT) --------
 	go func() {
-		log.Println("🚀 Ingress consumer started")
+		log.Println("Ingress consumer started")
 
 		for {
 			incoming, err := messaging.ConsumeIngressMessage(ctx)
 			if err != nil {
-				log.Printf("❌ Error consuming ingress message: %v\n", err)
+				log.Printf("Error consuming ingress message: %v\n", err)
 				continue
 			}
 
@@ -74,7 +77,7 @@ func main() {
 
 			if err != nil {
 				// System failure → retry (do NOT ack yet)
-				log.Printf("❌ System error processing intent: %v\n", err)
+				log.Printf("System error processing intent: %v\n", err)
 				continue
 			}
 
@@ -91,7 +94,7 @@ func main() {
 			}
 
 			log.Printf(
-				"✅ Intent processed successfully [intent_id=%s envelope=%s]",
+				"Intent processed successfully [intent_id=%s envelope=%s]",
 				canonical.IntentID,
 				incoming.EnvelopeID,
 			)
@@ -102,6 +105,6 @@ func main() {
 	}()
 
 	// -------- HTTP SERVER --------
-	log.Println("🧠 Intent Engine (Service-2) running on :8081")
+	log.Println("Intent Engine (Service-2) running on :8081")
 	log.Fatal(http.ListenAndServe(":8082", nil))
 }

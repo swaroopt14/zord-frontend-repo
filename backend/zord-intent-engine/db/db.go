@@ -12,8 +12,8 @@ func CreateTables() error {
 	paymentIntents := `
 	CREATE TABLE IF NOT EXISTS payment_intents (
 		intent_id UUID PRIMARY KEY,
-		envelope_id UUID NOT NULL REFERENCES ingress_envelopes(envelope_id),
-		tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
+		envelope_id UUID NOT NULL,
+		tenant_id UUID NOT NULL,
 
 		intent_type TEXT NOT NULL,
 		canonical_version TEXT NOT NULL,
@@ -82,8 +82,8 @@ func CreateTables() error {
 	dlqItems := `
 	CREATE TABLE IF NOT EXISTS dlq_items (
 		dlq_id UUID PRIMARY KEY,
-		tenant_id UUID NOT NULL REFERENCES tenants(tenant_id),
-		envelope_id UUID NOT NULL REFERENCES ingress_envelopes(envelope_id),
+		tenant_id UUID NOT NULL,
+		envelope_id UUID NOT NULL,
 
 		stage TEXT NOT NULL,
 		reason_code TEXT NOT NULL,
