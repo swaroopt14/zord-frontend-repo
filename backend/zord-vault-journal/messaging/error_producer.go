@@ -8,6 +8,12 @@ import (
 	"main.go/model"
 )
 
+const (
+	ClientErrorStream = "client:errors"
+	TraceIDField      = "trace_id"
+	DataField         = "data"
+)
+
 func PublishClientError(ctx context.Context, rdb *redis.Client, errEvent_ model.ClientErrorEvent) error {
 
 	payload, err := json.Marshal(errEvent_)
@@ -16,10 +22,10 @@ func PublishClientError(ctx context.Context, rdb *redis.Client, errEvent_ model.
 	}
 
 	err = rdb.XAdd(ctx, &redis.XAddArgs{
-		Stream: "client:errors",
+		Stream: ClientErrorStream,
 		Values: map[string]interface{}{
-			"trace_id": errEvent_.TraceID,
-			"data":     payload,
+			TraceIDField: errEvent_.TraceID,
+			DataField:    string(payload),
 		},
 	}).Err()
 	if err != nil {

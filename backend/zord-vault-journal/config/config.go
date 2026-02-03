@@ -37,23 +37,17 @@ func InitDB() {
 
 }
 
-func InitRedis() {
-	RedisClient = redis.NewClient(&redis.Options{
-		Addr: getRedisAddr(),
-		DB:   0,
+func InitRedis() *redis.Client {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379", // or from env
+		Password: "",
+		DB:       0,
 	})
 
-	if err := RedisClient.Ping(context.Background()).Err(); err != nil {
-		log.Fatalf("Redis init failed: %v", err)
+	// optional health check
+	if err := rdb.Ping(context.Background()).Err(); err != nil {
+		log.Fatal("failed to connect to redis:", err)
 	}
 
-	log.Println("Redis connected")
-}
-
-func getRedisAddr() string {
-	addr := os.Getenv("REDIS_ADDR")
-	if addr == "" {
-		addr = "localhost:6379" // fallback to default
-	}
-	return addr
+	return rdb
 }

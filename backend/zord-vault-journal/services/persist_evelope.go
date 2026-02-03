@@ -3,9 +3,11 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"main.go/db"
 	"main.go/dto"
 	"main.go/messaging"
@@ -13,7 +15,7 @@ import (
 )
 
 func RawIntent(ctx context.Context,
-	msg model.RawIntentMessage, ack *model.AckMessage) error {
+	msg model.RawIntentMessage, ack *model.AckMessage, rdb *redis.Client) error {
 	var req dto.Intent
 
 	err := json.Unmarshal([]byte(msg.RawPayload), &req)
@@ -58,13 +60,24 @@ func RawIntent(ctx context.Context,
 		&envelope,
 	)
 	if err != nil {
-		log.Printf("Failed to save raw intent: %v", err)
+		if errors.Is(err, ErrDuplicateIdempotencyKey) {
+			// log.Printf("Duplicate entry for Idempotency Key: %s", envelope.IdempotencyKey)
+			_ = messaging.PublishClientError(ctx, rdb, model.ClientErrorEvent{
+				TraceID:    envelope.TraceID.String(),
+				ErrorCode:  "DUPLICATE_IDEMPOTENCY_KEY",
+				ErrorMsg:   "An envelope with the same idempotency key already exists.",
+				HttpStatus: 409,
+			})
+
+			return err
+
+		}
 		return err
 	}
 
 	envelope.Payload = json.RawMessage(msg.RawPayload)
 	// Send to Intent Engine via Redis
-	err = messaging.SendRawIntentMessage(ctx, envelope)
+	err = messaging.SendRawIntentMessage(ctx, envelope, rdb)
 	if err != nil {
 		log.Printf("Failed to send raw intent message: %v", err)
 		return err

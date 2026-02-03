@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 
-	"zord-intent-engine/config"
 	"zord-intent-engine/internal/models"
+
+	"github.com/redis/go-redis/v9"
 )
 
-func ConsumeIngressMessage(ctx context.Context) (*models.IncomingIntent, error) {
+func ConsumeIngressMessage(ctx context.Context, rdb *redis.Client) (*models.IncomingIntent, error) {
 
-	result, err := config.RedisClient.BRPop(ctx,
+	result, err := rdb.BRPop(ctx,
 		0,
 		"vault.envelope.stored.v1",
 	).Result()

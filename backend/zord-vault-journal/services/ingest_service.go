@@ -3,12 +3,13 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log"
 
-	"main.go/config"
-	"main.go/messaging"
 	"main.go/model"
 )
+
+var ErrDuplicateIdempotencyKey = errors.New("duplicate idempotency key")
 
 // intent *model.Payment_Intent,
 func SaveRawIntent(
@@ -45,18 +46,7 @@ func SaveRawIntent(
 		return err
 	}
 	if rows == 0 {
-		// log.Printf("Duplicate entry for Idempotency Key: %s", envelope.IdempotencyKey)
-		err := messaging.PublishClientError(ctx, config.RedisClient, model.ClientErrorEvent{
-			TraceID:    envelope.TraceID.String(),
-			ErrorCode:  "DUPLICATE_IDEMPOTENCY_KEY",
-			ErrorMsg:   "An envelope with the same idempotency key already exists.",
-			HttpStatus: 409,
-		})
-		if err != nil {
-			log.Printf("Failed to publish client error event: %v", err)
-			return err
-		}
-		//log.Printf("Published client error event")
+		return ErrDuplicateIdempotencyKey
 	}
 	return tx.Commit()
 

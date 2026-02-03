@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -37,9 +38,9 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 	}
 
 	errCh := make(chan *model.ErrorEvent, 1)
+	ackCh := make(chan *model.AckMessage, 1)
 	messaging.ConsumeErrorEvent(context.Request.Context(), msg.TraceID, h.Redis, errCh)
-
-	ack, err := messaging.ConsumeAckMessage(context.Request.Context(), msg.TraceID, h.Redis)
+	messaging.ConsumeAckMessage(context.Request.Context(), msg.TraceID, h.Redis, ackCh)
 
 	select {
 	case errEvent := <-errCh:
@@ -50,19 +51,27 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 		})
 		return
 
-	default:
-		//No error event received
-	}
+	case ack := <-ackCh:
+		if ack == nil {
+			context.JSON(http.StatusInternalServerError, gin.H{
+				"error": "ack is nil",
+			})
+			return
+		}
+		context.JSON(http.StatusAccepted, gin.H{
+			"EnvelopeID":  ack.EnvelopeId,
+			"Trace_id":    ack.TraceID,
+			"Received_At": ack.ReceivedAt})
+	//No error event received
 
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"error": "failed to consume ack message from service 2"})
+	case <-time.After(10 * time.Second):
+		context.JSON(http.StatusGatewayTimeout, gin.H{
+			"error": "timeout waiting for downstream response",
+		})
 		return
-	}
-	//Need to change this err process with go routine to listen error event
 
-	context.JSON(http.StatusAccepted, gin.H{
-		"EnvelopeID":  ack.EnvelopeId,
-		"Trace_id":    ack.TraceID,
-		"Received_At": ack.ReceivedAt})
+	}
+
+	//Need to change this err process with go routine to listen error event
 
 }
