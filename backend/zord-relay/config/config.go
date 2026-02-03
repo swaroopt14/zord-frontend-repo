@@ -14,7 +14,8 @@ type Config struct {
 	ReadyTopic         string
 	DLQTopic           string
 	PayoutTopic        string
-	DBURL              string
+	SinkDBURL          string
+	SourceDBURL        string
 	WorkerCount        int
 	BatchSize          int
 	MaxRetries         int
@@ -55,7 +56,8 @@ func Load() *Config {
 		ReadyTopic:         getEnv("KAFKA_READY_TOPIC", "z.intent.ready.v1"),
 		DLQTopic:           getEnv("KAFKA_DLQ_TOPIC", "z.intent.dlq.v1"),
 		PayoutTopic:        getEnv("KAFKA_PAYOUT_TOPIC", "payout_contract.v1"),
-		DBURL:              getEnv("DATABASE_URL", ""),
+		SinkDBURL:          getEnv("SINK_DATABASE_URL", ""),
+		SourceDBURL:        getEnv("SOURCE_DATABASE_URL", ""),
 		WorkerCount:        workerCount,
 		BatchSize:          batchSize,
 		MaxRetries:         maxRetries,

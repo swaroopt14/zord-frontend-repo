@@ -82,9 +82,6 @@ func (h *DummyProviderHandler) HandleMessage(ctx context.Context, topic string, 
 	if err != nil {
 		return err
 	}
-	_, _ = h.db.Exec(`INSERT INTO tenants (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING`, uuid.MustParse(tenantID))
-	_, _ = h.db.Exec(`INSERT INTO payment_intents (intent_id) VALUES ($1) ON CONFLICT (intent_id) DO NOTHING`, uuid.MustParse(intentID))
-	_, _ = h.db.Exec(`INSERT INTO ingress_envelopes (envelope_id) VALUES ($1) ON CONFLICT (envelope_id) DO NOTHING`, uuid.MustParse(envelopeID))
 	_, err = h.db.Exec(`INSERT INTO payout_contracts (contract_id, tenant_id, intent_id, envelope_id, contract_payload, contract_hash, status, created_at, trace_id)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		ON CONFLICT (intent_id) DO NOTHING`,
@@ -113,11 +110,11 @@ func main() {
 		w.Write([]byte("OK"))
 	})
 
-		port := os.Getenv("HEALTH_PORT")
-		if port == "" {
-			port = "8082"
-		}
-		server := &http.Server{Addr: ":" + port}
+	port := os.Getenv("HEALTH_PORT")
+	if port == "" {
+		port = "8082"
+	}
+	server := &http.Server{Addr: ":" + port}
 	go func() {
 		utils.Logger.Info("Starting health check server on :" + port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -125,9 +122,17 @@ func main() {
 		}
 	}()
 
-	database := db.Connect(cfg.DBURL)
+	sinkDB := db.Connect(cfg.SinkDBURL)
+	defer sinkDB.Close()
+
+	sourceDB := db.Connect(cfg.SourceDBURL)
+	defer sourceDB.Close()
+
 	producer := kafka.NewProducer(cfg.KafkaBrokers)
+	defer producer.Close()
+
 	consumer := kafka.NewConsumer(cfg.KafkaBrokers, cfg.KafkaConsumerGroup)
+	defer consumer.Close()
 
 	pubCfg := &services.Config{
 		ReadyTopic:   cfg.ReadyTopic,
@@ -139,11 +144,11 @@ func main() {
 		PollInterval: cfg.PollInterval,
 	}
 
-	publisher := services.NewPublisher(database, producer, pubCfg)
+	publisher := services.NewPublisher(sourceDB, producer, pubCfg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	publisher.Start(ctx)
-	consumer.Consume(ctx, []string{cfg.ReadyTopic}, &DummyProviderHandler{db: database, producer: producer, dlqTopic: cfg.DLQTopic})
+	consumer.Consume(ctx, []string{cfg.ReadyTopic}, &DummyProviderHandler{db: sinkDB, producer: producer, dlqTopic: cfg.DLQTopic})
 
 	http.HandleFunc("/admin/replay", func(w http.ResponseWriter, r *http.Request) {
 		token := r.Header.Get("Authorization")
@@ -159,12 +164,12 @@ func main() {
 		}
 		var aggID, evType, tenantID, traceID, envID string
 		var payload []byte
-		err := database.QueryRow(`SELECT aggregate_id, event_type, payload, tenant_id, trace_id, envelope_id FROM dlq_events WHERE envelope_id=$1 ORDER BY created_at DESC LIMIT 1`, envelopeID).Scan(&aggID, &evType, &payload, &tenantID, &traceID, &envID)
+		err := sinkDB.QueryRow(`SELECT aggregate_id, event_type, payload, tenant_id, trace_id, envelope_id FROM dlq_events WHERE envelope_id=$1 ORDER BY created_at DESC LIMIT 1`, envelopeID).Scan(&aggID, &evType, &payload, &tenantID, &traceID, &envID)
 		if err != nil {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		_, err = database.Exec(`INSERT INTO outbox (id, aggregate_id, event_type, payload, status, retry_count, tenant_id, trace_id, envelope_id, created_at) VALUES ($1,$2,$3,$4,'PENDING',0,$5,$6,$7,NOW()) ON CONFLICT (envelope_id) DO NOTHING`,
+		_, err = sourceDB.Exec(`INSERT INTO outbox (outbox_id, aggregate_id, event_type, payload, status, attempts, tenant_id, trace_id, envelope_id, created_at) VALUES ($1,$2,$3,$4,'PENDING',0,$5,$6,$7,NOW())`,
 			uuid.New(), aggID, evType, payload, tenantID, traceID, envID)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -184,6 +189,4 @@ func main() {
 	}
 
 	cancel()
-	consumer.Close()
-	producer.Close()
 }
