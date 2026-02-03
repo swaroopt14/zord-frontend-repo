@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"log"
 
-	"main.go/config"
+	"github.com/redis/go-redis/v9"
 	"main.go/model"
 )
 
@@ -16,10 +16,12 @@ type RawIntentHandler func(
 
 func StartRawIntentWorker(
 	ctx context.Context,
+	rdb *redis.Client,
 	handler RawIntentHandler,
+
 ) {
 	for {
-		result, err := config.RedisClient.BRPop(
+		result, err := rdb.BRPop(
 			ctx,
 			0,
 			"Intent_Data",

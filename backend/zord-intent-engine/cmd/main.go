@@ -25,7 +25,8 @@ func main() {
 	if err := db.CreateTables(); err != nil {
 		log.Fatal("failed to create tables:", err)
 	}
-	config.InitRedis()
+
+	Rdb := config.InitRedis()
 
 	ctx := context.Background()
 
@@ -64,7 +65,7 @@ func main() {
 		log.Println("Ingress consumer started")
 
 		for {
-			incoming, err := messaging.ConsumeIngressMessage(ctx)
+			incoming, err := messaging.ConsumeIngressMessage(ctx, Rdb)
 			if err != nil {
 				log.Printf("Error consuming ingress message: %v\n", err)
 				continue
@@ -83,13 +84,22 @@ func main() {
 
 			if dlq != nil {
 				// Business failure → DLQ already persisted
+				// err := messaging.ProduceErrorEvent(ctx, config.RedisClient, models.ErrorEvent{
+				// 	TraceID:    incoming.TraceID.String(),
+				// 	ErrorCode:  dlq.ReasonCode,
+				// 	ErrorMsg:   "INTENT_PROCESSED_TO_DLQ",
+				// 	HttpStatus: http.StatusBadRequest,
+				// })
+				// if err != nil {
+				// 	log.Printf("Failed to produce error event: %v\n", err)
+				// }
 				log.Printf(
 					"⚠️ Intent rejected [tenant=%s envelope=%s reason=%s]",
 					incoming.TenantID,
 					incoming.EnvelopeID,
 					dlq.ReasonCode,
 				)
-				// STEP 11 (ACK) will still happen
+
 				continue
 			}
 

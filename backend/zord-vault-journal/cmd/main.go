@@ -11,6 +11,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"main.go/config"
 	"main.go/db"
@@ -46,6 +47,8 @@ func init() {
 	prometheus.MustRegister(s3OperationsTotal)
 }
 
+var Rdb *redis.Client
+
 func main() {
 	// Initialize tracing
 	cleanup := tracing.InitTracing("zord-vault-journal")
@@ -54,8 +57,9 @@ func main() {
 	ctx := context.Background()
 
 	config.InitDB()
-	config.InitRedis()
 	db.CreateTable()
+
+	Rdb = config.InitRedis()
 
 	err := godotenv.Load()
 	if err != nil {
@@ -75,15 +79,18 @@ func main() {
 	}
 
 	// Start message processing worker
-	go messaging.StartRawIntentWorker(ctx, func(ctx context.Context, msg model.RawIntentMessage) error {
+	go messaging.StartRawIntentWorker(ctx, Rdb, func(ctx context.Context, msg model.RawIntentMessage) error {
 		ack, err := services.ProcessRawIntent(ctx, msg, s3store)
 		if err != nil {
 			return err
 		}
-		if err := services.RawIntent(ctx, msg, ack); err != nil {
+		if ack == nil {
+			return fmt.Errorf("ack is nil for trace_id=%s", msg.TraceID)
+		}
+		if err := services.RawIntent(ctx, msg, ack, Rdb); err != nil {
 			return err
 		}
-		return messaging.SendACKMessage(ctx, *ack)
+		return messaging.SendACKMessage(ctx, *ack, Rdb)
 	})
 
 	// Start HTTP server for metrics and health checks

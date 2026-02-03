@@ -5,27 +5,26 @@ import (
 	"encoding/json"
 	"log"
 
-	"main.go/config"
+	"github.com/redis/go-redis/v9"
 	"main.go/model"
 )
 
-func SendACKMessage(ctx context.Context, ack model.AckMessage) error {
+func SendACKMessage(ctx context.Context, ack model.AckMessage, rdb *redis.Client) error {
 	data, err := json.Marshal(ack)
 	if err != nil {
 		return err
 	}
 
-	config.RedisClient.LPush(ctx, ack.TraceID, data)
+	return rdb.LPush(ctx, ack.TraceID, data).Err()
 
-	return nil
 }
-func SendRawIntentMessage(ctx context.Context, msg model.IngressEnvolope) error {
+func SendRawIntentMessage(ctx context.Context, msg model.IngressEnvolope, rdb *redis.Client) error {
 	data, err := json.Marshal(msg)
 	if err != nil {
 		return err
 
 	}
-	err = config.RedisClient.LPush(ctx, "vault.envelope.stored.v1", data).Err()
+	err = rdb.LPush(ctx, "vault.envelope.stored.v1", data).Err()
 	if err != nil {
 		return err
 	}
