@@ -46,7 +46,7 @@ export default function OpsLoginPage() {
     })
     setCurrentRole('OPS')
     
-    router.push('/ops/ingestion/monitor')
+    router.push('/ops/tenants')
   }
 
   const handleLogin = async (
@@ -90,7 +90,7 @@ export default function OpsLoginPage() {
     })
     setCurrentRole('OPS')
     
-    router.push('/ops/ingestion/monitor')
+    router.push('/ops/tenants')
   }
 
   const handleLoginClick = () => {

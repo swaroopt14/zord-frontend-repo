@@ -2,7 +2,9 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { isAuthenticated, getCurrentUser } from '@/services/auth'
+import { Layout } from '@/components/aws'
 import { RoleSwitcher } from '@/components/auth'
 
 export default function TenantsPage() {
@@ -29,7 +31,7 @@ export default function TenantsPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <Layout serviceName="" breadcrumbs={['Admin', 'Tenants']}>
       <RoleSwitcher />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
@@ -92,6 +94,6 @@ export default function TenantsPage() {
           </table>
         </div>
       </div>
-    </div>
+    </Layout>
   )
 }
