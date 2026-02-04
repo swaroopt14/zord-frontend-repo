@@ -1,0 +1,309 @@
+# ============================================================================
+# ZORD PLATFORM - COMPLETE MICROSERVICES DEPLOYMENT
+# Single-click deployment for all Zord services with full connectivity
+# ============================================================================
+
+version: "3.8"
+
+services:
+  # ============================================================================
+  # DATABASES
+  # ============================================================================
+
+  # Shared Redis for message queues
+  redis:
+    image: redis:7-alpine
+    container_name: zord-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - zord-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL for zord-edge
+  postgres-edge:
+    image: postgres:16-alpine
+    container_name: zord-edge-postgres
+    environment:
+      - POSTGRES_USER=edge_user
+      - POSTGRES_PASSWORD=edge_password
+      - POSTGRES_DB=zord_edge_db
+    volumes:
+      - postgres_edge_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - zord-network
+    restart: unless-stopped
+
+  # PostgreSQL for zord-vault-journal
+  postgres-vault:
+    image: postgres:16-alpine
+    container_name: zord-vault-postgres
+    environment:
+      - POSTGRES_USER=vault_user
+      - POSTGRES_PASSWORD=vault_password
+      - POSTGRES_DB=zord_vault_journal_db
+    volumes:
+      - postgres_vault_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - zord-network
+    restart: unless-stopped
+
+  # PostgreSQL for zord-intent-engine
+  postgres-intent:
+    image: postgres:16-alpine
+    container_name: zord-intent-postgres
+    environment:
+      - POSTGRES_USER=intent_user
+      - POSTGRES_PASSWORD=intent_password
+      - POSTGRES_DB=zord_intent_engine_db
+    volumes:
+      - postgres_intent_data:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+    networks:
+      - zord-network
+    restart: unless-stopped
+
+  # PostgreSQL for zord-relay
+  postgres-relay:
+    image: postgres:16-alpine
+    container_name: zord-relay-postgres
+    environment:
+      - POSTGRES_USER=relay_user
+      - POSTGRES_PASSWORD=relay_password
+      - POSTGRES_DB=zord_relay_db
+    volumes:
+      - postgres_relay_data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    networks:
+      - zord-network
+    restart: unless-stopped
+
+  # Kafka for zord-relay
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: zord-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092"
+      KAFKA_LISTENERS: "PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:29093"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      CLUSTER_ID: "abcdefghijklmnopqrstuv"
+    ports:
+      - "9092:9092"
+    networks:
+      - zord-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "kafka-topics",
+          "--bootstrap-server",
+          "localhost:9092",
+          "--list",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ============================================================================
+  # MICROSERVICES
+  # ============================================================================
+
+  # zord-edge - API Gateway & Ingestion
+  zord-edge:
+    build:
+      context: ./backend/zord-edge
+      dockerfile: Dockerfile
+    container_name: zord-edge-service
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=postgres-edge
+      - DB_PORT=5432
+      - DB_USER=edge_user
+      - DB_PASSWORD=edge_password
+      - DB_NAME=zord_edge_db
+      - DB_SSLMODE=disable
+      - REDIS_ADDR=redis:6379
+      - VAULT_JOURNAL_URL=http://zord-vault-journal:8081
+      - INTENT_ENGINE_URL=http://zord-intent-engine:8083
+      - ENVIRONMENT=production
+    depends_on:
+      - postgres-edge
+      - redis
+    networks:
+      - zord-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # zord-vault-journal - Secure Storage & Audit
+  zord-vault-journal:
+    build:
+      context: ./backend/zord-vault-journal
+      dockerfile: Dockerfile
+    container_name: zord-vault-journal-service
+    ports:
+      - "8081:8081"
+    environment:
+      - DB_HOST=postgres-vault
+      - DB_PORT=5432
+      - DB_USER=vault_user
+      - DB_PASSWORD=vault_password
+      - DB_NAME=zord_vault_journal_db
+      - DB_SSLMODE=disable
+      - REDIS_ADDR=redis:6379
+      - S3_BUCKET=zord-vault
+      - S3_REGION=eu-north-1
+      - ENCRYPTION_KEY=change-me-in-production-32-chars
+      - ENVIRONMENT=production
+    depends_on:
+      - postgres-vault
+      - redis
+    networks:
+      - zord-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # zord-intent-engine - Intent Processing & Validation
+  zord-intent-engine:
+    build:
+      context: ./backend/zord-intent-engine
+      dockerfile: Dockerfile
+    container_name: zord-intent-engine-service
+    ports:
+      - "8083:8083"
+    environment:
+      - DB_HOST=postgres-intent
+      - DB_PORT=5432
+      - DB_USER=intent_user
+      - DB_PASSWORD=intent_password
+      - DB_NAME=zord_intent_engine_db
+      - DB_SSLMODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - VAULT_JOURNAL_URL=http://zord-vault-journal:8081
+      - PII_ENCLAVE_URL=http://zord-pii-enclave:8085
+      - PII_TOKEN_SECRET=your-secret-key-for-pii-tokenization-change-in-production
+      - ENVIRONMENT=production
+    depends_on:
+      - postgres-intent
+      - redis
+    networks:
+      - zord-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # zord-relay - Message Broker & Routing
+  zord-relay:
+    build:
+      context: ./backend/zord-relay
+      dockerfile: Dockerfile
+    container_name: zord-relay-service
+    ports:
+      - "8082:8082"
+    environment:
+      - DATABASE_URL=postgres://relay_user:relay_password@postgres-relay:5432/zord_relay_db?sslmode=disable
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_CONSUMER_GROUP=zord-relay-group
+      - HTTP_PORT=8082
+      - OUTBOX_POLL_INTERVAL=5s
+      - OUTBOX_BATCH_SIZE=10
+      - ENVIRONMENT=production
+      - SERVICE_NAME=zord-relay
+    depends_on:
+      - postgres-relay
+      - kafka
+    networks:
+      - zord-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # zord-console - Web Dashboard
+  zord-console:
+    build:
+      context: ./backend/zord-console
+      dockerfile: Dockerfile
+    container_name: zord-console-service
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+      - ZORD_EDGE_URL=http://zord-edge:8080
+      - ZORD_VAULT_URL=http://zord-vault-journal:8081
+      - ZORD_INTENT_URL=http://zord-intent-engine:8083
+      - ZORD_RELAY_URL=http://zord-relay:8082
+    depends_on:
+      - zord-edge
+      - zord-vault-journal
+      - zord-intent-engine
+      - zord-relay
+    networks:
+      - zord-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/api/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# ============================================================================
+# VOLUMES & NETWORKS
+# ============================================================================
+
+volumes:
+  postgres_edge_data:
+  postgres_vault_data:
+  postgres_intent_data:
+  postgres_relay_data:
+
+networks:
+  zord-network:
+    driver: bridge
