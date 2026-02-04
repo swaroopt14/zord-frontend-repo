@@ -37,6 +37,14 @@ type CanonicalIntentRepository interface {
 		tenantID string,
 		envelopeID string,
 	) (*models.CanonicalIntent, error)
+
+	UpdateCanonicalSnapshotMeta(
+		ctx context.Context,
+		intentID string,
+		objectRef string,
+		hash string,
+		prevHash string,
+	) error
 }
 
 func NewIntentService(
@@ -234,35 +242,7 @@ func (s *IntentService) ProcessIncomingIntent(
 		CreatedAt: time.Now().UTC(),
 	}
 
-	// -------- WORM SNAPSHOT (NEW) --------
-
-	// versioning: v1 for now
-	version := 1
-	prevHash := "" // later: fetch from DB if version > 1
-
-	canonicalBytes, err := json.Marshal(canonical)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	objectRef, hash, err := s.s3.StoreCanonicalSnapshot(
-		ctx,
-		canonical.TenantID,
-		canonical.IntentID,
-		version,
-		canonicalBytes,
-		prevHash,
-	)
-	if err != nil {
-		return nil, nil, err // ❌ DO NOT SAVE DB IF S3 FAILS
-	}
-
-	// attach WORM metadata
-	canonical.CanonicalRef = objectRef
-	canonical.CanonicalHash = hash
-	canonical.PrevHash = prevHash
-
-	// -------- STEP 10: OUTBOX + PERSISTENCE --------
+	// -------- STEP 10: OUTBOX + PERSISTENCE (ATOMIC DB) --------
 
 	outbox, err := CanonicalIntentToOutboxEvent(canonical, in.Payload)
 	if err != nil {
@@ -274,5 +254,47 @@ func (s *IntentService) ProcessIncomingIntent(
 		return nil, nil, err
 	}
 
+	// -------- STEP 11: WORM SNAPSHOT (S3) --------
+
+	// versioning: v1 for now
+	version := 1
+	prevHash := "" // later: fetch last hash if version > 1
+
+	canonicalBytes, err := json.Marshal(saved)
+	if err != nil {
+		return &saved, nil, err
+	}
+
+	objectRef, hash, err := s.s3.StoreCanonicalSnapshot(
+		ctx,
+		saved.TenantID,
+		saved.IntentID,
+		version,
+		canonicalBytes,
+		prevHash,
+	)
+	if err != nil {
+		// ⚠️ Do NOT rollback DB. Log + alert + retry mechanism later.
+		return &saved, nil, err
+	}
+
+	// -------- STEP 12: UPDATE DB WITH WORM METADATA --------
+
+	err = s.repo.UpdateCanonicalSnapshotMeta(
+		ctx,
+		saved.IntentID,
+		objectRef,
+		hash,
+		prevHash,
+	)
+	if err != nil {
+		return &saved, nil, err
+	}
+
+	saved.CanonicalRef = objectRef
+	saved.CanonicalHash = hash
+	saved.PrevHash = prevHash
+
 	return &saved, nil, nil
+
 }

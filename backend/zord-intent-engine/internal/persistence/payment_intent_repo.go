@@ -56,22 +56,25 @@ func (r *PaymentIntentRepo) Save(
 	_, err = tx.ExecContext(
 		ctx,
 		query,
-		intent.IntentID,
-		intent.EnvelopeID,
-		intent.TenantID,
-		intent.IntentType,
-		intent.CanonicalVersion,
-		intent.SchemaVersion,
-		intent.Amount,
-		intent.Currency,
-		intent.DeadlineAt,
-		intent.Constraints,
-		intent.BeneficiaryType,
-		intent.PIITokens,
-		intent.Beneficiary,
-		intent.Status,
-		intent.ConfidenceScore,
-		intent.CreatedAt,
+		intent.IntentID,         // $1
+		intent.EnvelopeID,       // $2
+		intent.TenantID,         // $3
+		intent.IntentType,       // $4
+		intent.CanonicalVersion, // $5
+		intent.SchemaVersion,    // $6
+		intent.Amount,           // $7
+		intent.Currency,         // $8
+		intent.DeadlineAt,       // $9
+		intent.Constraints,      // $10
+		intent.BeneficiaryType,  // $11
+		intent.PIITokens,        // $12
+		intent.Beneficiary,      // $13
+		intent.Status,           // $14
+		intent.ConfidenceScore,  // $15
+		intent.CanonicalRef,     // $16  ✅ new
+		intent.CanonicalHash,    // $17  ✅ new
+		intent.PrevHash,         // $18  ✅ new
+		intent.CreatedAt,        // $19
 	)
 
 	if err != nil {
@@ -180,4 +183,23 @@ func (r *PaymentIntentRepo) FindByEnvelope(
 	}
 
 	return &intent, nil
+}
+
+func (r *PaymentIntentRepo) UpdateCanonicalSnapshotMeta(
+	ctx context.Context,
+	intentID string,
+	objectRef string,
+	hash string,
+	prevHash string,
+) error {
+	query := `
+	UPDATE payment_intents
+	SET canonical_ref = $1,
+	    canonical_hash = $2,
+	    prev_hash = $3
+	WHERE intent_id = $4
+	`
+
+	_, err := r.db.ExecContext(ctx, query, objectRef, hash, prevHash, intentID)
+	return err
 }
