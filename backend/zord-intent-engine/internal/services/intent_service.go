@@ -225,6 +225,10 @@ func (s *IntentService) ProcessIncomingIntent(
 		EnvelopeID: in.EnvelopeID.String(),
 		TenantID:   in.TenantID.String(),
 
+		TraceID:        in.TraceID.String(),
+		IdempotencyKey: in.IdempotencyKey,
+		SalientHash:    in.PayloadHash,
+
 		IntentType:       canonicalInput.IntentType,
 		CanonicalVersion: "v1",
 		SchemaVersion:    canonicalInput.SchemaVersion,

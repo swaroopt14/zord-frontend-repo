@@ -15,6 +15,10 @@ func CreateTables() error {
     envelope_id UUID NOT NULL,
     tenant_id UUID NOT NULL,
 
+	trace_id TEXT NOT NULL,
+    idempotency_key TEXT,
+    salient_hash TEXT NOT NULL,
+
     intent_type TEXT NOT NULL,
     canonical_version TEXT NOT NULL,
     schema_version TEXT,

@@ -10,6 +10,11 @@ type CanonicalIntent struct {
 	EnvelopeID string `json:"envelope_id"`
 	TenantID   string `json:"tenant_id"`
 
+	// ✅ ADD THESE
+	TraceID        string `json:"trace_id" db:"trace_id"`
+	IdempotencyKey string `json:"idempotency_key" db:"idempotency_key"`
+	SalientHash    string `json:"salient_hash" db:"salient_hash"`
+
 	IntentType       string `json:"intent_type"`
 	CanonicalVersion string `json:"canonical_version"`
 	SchemaVersion    string `json:"schema_version"`
@@ -30,7 +35,6 @@ type CanonicalIntent struct {
 	CreatedAt time.Time `json:"created_at"`
 
 	// 🆕 WORM fields
-	// 🆕 EXACTLY like ObjectRef pattern
 	CanonicalRef  string `db:"canonical_ref"`
 	CanonicalHash string `db:"canonical_hash"`
 	PrevHash      string `db:"prev_hash"`

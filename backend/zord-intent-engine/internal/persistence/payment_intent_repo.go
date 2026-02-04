@@ -36,45 +36,57 @@ func (r *PaymentIntentRepo) Save(
 	query := `
 	INSERT INTO payment_intents (
     intent_id, envelope_id, tenant_id,
+    trace_id, idempotency_key, salient_hash,
     intent_type, canonical_version, schema_version,
     amount, currency, deadline_at,
     constraints, beneficiary_type, pii_tokens, beneficiary,
     status, confidence_score,
     canonical_ref, canonical_hash, prev_hash,
     created_at
-	)
-	VALUES (
+)
+VALUES (
     $1,$2,$3,
     $4,$5,$6,
     $7,$8,$9,
-    $10,$11,$12,$13,
-    $14,$15,
-    $16,$17,$18,
-    $19
+    $10,$11,$12,
+    $13,$14,$15,$16,
+    $17,$18,
+    $19,$20,$21,
+    $22
 )`
 
 	_, err = tx.ExecContext(
 		ctx,
 		query,
-		intent.IntentID,         // $1
-		intent.EnvelopeID,       // $2
-		intent.TenantID,         // $3
-		intent.IntentType,       // $4
-		intent.CanonicalVersion, // $5
-		intent.SchemaVersion,    // $6
-		intent.Amount,           // $7
-		intent.Currency,         // $8
-		intent.DeadlineAt,       // $9
-		intent.Constraints,      // $10
-		intent.BeneficiaryType,  // $11
-		intent.PIITokens,        // $12
-		intent.Beneficiary,      // $13
-		intent.Status,           // $14
-		intent.ConfidenceScore,  // $15
-		intent.CanonicalRef,     // $16  ✅ new
-		intent.CanonicalHash,    // $17  ✅ new
-		intent.PrevHash,         // $18  ✅ new
-		intent.CreatedAt,        // $19
+		intent.IntentID,   // $1
+		intent.EnvelopeID, // $2
+		intent.TenantID,   // $3
+
+		intent.TraceID,        // $4  ✅ new
+		intent.IdempotencyKey, // $5  ✅ new
+		intent.SalientHash,    // $6  ✅ new
+
+		intent.IntentType,       // $7
+		intent.CanonicalVersion, // $8
+		intent.SchemaVersion,    // $9
+
+		intent.Amount,     // $10
+		intent.Currency,   // $11
+		intent.DeadlineAt, // $12
+
+		intent.Constraints,     // $13
+		intent.BeneficiaryType, // $14
+		intent.PIITokens,       // $15
+		intent.Beneficiary,     // $16
+
+		intent.Status,          // $17
+		intent.ConfidenceScore, // $18
+
+		intent.CanonicalRef,  // $19
+		intent.CanonicalHash, // $20
+		intent.PrevHash,      // $21
+
+		intent.CreatedAt, // $22
 	)
 
 	if err != nil {
