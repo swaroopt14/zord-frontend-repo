@@ -28,4 +28,10 @@ type CanonicalIntent struct {
 	ConfidenceScore *float64 `json:"confidence_score,omitempty"`
 
 	CreatedAt time.Time `json:"created_at"`
+
+	// 🆕 WORM fields
+	// 🆕 EXACTLY like ObjectRef pattern
+	CanonicalRef  string `db:"canonical_ref"`
+	CanonicalHash string `db:"canonical_hash"`
+	PrevHash      string `db:"prev_hash"`
 }

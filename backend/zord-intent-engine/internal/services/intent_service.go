@@ -14,12 +14,14 @@ import (
 	"zord-intent-engine/internal/models"
 	"zord-intent-engine/internal/pii"
 	"zord-intent-engine/internal/validator"
+	"zord-intent-engine/storage"
 )
 
 type IntentService struct {
 	validator *validator.Validator
 	tokenizer *pii.Tokenizer
 	repo      CanonicalIntentRepository
+	s3        *storage.S3Store
 }
 
 // Repository abstraction
@@ -41,11 +43,13 @@ func NewIntentService(
 	v *validator.Validator,
 	t *pii.Tokenizer,
 	r CanonicalIntentRepository,
+	s3 *storage.S3Store, // ✅ ADD
 ) *IntentService {
 	return &IntentService{
 		validator: v,
 		tokenizer: t,
 		repo:      r,
+		s3:        s3,
 	}
 }
 
@@ -229,6 +233,34 @@ func (s *IntentService) ProcessIncomingIntent(
 		Status:    "CREATED",
 		CreatedAt: time.Now().UTC(),
 	}
+
+	// -------- WORM SNAPSHOT (NEW) --------
+
+	// versioning: v1 for now
+	version := 1
+	prevHash := "" // later: fetch from DB if version > 1
+
+	canonicalBytes, err := json.Marshal(canonical)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	objectRef, hash, err := s.s3.StoreCanonicalSnapshot(
+		ctx,
+		canonical.TenantID,
+		canonical.IntentID,
+		version,
+		canonicalBytes,
+		prevHash,
+	)
+	if err != nil {
+		return nil, nil, err // ❌ DO NOT SAVE DB IF S3 FAILS
+	}
+
+	// attach WORM metadata
+	canonical.CanonicalRef = objectRef
+	canonical.CanonicalHash = hash
+	canonical.PrevHash = prevHash
 
 	// -------- STEP 10: OUTBOX + PERSISTENCE --------
 

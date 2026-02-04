@@ -11,28 +11,33 @@ func CreateTables() error {
 
 	paymentIntents := `
 	CREATE TABLE IF NOT EXISTS payment_intents (
-		intent_id UUID PRIMARY KEY,
-		envelope_id UUID NOT NULL,
-		tenant_id UUID NOT NULL,
+    intent_id UUID PRIMARY KEY,
+    envelope_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
 
-		intent_type TEXT NOT NULL,
-		canonical_version TEXT NOT NULL,
-		schema_version TEXT,
+    intent_type TEXT NOT NULL,
+    canonical_version TEXT NOT NULL,
+    schema_version TEXT,
 
-		amount NUMERIC(18,2) NOT NULL,
-		currency CHAR(3) NOT NULL,
-		deadline_at TIMESTAMPTZ,
+    amount NUMERIC(18,2) NOT NULL,
+    currency CHAR(3) NOT NULL,
+    deadline_at TIMESTAMPTZ,
 
-		constraints JSONB,
-		beneficiary_type TEXT,
-		pii_tokens JSONB,
-		beneficiary JSONB,
+    constraints JSONB,
+    beneficiary_type TEXT,
+    pii_tokens JSONB,
+    beneficiary JSONB,
 
-		status TEXT NOT NULL,
-		confidence_score NUMERIC(5,2),
+    status TEXT NOT NULL,
+    confidence_score NUMERIC(5,2),
 
-		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-	);`
+    -- 🆕 WORM / Tamper-evidence fields
+    canonical_hash TEXT NOT NULL,
+    prev_hash TEXT,
+    canonical_ref TEXT NOT NULL,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);`
 
 	if _, err := DB.Exec(paymentIntents); err != nil {
 		return err
