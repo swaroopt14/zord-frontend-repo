@@ -115,6 +115,6 @@ func main() {
 	}()
 
 	// -------- HTTP SERVER --------
-	log.Println("Intent Engine (Service-2) running on :8081")
-	log.Fatal(http.ListenAndServe(":8082", nil))
+	log.Println("Intent Engine (Service-2) running on :8083")
+	log.Fatal(http.ListenAndServe(":8083", nil))
 }

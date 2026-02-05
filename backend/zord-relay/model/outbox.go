@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 type OutboxEvent struct {
 	ID          string
@@ -13,6 +16,6 @@ type OutboxEvent struct {
 	CreatedAt   time.Time
 
 	TenantID   string
-	TraceID    string
-	EnvelopeID string
+	TraceID     sql.NullString
+	EnvelopeID  sql.NullString
 }

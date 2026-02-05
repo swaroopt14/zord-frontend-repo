@@ -18,8 +18,10 @@ services: # Define the containers/services to run
       - DB_SSLMODE=disable # Disable SSL for local Docker connections
       - ENVIRONMENT=production # Environment setting
       - JAEGER_ENDPOINT=http://host.docker.internal:14268/api/traces # Jaeger tracing endpoint
+      - REDIS_ADDR=zord-vault-redis:6379 # Redis address (Shared Redis)
     depends_on: # Service dependencies (start postgres first)
       - postgres
+      - redis
     networks: # Networks this service connects to
       - zord-network
     restart: unless-stopped # Restart policy (restart unless manually stopped)
@@ -45,16 +47,38 @@ services: # Define the containers/services to run
       - POSTGRES_PASSWORD=zord_password # Database password
       - POSTGRES_DB=zord_edge_db # Default database to create
     volumes: # Volume mounts for data persistence
-      - postgres_data:/var/lib/postgresql/data # Mount data directory
+      - postgres_data_fix:/var/lib/postgresql/data # Mount data directory
     ports: # External access port (different from internal to avoid conflicts)
       - "5433:5432" # Map host port 5433 to container port 5432
     networks: # Networks this service connects to
       - zord-network
     restart: unless-stopped # Restart policy
+    healthcheck: # Health check configuration
+      test: ["CMD-SHELL", "pg_isready -U zord_user -d zord_edge_db"] # Check if database is ready
+      interval: 10s # Check interval
+      timeout: 5s # Check timeout
+      retries: 5 # Number of retries before marking unhealthy
+      start_period: 10s # Initial delay before starting health checks
+
+  redis: # Redis service
+    image: redis:alpine # Docker image to use
+    container_name: zord-edge-redis # Container name
+    ports: # External access port
+      - "6379:6379" # Map host port 6379 to container port 6379
+    networks: # Networks this service connects to
+      - zord-network
+    restart: unless-stopped # Restart policy
+    healthcheck: # Health check configuration
+      test: ["CMD", "redis-cli", "ping"] # Check if redis is ready
+      interval: 10s # Check interval
+      timeout: 5s # Check timeout
+      retries: 5 # Number of retries before marking unhealthy
+      start_period: 10s # Initial delay before starting health checks
 
 volumes: # Named volumes for data persistence
-  postgres_data: # Volume for PostgreSQL data
+  postgres_data_fix: # Volume for PostgreSQL data
 
 networks: # Custom networks for service communication
   zord-network: # Isolated network for Zord services
-    driver: bridge # Bridge network driver for container communication
+    external: true
+    name: zord-shared-network

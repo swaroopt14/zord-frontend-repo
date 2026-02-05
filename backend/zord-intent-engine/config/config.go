@@ -39,8 +39,22 @@ func InitDB() {
 }
 
 func InitRedis() *redis.Client {
+	// Construct the Redis address from environment variables
+	addr := os.Getenv("REDIS_ADDR")
+	if addr == "" {
+		host := os.Getenv("REDIS_HOST")
+		port := os.Getenv("REDIS_PORT")
+		if host == "" {
+			host = "localhost"
+		}
+		if port == "" {
+			port = "6379"
+		}
+		addr = fmt.Sprintf("%s:%s", host, port)
+	}
+
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     os.Getenv("localhost:6379"), // or from env
+		Addr:     addr,
 		Password: "",
 		DB:       0,
 	})

@@ -19,7 +19,6 @@ import (
 	"main.go/model"
 	"main.go/services"
 	"main.go/storage"
-	"main.go/tracing"
 )
 
 var (
@@ -51,8 +50,8 @@ var Rdb *redis.Client
 
 func main() {
 	// Initialize tracing
-	cleanup := tracing.InitTracing("zord-vault-journal")
-	defer cleanup()
+	// cleanup := tracing.InitTracing("zord-vault-journal")
+	// defer cleanup()
 
 	ctx := context.Background()
 
@@ -67,7 +66,7 @@ func main() {
 	}
 
 	bucket := os.Getenv("S3_BUCKET")
-	region := os.Getenv("S3_REGION")
+	region := os.Getenv("AWS_REGION")
 
 	if bucket == "" || region == "" {
 		log.Fatal("S3_BUCKET or S3_REGION not set in environment")
@@ -82,6 +81,16 @@ func main() {
 	go messaging.StartRawIntentWorker(ctx, Rdb, func(ctx context.Context, msg model.RawIntentMessage) error {
 		ack, err := services.ProcessRawIntent(ctx, msg, s3store)
 		if err != nil {
+			log.Printf("Error processing intent: %v", err)
+			errEvent := model.ClientErrorEvent{
+				TraceID:    msg.TraceID,
+				ErrorCode:  "INTERNAL_ERROR",
+				ErrorMsg:   err.Error(),
+				HttpStatus: 500,
+			}
+			if pubErr := messaging.PublishClientError(ctx, Rdb, errEvent); pubErr != nil {
+				log.Printf("Failed to publish error event: %v", pubErr)
+			}
 			return err
 		}
 		if ack == nil {

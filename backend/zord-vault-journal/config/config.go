@@ -38,8 +38,12 @@ func InitDB() {
 }
 
 func InitRedis() *redis.Client {
+	addr := os.Getenv("REDIS_ADDR")
+	if addr == "" {
+		addr = "localhost:6379"
+	}
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379", // or from env
+		Addr:     addr, // or from env
 		Password: "",
 		DB:       0,
 	})
