@@ -60,9 +60,8 @@ docker exec zord-edge-postgres pg_isready && echo "✅ zord-edge-postgres: Ready
 docker exec zord-vault-postgres pg_isready && echo "✅ zord-vault-postgres: Ready"
 docker exec zord-intent-postgres pg_isready && echo "✅ zord-intent-postgres: Ready"
 docker exec zord-relay-postgres pg_isready && echo "✅ zord-relay-postgres: Ready"
-docker exec zord-vault-redis redis-cli ping && echo "✅ zord-vault-redis: Ready"
-docker exec zord-intent-redis redis-cli ping && echo "✅ zord-intent-redis: Ready"
-docker exec zord-kafka kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1 && echo "✅ zord-kafka: Ready"
+docker exec zord-redis redis-cli ping && echo "✅ zord-redis: Ready"
+docker exec zord-kafka-1 kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1 && echo "✅ zord-kafka: Ready"
 ```
 
 ## 🔍 **DETAILED TEST PHASES**
@@ -124,7 +123,7 @@ docker exec zord-vault-redis redis-cli ping && echo "✅ zord-vault-redis: Ready
 docker exec zord-intent-redis redis-cli ping && echo "✅ zord-intent-redis: Ready"
 
 # Test Kafka connectivity
-docker exec zord-kafka kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1 && echo "✅ zord-kafka: Ready"
+docker exec zord-kafka-1 kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1 && echo "✅ zord-kafka: Ready"
 ```
 
 **Detailed Database Testing**:
