@@ -39,13 +39,31 @@ zord-console                 Up X days (healthy)   0.0.0.0:3000->3000/tcp
 
 ## 🚀 **DEPLOYMENT OPTIONS**
 
-### **Option 1: Use Existing Deployment (Recommended)**
+### **Option 1: Automated Deployment with Database Initialization (Recommended)**
 
-Your Zord platform is already deployed and running! Skip to the [Testing & Verification](#testing--verification) section to validate your deployment.
+Use the new automated deployment script that ensures all database tables are created automatically:
 
-### **Option 2: Fresh Deployment**
+```powershell
+# Run the automated deployment script
+.\deploy-with-db-init.ps1
+```
 
-If you need to redeploy from scratch:
+This script will:
+- ✅ Clean up any existing deployment
+- ✅ Remove old database volumes for fresh initialization
+- ✅ Build and deploy all services
+- ✅ Wait for databases to be ready
+- ✅ Verify all database schemas are created automatically
+- ✅ Test service health endpoints
+- ✅ Provide connection information and next steps
+
+### **Option 2: Use Existing Deployment**
+
+If your Zord platform is already deployed and running, skip to the [Testing & Verification](#testing--verification) section.
+
+### **Option 3: Manual Deployment**
+
+If you prefer manual control over the deployment process:
 
 ### **Prerequisites**
 - Docker Desktop installed and running
@@ -55,13 +73,10 @@ If you need to redeploy from scratch:
 ### **Step 1: Clean Existing Deployment (if needed)**
 ```bash
 # Stop and remove existing containers
-docker-compose down
+docker-compose down --remove-orphans
 
-# Remove existing containers (optional)
-docker container prune -f
-
-# Remove existing networks (optional)
-docker network prune -f
+# Remove database volumes for fresh initialization
+docker volume rm arealis-zord_postgres_edge_data arealis-zord_postgres_vault_data arealis-zord_postgres_intent_data arealis-zord_postgres_relay_data
 ```
 
 ### **Step 2: Deploy All Services**
@@ -71,12 +86,24 @@ docker-compose up -d --build
 
 # This will:
 # ✅ Build all microservice images
-# ✅ Start all databases (PostgreSQL, Redis, Kafka)
+# ✅ Start all databases (PostgreSQL, Redis, Kafka) 
+# ✅ Automatically run database initialization scripts
 # ✅ Deploy all microservices with proper networking
 # ✅ Configure health checks and auto-restart
 ```
 
-### **Step 3: Verify Deployment**
+### **Step 3: Verify Database Initialization**
+```bash
+# Check that all database tables were created automatically
+docker exec zord-edge-postgres psql -U zord_user -d zord_edge_db -c "\dt"
+docker exec zord-vault-postgres psql -U vault_user -d zord_vault_journal_db -c "\dt"  
+docker exec zord-intent-postgres psql -U intent_user -d zord_intent_engine_db -c "\dt"
+docker exec zord-relay-postgres psql -U relay_user -d zord_relay_db -c "\dt"
+
+# Expected: Each database should show its tables without manual creation
+```
+
+### **Step 4: Verify Deployment**
 ```bash
 # Check all services are running
 docker-compose ps
@@ -130,17 +157,45 @@ For comprehensive database testing, see **[testdatabase.md](testdatabase.md)** w
 - Performance monitoring commands
 - Automated testing scripts
 
-#### **Quick Database Health Check**
+## 🔧 **DATABASE INITIALIZATION - FIXED!**
+
+### **✅ Automatic Table Creation**
+
+The deployment now includes automatic database initialization! All PostgreSQL containers are configured with initialization scripts that run automatically when the containers start for the first time.
+
+**What's Fixed:**
+- ✅ All `init.sql` files are mounted to `/docker-entrypoint-initdb.d/` in PostgreSQL containers
+- ✅ Database tables are created automatically on first startup
+- ✅ No manual table creation required
+- ✅ Corrected database user credentials in docker-compose.yml
+
+**Database Initialization Files:**
+- `backend/zord-edge/db/init.sql` → Creates `tenants` table
+- `backend/zord-vault-journal/db/migration.sql` → Creates `ingress_envelopes` table  
+- `backend/zord-intent-engine/db/init.sql` → Creates `payment_intents`, `outbox`, `dlq_items` tables
+- `backend/zord-relay/db/init.sql` → Creates `payout_contracts` table
+
+### **✅ Database Connection Information**
+
+**CORRECTED DATABASE USERS (now match docker-compose.yml):**
+
+| Database | Container | User | Password | Database Name |
+|----------|-----------|------|----------|---------------|
+| **zord-edge** | zord-edge-postgres | zord_user | zord_password | zord_edge_db |
+| **zord-vault** | zord-vault-postgres | vault_user | vault_password | zord_vault_journal_db |
+| **zord-intent** | zord-intent-postgres | intent_user | intent_password | zord_intent_engine_db |
+| **zord-relay** | zord-relay-postgres | relay_user | relay_password | zord_relay_db |
+
+#### **Quick Database Health Check (CORRECTED)**
 ```bash
-# Test PostgreSQL connections
-docker exec zord-edge-postgres pg_isready && echo "✅ zord-edge-postgres: Ready"
-docker exec zord-vault-postgres pg_isready && echo "✅ zord-vault-postgres: Ready"
-docker exec zord-intent-postgres pg_isready && echo "✅ zord-intent-postgres: Ready"
-docker exec zord-relay-postgres pg_isready && echo "✅ zord-relay-postgres: Ready"
+# Test PostgreSQL connections with correct users
+docker exec zord-edge-postgres psql -U zord_user -d zord_edge_db -c "SELECT version();" && echo "✅ zord-edge-postgres: Ready"
+docker exec zord-vault-postgres psql -U vault_user -d zord_vault_journal_db -c "SELECT version();" && echo "✅ zord-vault-postgres: Ready"
+docker exec zord-intent-postgres psql -U intent_user -d zord_intent_engine_db -c "SELECT version();" && echo "✅ zord-intent-postgres: Ready"
+docker exec zord-relay-postgres psql -U relay_user -d zord_relay_db -c "SELECT version();" && echo "✅ zord-relay-postgres: Ready"
 
 # Test Redis connections
-docker exec zord-vault-redis redis-cli ping && echo "✅ zord-vault-redis: Ready"
-docker exec zord-intent-redis redis-cli ping && echo "✅ zord-intent-redis: Ready"
+docker exec zord-redis redis-cli ping && echo "✅ zord-redis: Ready"
 
 # Test Kafka connection
 docker exec zord-kafka kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1 && echo "✅ zord-kafka: Ready"
@@ -150,34 +205,68 @@ docker exec zord-kafka kafka-topics --bootstrap-server localhost:9092 --list > /
 
 #### **A. Test Complete Request Flow**
 ```bash
-# 1. Register a test tenant
+# 1. Register a test tenant (CORRECTED FORMAT)
 curl -X POST http://localhost:8080/v1/tenantReg \
   -H "Content-Type: application/json" \
   -d '{
-    "tenant_name": "test-deployment-tenant",
-    "contact_email": "test@example.com"
+    "name": "test-deployment-tenant"
   }'
 
-# 2. Submit intent with returned API key
+# Expected Response:
+# {
+#   "APIKEY": "test-deployment-tenant.64-char-hex-key",
+#   "Message": "Merchent Registered",
+#   "TenantId": "uuid"
+# }
+
+# 2. Submit intent with returned API key (CORRECTED FORMAT)
 curl -X POST http://localhost:8080/v1/ingest \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_API_KEY_HERE" \
+  -H "X-Idempotency-Key: unique-test-key-001" \
   -d '{
-    "tenant_id": "test-deployment-tenant",
     "intent_type": "PAYOUT",
+    "account_number": "1234567890",
     "amount": {
       "value": "100.00",
       "currency": "USD"
     },
-    "recipient": {
-      "name": "John Doe",
-      "account": "1234567890"
+    "beneficiary": {
+      "type": "PERSON",
+      "instrument": {
+        "kind": "BANK"
+      }
+    },
+    "purpose_code": "SALARY",
+    "metadata": {
+      "reference": "TEST-001",
+      "description": "Test deployment transaction"
     }
   }'
+
+# Expected Response:
+# Success: {"trace_id": "uuid", "envelope_id": "uuid", "status": "accepted"}
+# Or Queue Issue: {"error": "failed to enqueue intent message service 1"}
 
 # 3. Check if message was processed through the pipeline
 # (Check logs and databases as shown in testdatabase.md)
 ```
+
+#### **IMPORTANT API CORRECTIONS**
+Based on testing, the correct API usage is:
+
+**Tenant Registration:**
+- ✅ **Correct Field**: `"name"` (not `"tenant_name"`)
+- ✅ **Contact Email**: Not required for registration
+- ✅ **Response Fields**: `APIKEY`, `TenantId`, `Message`
+
+**Intent Ingestion:**
+- ✅ **Required Headers**: 
+  - `Authorization: Bearer API_KEY`
+  - `X-Idempotency-Key: unique-key`
+- ✅ **Required Fields**: `intent_type`, `account_number`, `amount`, `beneficiary`, `purpose_code`
+- ✅ **Beneficiary Structure**: Must include `instrument.kind`
+- ✅ **Amount Structure**: `value` (string) and `currency` (3-char code)
 
 #### **B. Test Message Queue Flow**
 ```bash
@@ -225,7 +314,7 @@ docker exec zord-kafka kafka-topics --bootstrap-server localhost:9092 --list > /
 
 | Database | Host | Port | User | Database Name | Container |
 |----------|------|------|------|---------------|-----------|
-| **zord-edge** | localhost | 5433 | edge_user | zord_edge_db | zord-edge-postgres |
+| **zord-edge** | localhost | 5433 | zord_user | zord_edge_db | zord-edge-postgres |
 | **zord-vault** | localhost | 5434 | vault_user | zord_vault_journal_db | zord-vault-postgres |
 | **zord-intent** | localhost | 5436 | intent_user | zord_intent_engine_db | zord-intent-postgres |
 | **zord-relay** | localhost | 5435 | relay_user | zord_relay_db | zord-relay-postgres |
@@ -233,17 +322,19 @@ docker exec zord-kafka kafka-topics --bootstrap-server localhost:9092 --list > /
 | **Redis (Intent)** | localhost | 6380 | - | - | zord-intent-redis |
 | **Kafka** | localhost | 9092 | - | - | zord-kafka |
 
+**Note**: The actual database users differ from the docker-compose.yml configuration. Use the users listed above for connections.
+
 ### **3. Check Data in Each Database**
 
 #### **zord-edge Database**
 ```bash
-# Connect to zord-edge database
-docker exec -it zord-edge-postgres psql -U edge_user -d zord_edge_db
+# Connect to zord-edge database (CORRECTED USER)
+docker exec -it zord-edge-postgres psql -U zord_user -d zord_edge_db
 
 # Check tables and data
 \dt                                    # List tables
 SELECT * FROM tenants LIMIT 10;       # View tenant data
-SELECT * FROM api_keys LIMIT 10;      # View API keys
+SELECT * FROM api_keys LIMIT 10;      # View API keys (if table exists)
 SELECT COUNT(*) FROM tenants;         # Count total tenants
 \q                                     # Exit
 ```
@@ -380,20 +471,31 @@ docker-compose logs --tail=100 zord-edge
 
 ## 🧪 **END-TO-END TESTING SCENARIOS**
 
-### **Scenario 1: Complete Transaction Flow**
+### **Scenario 1: Complete Transaction Flow (CORRECTED)**
 ```bash
-# 1. Submit a payout intent
-curl -X POST http://localhost:8080/v1/ingest \
+# 1. Submit a payout intent with correct format
+curl -X POST http://localhost:8080/v1/tenantReg \
   -H "Content-Type: application/json" \
   -d '{
-    "tenant_id": "test-tenant-001",
+    "name": "test-tenant-001"
+  }'
+
+# Save the returned API key, then:
+curl -X POST http://localhost:8080/v1/ingest \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer test-tenant-001.YOUR_API_KEY_SUFFIX" \
+  -H "X-Idempotency-Key: test-payout-001" \
+  -d '{
     "intent_type": "PAYOUT",
+    "account_number": "9876543210",
     "amount": {"value": "250.00", "currency": "USD"},
-    "recipient": {
-      "name": "Alice Johnson",
-      "account": "9876543210",
-      "bank_code": "CHASE"
+    "beneficiary": {
+      "type": "PERSON",
+      "instrument": {
+        "kind": "BANK"
+      }
     },
+    "purpose_code": "SALARY",
     "metadata": {
       "reference": "PAY-001",
       "description": "Salary payment"
@@ -414,7 +516,7 @@ ORDER BY created_at DESC LIMIT 5;"
 echo "=== Checking zord-intent-engine ==="
 docker exec -it zord-intent-postgres psql -U intent_user -d zord_intent_engine_db -c "
 SELECT intent_id, tenant_id, intent_type, status, created_at 
-FROM canonical_intents 
+FROM payment_intents 
 WHERE tenant_id = 'test-tenant-001' 
 ORDER BY created_at DESC LIMIT 5;"
 
@@ -425,33 +527,60 @@ FROM outbox
 ORDER BY created_at DESC LIMIT 5;"
 ```
 
-### **Scenario 2: Error Handling Test**
+### **Scenario 2: Error Handling Test (CORRECTED)**
 ```bash
 # Submit invalid intent to test error handling
 curl -X POST http://localhost:8080/v1/ingest \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer test-tenant-002.YOUR_API_KEY" \
+  -H "X-Idempotency-Key: test-error-001" \
   -d '{
-    "tenant_id": "test-tenant-002",
     "intent_type": "INVALID_TYPE",
-    "amount": {"value": "-100.00", "currency": "INVALID"}
+    "account_number": "invalid",
+    "amount": {"value": "-100.00", "currency": "INVALID"},
+    "beneficiary": {
+      "type": "INVALID",
+      "instrument": {
+        "kind": "INVALID"
+      }
+    },
+    "purpose_code": "INVALID"
   }'
 
+# Expected: Validation error response
 # Check DLQ (Dead Letter Queue) for failed processing
 docker exec -it zord-intent-postgres psql -U intent_user -d zord_intent_engine_db -c "
-SELECT * FROM dlq_entries ORDER BY created_at DESC LIMIT 5;"
+SELECT * FROM dlq_items ORDER BY created_at DESC LIMIT 5;"
 ```
 
-### **Scenario 3: High Volume Test**
+### **Scenario 3: High Volume Test (CORRECTED)**
 ```bash
-# Generate multiple requests quickly
+# First register a tenant for load testing
+curl -X POST http://localhost:8080/v1/tenantReg \
+  -H "Content-Type: application/json" \
+  -d '{"name": "load-test-tenant"}'
+
+# Save the API key, then generate multiple requests quickly
+API_KEY="load-test-tenant.YOUR_API_KEY_SUFFIX"
+
 for i in {1..10}; do
   curl -X POST http://localhost:8080/v1/ingest \
     -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $API_KEY" \
+    -H "X-Idempotency-Key: load-test-$i" \
     -d "{
-      \"tenant_id\": \"load-test-tenant\",
       \"intent_type\": \"PAYOUT\",
+      \"account_number\": \"ACC$i\",
       \"amount\": {\"value\": \"$((i * 10)).00\", \"currency\": \"USD\"},
-      \"recipient\": {\"name\": \"User $i\", \"account\": \"ACC$i\"}
+      \"beneficiary\": {
+        \"type\": \"PERSON\",
+        \"instrument\": {\"kind\": \"BANK\"}
+      },
+      \"purpose_code\": \"SALARY\",
+      \"metadata\": {
+        \"reference\": \"LOAD-$i\",
+        \"description\": \"Load test transaction $i\"
+      }
     }" &
 done
 wait
@@ -464,7 +593,7 @@ SELECT
   COUNT(CASE WHEN status = 'processed' THEN 1 END) as processed,
   COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
   tenant_id
-FROM canonical_intents 
+FROM payment_intents 
 WHERE tenant_id = 'load-test-tenant'
 GROUP BY tenant_id;"
 ```
@@ -492,8 +621,11 @@ docker-compose restart zord-edge
 # Check database status
 docker-compose ps | grep postgres
 
-# Test database connectivity
-docker exec -it zord-edge-postgres pg_isready -U edge_user
+# Test database connectivity (CORRECTED)
+docker exec zord-edge-postgres psql -U zord_user -d zord_edge_db -c "SELECT version();"
+docker exec zord-vault-postgres psql -U vault_user -d zord_vault_journal_db -c "SELECT version();"
+docker exec zord-intent-postgres psql -U intent_user -d zord_intent_engine_db -c "SELECT version();"
+docker exec zord-relay-postgres psql -U relay_user -d zord_relay_db -c "SELECT version();"
 
 # Reset database if needed
 docker-compose down
@@ -614,5 +746,70 @@ powershell -ExecutionPolicy Bypass -File "test-complete-deployment.ps1" -Mode al
 - **[testdatabase.md](testdatabase.md)** - Database testing guide
 - **[test-complete-deployment.ps1](test-complete-deployment.ps1)** - Automated testing script
 - **[test-api.sh](test-api.sh)** - API testing script
+
+## 📋 **API USAGE CORRECTIONS**
+
+Based on testing, the following corrections have been made to the API documentation:
+
+### **✅ Tenant Registration API**
+```bash
+# CORRECT FORMAT:
+curl -X POST http://localhost:8080/v1/tenantReg \
+  -H "Content-Type: application/json" \
+  -d '{"name": "your-tenant-name"}'
+
+# RESPONSE:
+{
+  "APIKEY": "your-tenant-name.64-char-hex-key",
+  "Message": "Merchent Registered",
+  "TenantId": "uuid"
+}
+```
+
+**Key Changes:**
+- ✅ Use `"name"` field (not `"tenant_name"`)
+- ✅ `contact_email` is not required
+- ✅ Response includes `APIKEY`, `TenantId`, `Message`
+
+### **✅ Intent Ingestion API**
+```bash
+# CORRECT FORMAT:
+curl -X POST http://localhost:8080/v1/ingest \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "X-Idempotency-Key: unique-key" \
+  -d '{
+    "intent_type": "PAYOUT",
+    "account_number": "1234567890",
+    "amount": {"value": "100.00", "currency": "USD"},
+    "beneficiary": {
+      "type": "PERSON",
+      "instrument": {"kind": "BANK"}
+    },
+    "purpose_code": "SALARY",
+    "metadata": {"reference": "REF-001", "description": "Description"}
+  }'
+```
+
+**Key Changes:**
+- ✅ Required headers: `Authorization` and `X-Idempotency-Key`
+- ✅ Required fields: `intent_type`, `account_number`, `amount`, `beneficiary`, `purpose_code`
+- ✅ `beneficiary` must include `instrument.kind`
+- ✅ `amount.value` must be a string
+- ✅ `currency` must be 3-character code
+
+### **✅ Database Connection Corrections**
+```bash
+# CORRECT DATABASE USERS:
+docker exec zord-edge-postgres psql -U zord_user -d zord_edge_db
+docker exec zord-vault-postgres psql -U vault_user -d zord_vault_journal_db
+docker exec zord-intent-postgres psql -U intent_user -d zord_intent_engine_db
+docker exec zord-relay-postgres psql -U relay_user -d zord_relay_db
+```
+
+**Key Changes:**
+- ✅ zord-edge uses `zord_user` (not `edge_user`)
+- ✅ All other database users remain as documented
+- ✅ Connection commands updated throughout documentation
 
 **Your complete Zord platform is now ready for production use!** 🎉
