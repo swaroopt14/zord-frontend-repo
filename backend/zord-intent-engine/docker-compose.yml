@@ -10,21 +10,18 @@ services:
     ports:
       - "8083:8083"
     environment:
-      - DB_HOST=postgres
+      - DB_HOST=zord-intent-postgres
       - DB_PORT=5432
       - DB_USER=intent_user
       - DB_PASSWORD=intent_password
       - DB_NAME=zord_intent_engine_db
       - DB_SSLMODE=disable
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      - REDIS_ADDR=zord-vault-redis:6379
       - VAULT_JOURNAL_URL=http://host.docker.internal:8081
-      - PII_ENCLAVE_URL=http://host.docker.internal:8084
       - PII_TOKEN_SECRET=your-secret-key-for-pii-tokenization-change-in-production
       - ENVIRONMENT=production
     depends_on:
       - postgres
-      - redis
     networks:
       - zord-network
     restart: unless-stopped
@@ -43,30 +40,17 @@ services:
       - POSTGRES_PASSWORD=intent_password
       - POSTGRES_DB=zord_intent_engine_db
     volumes:
-      - postgres_intent_data:/var/lib/postgresql/data
+      - postgres_intent_data_fix:/var/lib/postgresql/data
     ports:
       - "5436:5432"
     networks:
       - zord-network
     restart: unless-stopped
 
-  redis:
-    image: redis:7-alpine
-    container_name: zord-intent-redis
-    ports:
-      - "6380:6379"
-    networks:
-      - zord-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
 volumes:
-  postgres_intent_data:
+  postgres_intent_data_fix:
 
 networks:
   zord-network:
-    driver: bridge
+    external: true
+    name: zord-shared-network

@@ -10,7 +10,7 @@ services: # Define the containers/services to run
     ports: # Port mapping (host:container)
       - "8081:8081" # Map host port 8081 to container port 8081
     environment: # Environment variables for the application
-      - DB_HOST=postgres # Database host (references postgres service)
+      - DB_HOST=zord-vault-postgres # Database host (references postgres service)
       - DB_PORT=5432 # Database port
       - DB_USER=vault_user # Database username
       - DB_PASSWORD=vault_password # Database password
@@ -19,13 +19,16 @@ services: # Define the containers/services to run
       - ENVIRONMENT=production # Environment setting
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-change-me-in-production} # Encryption key (use strong key in production)
       - STORAGE_PATH=/data/vault # Path for encrypted data storage
-      - S3_BUCKET=zord-vault-bucket # S3 bucket name
-      - S3_REGION=us-east-1 # S3 region
-      - REDIS_ADDR=redis-vault:6379 # Redis address
-      - JAEGER_ENDPOINT=http://host.docker.internal:14268/api/traces # Jaeger tracing endpoint
+      - REDIS_ADDR=zord-vault-redis:6379
+      # - AWS_ACCESS_KEY_ID=AKIARAKMIDK5WPIBKAPD
+      # - AWS_SECRET_ACCESS_KEY=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
+      - AWS_REGION=ap-south-1
+      - AWS_EC2_METADATA_DISABLED=true
+      - S3_BUCKET=arealis-zord-vault
+ 
     depends_on: # Service dependencies (start postgres first)
       - postgres
-      - redis-vault
+    #   - redis-vault
     volumes: # Volume mounts for data persistence
       - vault_data:/data/vault # Mount encrypted data directory
     networks: # Networks this service connects to
@@ -53,7 +56,7 @@ services: # Define the containers/services to run
       - POSTGRES_PASSWORD=vault_password # Database password
       - POSTGRES_DB=zord_vault_journal_db # Default database to create
     volumes: # Volume mounts for data persistence
-      - postgres_vault_data:/var/lib/postgresql/data # Mount data directory
+      - postgres_vault_data_fix:/var/lib/postgresql/data # Mount data directory
     ports: # External access port (different from internal to avoid conflicts)
       - "5434:5432" # Map host port 5434 to container port 5432
     networks: # Networks this service connects to
@@ -64,7 +67,7 @@ services: # Define the containers/services to run
     image: redis:7-alpine # Docker image to use
     container_name: zord-vault-redis # Container name
     ports: # External access port
-      - "6379:6379" # Map host port 6379 to container port 6379
+      - "6380:6379" # Map host port 6380 to container port 6379
     networks: # Networks this service connects to
       - zord-network
     restart: unless-stopped # Restart policy
@@ -72,12 +75,14 @@ services: # Define the containers/services to run
     volumes: # Volume mounts for data persistence
       - redis_vault_data:/data # Mount data directory
 
+
 volumes: # Named volumes for data persistence
   vault_data: # Volume for encrypted vault data
-  postgres_vault_data: # Volume for PostgreSQL data
+  postgres_vault_data_fix: # Volume for PostgreSQL data
   redis_vault_data: # Volume for Redis vault data
   redis_intent_data: # Volume for Redis intent data
 
 networks: # Custom networks for service communication
   zord-network: # Isolated network for Zord services
-    driver: bridge # Bridge network driver for container communication
+    external: true
+    name: zord-shared-network

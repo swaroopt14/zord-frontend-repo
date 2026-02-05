@@ -82,13 +82,30 @@ func (h *DummyProviderHandler) HandleMessage(ctx context.Context, topic string, 
 	if err != nil {
 		return err
 	}
+	parsedContractID, err := uuid.Parse(contractID)
+	if err != nil {
+		parsedContractID = uuid.New()
+	}
+	parsedTenantID, err := uuid.Parse(tenantID)
+	if err != nil {
+		parsedTenantID = uuid.New()
+	}
+	parsedIntentID, err := uuid.Parse(intentID)
+	if err != nil {
+		parsedIntentID = uuid.New()
+	}
+	parsedEnvelopeID, err := uuid.Parse(envelopeID)
+	if err != nil {
+		parsedEnvelopeID = uuid.New()
+	}
+
 	_, err = h.db.Exec(`INSERT INTO payout_contracts (contract_id, tenant_id, intent_id, envelope_id, contract_payload, contract_hash, status, created_at, trace_id)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		ON CONFLICT (intent_id) DO NOTHING`,
-		uuid.MustParse(contractID),
-		uuid.MustParse(tenantID),
-		uuid.MustParse(intentID),
-		uuid.MustParse(envelopeID),
+		parsedContractID,
+		parsedTenantID,
+		parsedIntentID,
+		parsedEnvelopeID,
 		value,
 		contractHash,
 		"ISSUED",

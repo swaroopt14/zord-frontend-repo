@@ -6,6 +6,7 @@ import (
 	_ "github.com/lib/pq"
 	"log"
 	"strings"
+	"time"
 )
 
 func Connect(dbURL string) *sql.DB {
@@ -21,8 +22,19 @@ func Connect(dbURL string) *sql.DB {
 		log.Fatalf("failed to connect to db: %v", err)
 	}
 
+	// Retry pinging the database until it becomes available
+	for i := 0; i < 30; i++ {
+		if err := db.Ping(); err == nil {
+			log.Println("Successfully connected to database")
+			return db
+		}
+		log.Printf("Failed to ping db (attempt %d/30): %v. Retrying in 2s...", i+1, err)
+		time.Sleep(2 * time.Second)
+	}
+
+	// If still failing after retries, then fatal
 	if err := db.Ping(); err != nil {
-		log.Fatalf("failed to ping db: %v", err)
+		log.Fatalf("failed to ping db after multiple attempts: %v", err)
 	}
 
 	return db

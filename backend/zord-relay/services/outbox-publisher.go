@@ -80,9 +80,9 @@ func (p *Publisher) worker(ctx context.Context, id int) {
 
 		for _, e := range events {
 			headers := map[string]string{
-				"trace_id":    e.TraceID,
+				"trace_id":    e.TraceID.String,
 				"tenant_id":   e.TenantID,
-				"envelope_id": e.EnvelopeID,
+				"envelope_id": e.EnvelopeID.String,
 			}
 
 			err := p.producer.Publish(p.cfg.ReadyTopic, e.AggregateID, e.Payload, headers)
@@ -94,14 +94,20 @@ func (p *Publisher) worker(ctx context.Context, id int) {
 						"error_message":      err.Error(),
 						"original_event_type": e.EventType,
 						"tenant_id":          e.TenantID,
-						"trace_id":           e.TraceID,
-						"envelope_id":        e.EnvelopeID,
+						"trace_id":           e.TraceID.String,
+						"envelope_id":        e.EnvelopeID.String,
 						"schema_subject": "z.intent.ready",
 						"schema_version": "v1",
 					}
 					_ = p.producer.Publish(p.cfg.DLQTopic, e.AggregateID, dlq, headers)
+					
+					envelopeID := e.EnvelopeID.String
+					if !e.EnvelopeID.Valid {
+						envelopeID = uuid.New().String() // Fallback if missing, as dlq_items requires it
+					}
+					
 					_, _ = tx.ExecContext(ctx, `INSERT INTO dlq_items (dlq_id, tenant_id, envelope_id, stage, reason_code, error_detail, replayable, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())`,
-						uuid.New().String(), e.TenantID, e.EnvelopeID, "OUTBOX_PUBLISH", "PUBLISH_FAILED", err.Error(), true)
+						uuid.New().String(), e.TenantID, envelopeID, "OUTBOX_PUBLISH", "PUBLISH_FAILED", err.Error(), true)
 					_, _ = tx.ExecContext(ctx, `UPDATE outbox SET status='FAILED' WHERE outbox_id=$1`, e.ID)
 				} else {
 					backoff := p.cfg.RetryBackoff * time.Duration(1<<retries)

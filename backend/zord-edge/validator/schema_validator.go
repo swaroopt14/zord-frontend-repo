@@ -3,6 +3,7 @@ package validator
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/xeipuuv/gojsonschema"
@@ -13,7 +14,12 @@ var (
 )
 
 func InitSchemaValidator() error {
-	schemaPath := filepath.Join("..", "schemas", "incoming_intent.request.v1.json")
+	// Try current directory first (Docker / Production)
+	schemaPath := filepath.Join("schemas", "incoming_intent.request.v1.json")
+	if _, err := os.Stat(schemaPath); os.IsNotExist(err) {
+		// Try parent directory (Local development if running from cmd/)
+		schemaPath = filepath.Join("..", "schemas", "incoming_intent.request.v1.json")
+	}
 
 	absPath, err := filepath.Abs(schemaPath)
 	if err != nil {
