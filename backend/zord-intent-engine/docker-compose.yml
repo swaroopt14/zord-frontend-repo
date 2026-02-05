@@ -16,7 +16,7 @@ services:
       - DB_PASSWORD=intent_password
       - DB_NAME=zord_intent_engine_db
       - DB_SSLMODE=disable
-      - REDIS_ADDR=zord-vault-redis:6379
+      - REDIS_ADDR=zord-edge-redis:6379
       - VAULT_JOURNAL_URL=http://host.docker.internal:8081
       - PII_TOKEN_SECRET=your-secret-key-for-pii-tokenization-change-in-production
       - ENVIRONMENT=production
