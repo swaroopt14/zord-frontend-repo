@@ -47,7 +47,7 @@ func main() {
 
 	// -------- Intent Service --------
 	//------Initializing s3
-	s3store, err := storage.NewS3Store(ctx, os.Getenv("S3_BUCKET"), os.Getenv("S3_REGION"))
+	s3store, err := storage.NewS3Store(ctx, os.Getenv("S3_BUCKET"), os.Getenv("AWS_REGION"))
 	if err != nil {
 		log.Fatal(err)
 	}
