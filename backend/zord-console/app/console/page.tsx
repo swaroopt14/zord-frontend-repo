@@ -205,11 +205,12 @@ function RecentlyVisitedCard({ services, recentlyUsedServices }: { services: Ser
 }
 
 function SystemHealthCard({ overviewData, loading }: { overviewData: OverviewData | null; loading: boolean }) {
-  const healthyComponents = overviewData?.health.filter(h => h.status === 'HEALTHY').length || 0
-  const totalComponents = overviewData?.health.length || 0
+  const health = overviewData?.health ?? []
+  const healthyComponents = health.filter(h => h.status === 'HEALTHY').length
+  const totalComponents = health.length
   const healthScore = totalComponents > 0 ? Math.round((healthyComponents / totalComponents) * 100) : 100
-  const criticalFindings = overviewData?.health.filter(h => h.status === 'FAILED').length || 0
-  const degradedFindings = overviewData?.health.filter(h => h.status === 'DEGRADED').length || 0
+  const criticalFindings = health.filter(h => h.status === 'UNHEALTHY').length
+  const degradedFindings = health.filter(h => h.status === 'DEGRADED').length
   const lastUpdated = overviewData?.evidence?.last_write
     ? new Date(overviewData.evidence.last_write).toLocaleString('en-GB', {
         day: '2-digit',
@@ -488,7 +489,8 @@ function CostAndUsageCard({ overviewData }: { overviewData: OverviewData | null 
 }
 
 function ZordHealthCard({ overviewData }: { overviewData: OverviewData | null }) {
-  const openIssues = overviewData?.health.filter(h => h.status === 'FAILED' || h.status === 'DEGRADED').length || 0
+  const health = overviewData?.health ?? []
+  const openIssues = health.filter(h => h.status === 'UNHEALTHY' || h.status === 'DEGRADED').length
   const scheduledChanges = 0
   const otherNotifications = 0
 
