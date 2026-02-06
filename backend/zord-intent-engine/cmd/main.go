@@ -33,6 +33,7 @@ func main() {
 	// -------- Repositories --------
 	dlqRepo := persistence.NewDLQRepo(db.DB)
 	intentRepo := persistence.NewPaymentIntentRepo(db.DB)
+	intentQueryRepo := persistence.NewIntentQueryRepo(db.DB)
 
 	// -------- Validator --------
 	intentValidator := validator.NewValidator(dlqRepo)
@@ -52,6 +53,7 @@ func main() {
 
 	// -------- DLQ HTTP (READ-ONLY) --------
 	dlqHandler := handlers.NewDLQHandler(dlqRepo)
+	intentHandler := handlers.NewIntentHandler(intentQueryRepo)
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -59,6 +61,14 @@ func main() {
 	})
 
 	http.HandleFunc("/v1/dlq", dlqHandler.List)
+	http.HandleFunc("/v1/intents/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/intents" || r.URL.Path == "/v1/intents/" {
+			intentHandler.List(w, r)
+		} else {
+			intentHandler.GetByID(w, r)
+		}
+	})
+	http.HandleFunc("/v1/intents", intentHandler.List)
 
 	// -------- REDIS CONSUMER (PRIMARY ENTRYPOINT) --------
 	go func() {
