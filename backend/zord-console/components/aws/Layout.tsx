@@ -3,6 +3,7 @@
 import { ReactNode, useState, useEffect } from 'react'
 import { TopBar } from './TopBar'
 import { Sidebar } from './Sidebar'
+import { OpsSidebar } from './OpsSidebar'
 import { getCurrentUser } from '@/services/auth'
 import { EnvironmentProvider, useEnvironment } from './EnvironmentContext'
 
@@ -27,9 +28,12 @@ function LayoutContent({ children, serviceName = '', breadcrumbs, tenant }: Layo
   
   // Sidebar only appears when inside a service (serviceName is provided and not empty)
   const showSidebar = serviceName && serviceName !== ''
+  
+  // Use OpsSidebar for "Ops Ingestion", regular Sidebar for "Ingestion" or other services
+  const isOpsService = serviceName === 'Ops Ingestion'
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ background: 'var(--zord-page-bg)' }}>
       <TopBar 
         tenant={currentTenant}
         serviceName={serviceName}
@@ -37,9 +41,11 @@ function LayoutContent({ children, serviceName = '', breadcrumbs, tenant }: Layo
         environment={envContext.environment}
         onEnvironmentChange={envContext.setEnvironment}
       />
-      <div className="flex" style={{ height: 'calc(100vh - 4rem)' }}>
-        {showSidebar && <Sidebar serviceName={serviceName} />}
-        <main className={`${showSidebar ? 'flex-1' : 'w-full'} overflow-y-auto bg-gray-50`}>
+      <div className="flex" style={{ height: 'calc(100vh - 2.5rem)' }}>
+        {showSidebar && (
+          isOpsService ? <OpsSidebar /> : <Sidebar serviceName={serviceName} />
+        )}
+        <main className={`${showSidebar ? 'flex-1' : 'w-full'} overflow-y-auto`} style={{ background: 'var(--zord-page-bg)' }}>
           {children}
         </main>
       </div>

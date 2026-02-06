@@ -2,177 +2,369 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Zord Admin Console - Blue-First Visual Aesthetic */
+/* Zord Console - AWS-Style Clean Theme */
 :root {
-  /* Zord Blue - Primary Color System */
-  --zord-blue-50: #EFF6FF;
-  --zord-blue-500: #3B82F6;
-  --zord-blue-600: #2563EB;
-  --zord-blue-700: #1D4ED8;
-  --zord-blue-800: #1E3A8A;
+  /* Page Background */
+  --zord-page-bg: #F9FAFB;
   
-  /* Neutral Base (90% of admin UI) */
-  --zord-base-main: #0B1220;
-  --zord-base-panel: #111827;
-  --zord-base-table: #0F172A;
-  --zord-base-border: #1F2937;
-  --zord-text-primary: #E5E7EB;
-  --zord-text-secondary: #9CA3AF;
+  /* Card/Panel Backgrounds */
+  --zord-card-bg: #FFFFFF;
+  --zord-card-border: #E5E7EB;
+  --zord-card-header-bg: #F9FAFB;
   
-  /* Content Area (Light like AWS S3) */
-  --zord-content-bg: #FFFFFF;
-  --zord-content-panel: #FFFFFF;
-  --zord-content-table: #FFFFFF;
-  --zord-content-border: #D1D5DB;
-  --zord-content-text: #111827;
-  --zord-content-text-secondary: #6B7280;
+  /* Text Colors */
+  --zord-text-primary: #111827;
+  --zord-text-secondary: #6B7280;
+  --zord-text-tertiary: #9CA3AF;
+  --zord-text-muted: #D1D5DB;
   
-  /* Status Colors */
-  --zord-status-healthy: #16A34A;
-  --zord-status-degraded: #CA8A04;
-  --zord-status-failed: #DC2626;
-  --zord-status-active: #2563EB;
-  --zord-status-neutral: #9CA3AF;
+  /* Border Colors */
+  --zord-border-primary: #E5E7EB;
+  --zord-border-secondary: #F3F4F6;
   
-  /* Destructive Colors */
-  --zord-destructive-bg: #7F1D1D;
-  --zord-destructive-text: #FECACA;
+  /* Status Colors (ONLY for indicators and graphs) */
+  --zord-status-healthy: #22C55E;
+  --zord-status-warning: #EAB308;
+  --zord-status-critical: #EF4444;
+  --zord-status-info: #3B82F6;
+  --zord-status-neutral: #6B7280;
   
-  /* Legacy support */
-  --background: 11 18 32; /* #0B1220 */
-  --foreground: 229 231 235; /* #E5E7EB */
-  --border: 31 41 55; /* #1F2937 */
+  /* Interactive */
+  --zord-link: #2563EB;
+  --zord-link-hover: #1D4ED8;
+  --zord-focus-ring: #3B82F6;
+  
+  /* Hover States */
+  --zord-hover-bg: #F3F4F6;
+  --zord-active-bg: #E5E7EB;
 }
 
+/* Base Body Styles */
 body {
-  color: #111827;
-  background: #F9FAFB;
+  color: var(--zord-text-primary);
+  background: var(--zord-page-bg);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Focus & Accessibility - WCAG Compliant */
+/* Focus & Accessibility */
 *:focus-visible {
-  outline: 2px solid var(--zord-blue-600);
+  outline: 2px solid var(--zord-focus-ring);
   outline-offset: 2px;
 }
 
-/* Zord Button Styles */
+/* Scrollbar Styling (Minimal) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+
 @layer components {
-  .btn-zord-primary {
-    background-color: var(--zord-blue-600);
-    color: white;
-    border: none;
-    border-radius: 4px;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
+  /* Page Container */
+  .zord-page {
+    min-height: 100%;
+    background: var(--zord-page-bg);
+    background: var(--zord-page-bg);
+  }
+  
+  /* Page Header (White bar at top) */
+  .zord-page-header {
+    background: var(--zord-card-bg);
+    border-bottom: 1px solid var(--zord-border-primary);
+    padding: 1rem 1.5rem;
+  }
+  
+  .zord-page-title {
+    font-size: 1.125rem;
     font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-  
-  .btn-zord-primary:hover {
-    background-color: var(--zord-blue-700);
-  }
-  
-  .btn-zord-primary:focus-visible {
-    outline: 2px solid var(--zord-blue-600);
-    outline-offset: 2px;
-  }
-  
-  .btn-zord-secondary {
-    background-color: transparent;
-    border: 1px solid var(--zord-base-border);
     color: var(--zord-text-primary);
-    border-radius: 4px;
-    padding: 0.5rem 1rem;
+  }
+  
+  .zord-page-subtitle {
+    font-size: 0.875rem;
+    color: var(--zord-text-secondary);
+    margin-top: 0.25rem;
+  }
+  
+  /* Card Component */
+  .zord-card {
+    background: var(--zord-card-bg);
+    border: 1px solid var(--zord-border-primary);
+    border-radius: 0.375rem;
+  }
+  
+  .zord-card-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--zord-border-primary);
+  }
+  
+  .zord-card-title {
     font-size: 0.875rem;
     font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s;
+    color: var(--zord-text-primary);
   }
   
-  .btn-zord-secondary:hover {
-    background-color: var(--zord-base-panel);
-  }
-  
-  .btn-zord-secondary:focus-visible {
-    outline: 2px solid var(--zord-blue-600);
-    outline-offset: 2px;
-  }
-  
-  .btn-zord-destructive {
-    background-color: var(--zord-destructive-bg);
-    color: var(--zord-destructive-text);
-    border-radius: 4px;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-  
-  .btn-zord-destructive:focus-visible {
-    outline: 2px solid var(--zord-status-failed);
-    outline-offset: 2px;
+  .zord-card-body {
+    padding: 1rem;
   }
   
   /* Table Styles */
-  .table-zord {
+  .zord-table {
     width: 100%;
     border-collapse: collapse;
   }
   
-  .table-zord thead {
-    background-color: var(--zord-base-panel);
+  .zord-table thead {
+    background: var(--zord-card-header-bg);
   }
   
-  .table-zord tbody tr {
-    background-color: var(--zord-base-table);
+  .zord-table th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--zord-text-secondary);
+    border-bottom: 1px solid var(--zord-border-primary);
   }
   
-  .table-zord tbody tr:hover {
-    background-color: var(--zord-base-panel);
+  .zord-table td {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    color: var(--zord-text-primary);
+    border-bottom: 1px solid var(--zord-border-secondary);
   }
   
-  .table-zord tbody tr.selected {
-    background-color: var(--zord-blue-800);
+  .zord-table tbody tr:hover {
+    background: var(--zord-hover-bg);
   }
   
-  /* Link Styles in Tables */
-  .table-zord a {
-    color: var(--zord-blue-500);
+  .zord-table tbody tr.zord-row-warning {
+    background: rgba(234, 179, 8, 0.05);
   }
   
-  .table-zord a:hover {
+  .zord-table tbody tr.zord-row-critical {
+    background: rgba(239, 68, 68, 0.05);
+  }
+  
+  /* Button Styles */
+  .zord-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  
+  .zord-btn-primary {
+    background: var(--zord-link);
+    color: white;
+    border: none;
+  }
+  
+  .zord-btn-primary:hover {
+    background: var(--zord-link-hover);
+  }
+  
+  .zord-btn-secondary {
+    background: var(--zord-card-bg);
+    color: var(--zord-text-primary);
+    border: 1px solid var(--zord-border-primary);
+  }
+  
+  .zord-btn-secondary:hover {
+    background: var(--zord-hover-bg);
+  }
+  
+  /* Status Dots (Only colored elements besides graphs) */
+  .zord-status-dot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+  }
+  
+  .zord-status-dot-healthy {
+    background: var(--zord-status-healthy);
+  }
+  
+  .zord-status-dot-warning {
+    background: var(--zord-status-warning);
+  }
+  
+  .zord-status-dot-critical {
+    background: var(--zord-status-critical);
+  }
+  
+  .zord-status-dot-info {
+    background: var(--zord-status-info);
+  }
+  
+  .zord-status-dot-neutral {
+    background: var(--zord-status-neutral);
+  }
+  
+  /* Status Badge */
+  .zord-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 0.25rem;
+  }
+  
+  .zord-badge-healthy {
+    background: rgba(34, 197, 94, 0.1);
+    color: #166534;
+  }
+  
+  .zord-badge-warning {
+    background: rgba(234, 179, 8, 0.1);
+    color: #854D0E;
+  }
+  
+  .zord-badge-critical {
+    background: rgba(239, 68, 68, 0.1);
+    color: #991B1B;
+  }
+  
+  /* Monitor Badge (Colored background) */
+  .zord-monitor-badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 0.25rem;
+    color: white;
+  }
+  
+  .zord-monitor-ok {
+    background: var(--zord-status-healthy);
+  }
+  
+  .zord-monitor-warning {
+    background: var(--zord-status-warning);
+  }
+  
+  .zord-monitor-critical {
+    background: var(--zord-status-critical);
+  }
+  
+  /* Link Styles */
+  .zord-link {
+    color: var(--zord-link);
+    text-decoration: none;
+  }
+  
+  .zord-link:hover {
+    color: var(--zord-link-hover);
     text-decoration: underline;
   }
   
-  /* Status Badge Styles */
-  .badge-zord-healthy {
-    color: var(--zord-status-healthy);
+  /* Metric Display */
+  .zord-metric {
+    font-variant-numeric: tabular-nums;
   }
   
-  .badge-zord-degraded {
-    color: var(--zord-status-degraded);
+  .zord-metric-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--zord-text-secondary);
   }
   
-  .badge-zord-failed {
-    color: var(--zord-status-failed);
+  .zord-metric-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--zord-text-primary);
   }
   
-  .badge-zord-active {
-    color: var(--zord-status-active);
+  /* Input Styles */
+  .zord-input {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    border: 1px solid var(--zord-border-primary);
+    border-radius: 0.25rem;
+    background: var(--zord-card-bg);
+    color: var(--zord-text-primary);
   }
   
-  .badge-zord-neutral {
-    color: var(--zord-status-neutral);
+  .zord-input:focus {
+    outline: none;
+    border-color: var(--zord-focus-ring);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  }
+  
+  .zord-input::placeholder {
+    color: var(--zord-text-tertiary);
+  }
+  
+  /* Divider */
+  .zord-divider {
+    border: none;
+    border-top: 1px solid var(--zord-border-secondary);
+  }
+  
+  /* Section spacing */
+  .zord-section {
+    margin-bottom: 1.5rem;
+  }
+  
+  /* Progress Bar Container */
+  .zord-progress {
+    height: 0.375rem;
+    background: var(--zord-border-secondary);
+    border-radius: 0.25rem;
+    overflow: hidden;
+  }
+  
+  .zord-progress-bar {
+    height: 100%;
+    border-radius: 0.25rem;
+    transition: width 0.3s ease;
+  }
+  
+  .zord-progress-healthy {
+    background: var(--zord-status-healthy);
+  }
+  
+  .zord-progress-warning {
+    background: var(--zord-status-warning);
+  }
+  
+  .zord-progress-critical {
+    background: var(--zord-status-critical);
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  
+  /* Tabular numbers for metrics */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }
