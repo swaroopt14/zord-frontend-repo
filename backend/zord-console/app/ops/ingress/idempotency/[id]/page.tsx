@@ -42,7 +42,7 @@ export default function IdempotencyDetailPage() {
       <div className="mb-4">
         <Link href="/ops/tenants" className="text-sm text-gray-500 hover:text-gray-700">Ingress</Link>
         <span className="mx-2 text-gray-400">▸</span>
-        <Link href="/ops/ingress/idempotency" className="text-sm text-gray-500 hover:text-gray-700">Idempotency</span>
+        <Link href="/ops/ingress/idempotency" className="text-sm text-gray-500 hover:text-gray-700">Idempotency</Link>
         <span className="mx-2 text-gray-400">▸</span>
         <span className="text-sm font-medium text-gray-900">{id}</span>
       </div>
