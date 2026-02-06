@@ -18,7 +18,7 @@ services: # Define the containers/services to run
       - DB_SSLMODE=disable # Disable SSL for local Docker connections
       - ENVIRONMENT=production # Environment setting
       - JAEGER_ENDPOINT=http://host.docker.internal:14268/api/traces # Jaeger tracing endpoint
-      - REDIS_ADDR=zord-vault-redis:6379 # Redis address (Shared Redis)
+      - REDIS_ADDR=zord-edge-redis:6379 # Redis address (Shared Redis)
     depends_on: # Service dependencies (start postgres first)
       - postgres
       - redis

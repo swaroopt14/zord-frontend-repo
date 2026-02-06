@@ -35,7 +35,7 @@ func (r *PaymentIntentRepo) Save(
 
 	query := `
 	INSERT INTO payment_intents (
-		intent_id, envelope_id, tenant_id,
+		intent_id,trace_id, envelope_id, tenant_id,
 		intent_type, canonical_version, schema_version,
 		amount, currency, deadline_at,
 		constraints, beneficiary_type, pii_tokens, beneficiary,
@@ -45,13 +45,14 @@ func (r *PaymentIntentRepo) Save(
 		$4,$5,$6,
 		$7,$8,$9,
 		$10,$11,$12,$13,
-		$14,$15,$16
+		$14,$15,$16,$17
 	)`
 
 	_, err = tx.ExecContext(
 		ctx,
 		query,
 		intent.IntentID,
+		intent.TraceID,
 		intent.EnvelopeID,
 		intent.TenantID,
 		intent.IntentType,
@@ -75,29 +76,35 @@ func (r *PaymentIntentRepo) Save(
 
 	outboxQuery := `
 	INSERT INTO outbox (
+		trace_id,
+		envelope_id,
 		tenant_id,
 		aggregate_type,
 		aggregate_id,
 		event_type,
 		payload,
 		status,
-		created_at,
-		envelope_id
+		retry_count,
+		next_attempt_at,
+		created_at
 	) VALUES (
-		$1,$2,$3,$4,$5,$6,$7,$8
+		$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
 	)`
 
 	_, err = tx.ExecContext(
 		ctx,
 		outboxQuery,
+		outbox.TraceID,
+		outbox.EnvelopeID,
 		outbox.TenantID,
 		outbox.AggregateType,
 		outbox.AggregateID,
 		outbox.EventType,
 		outbox.Payload,
 		outbox.Status,
+		outbox.RetryCount,
+		outbox.NextRetryAt,
 		outbox.CreatedAt,
-		outbox.EnvelopeID,
 	)
 	if err != nil {
 		return intent, err

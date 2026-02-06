@@ -19,7 +19,7 @@ services: # Define the containers/services to run
       - ENVIRONMENT=production # Environment setting
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-change-me-in-production} # Encryption key (use strong key in production)
       - STORAGE_PATH=/data/vault # Path for encrypted data storage
-      - REDIS_ADDR=zord-vault-redis:6379
+      - REDIS_ADDR=zord-edge-redis:6379
       # - AWS_ACCESS_KEY_ID=AKIARAKMIDK5WPIBKAPD
       # - AWS_SECRET_ACCESS_KEY=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
       - AWS_REGION=ap-south-1
@@ -62,19 +62,6 @@ services: # Define the containers/services to run
     networks: # Networks this service connects to
       - zord-network
     restart: unless-stopped # Restart policy
-
-  redis-vault: # Redis service for vault journal message queuing
-    image: redis:7-alpine # Docker image to use
-    container_name: zord-vault-redis # Container name
-    ports: # External access port
-      - "6380:6379" # Map host port 6380 to container port 6379
-    networks: # Networks this service connects to
-      - zord-network
-    restart: unless-stopped # Restart policy
-    command: redis-server --appendonly yes # Enable persistence
-    volumes: # Volume mounts for data persistence
-      - redis_vault_data:/data # Mount data directory
-
 
 volumes: # Named volumes for data persistence
   vault_data: # Volume for encrypted vault data

@@ -6,14 +6,15 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/google/uuid"
-	_ "github.com/lib/pq"
-	"go.uber.org/zap"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/google/uuid"
+	_ "github.com/lib/pq"
+	"go.uber.org/zap"
 
 	"zord-relay/config"
 	"zord-relay/db"
@@ -35,8 +36,8 @@ type payoutContract struct {
 	IntentID     string `json:"intent_id"`
 	EnvelopeID   string `json:"envelope_id"`
 	CreatedAt    string `json:"created_at"`
-	ContractHash     string `json:"contract_hash"`
-	TraceID          string `json:"trace_id"`
+	ContractHash string `json:"contract_hash"`
+	TraceID      string `json:"trace_id"`
 }
 
 func (h *DummyProviderHandler) HandleMessage(ctx context.Context, topic string, key string, value []byte, headers map[string]string, timestamp time.Time) error {
@@ -46,12 +47,12 @@ func (h *DummyProviderHandler) HandleMessage(ctx context.Context, topic string, 
 		tenantID := uuid.New().String()
 		traceID := headers["trace_id"]
 		dlq := map[string]interface{}{
-			"reason_code":        "SCHEMA_INVALID",
-			"error_message":      err.Error(),
+			"reason_code":         "SCHEMA_INVALID",
+			"error_message":       err.Error(),
 			"original_event_type": topic,
-			"tenant_id":          tenantID,
-			"trace_id":           traceID,
-			"envelope_id":        envelopeID,
+			"tenant_id":           tenantID,
+			"trace_id":            traceID,
+			"envelope_id":         envelopeID,
 		}
 		h.producer.Publish(h.dlqTopic, key, dlq, map[string]string{
 			"trace_id":    traceID,
@@ -71,12 +72,12 @@ func (h *DummyProviderHandler) HandleMessage(ctx context.Context, topic string, 
 	contractHashBytes := sha256.Sum256(value)
 	contractHash := hex.EncodeToString(contractHashBytes[:])
 	payloadObj := payoutContract{
-		ContractID:       contractID,
-		IntentID:         intentID,
-		EnvelopeID:       envelopeID,
-		CreatedAt:        timestamp.UTC().Format(time.RFC3339Nano),
-		ContractHash:     contractHash,
-		TraceID:          traceID,
+		ContractID:   contractID,
+		IntentID:     intentID,
+		EnvelopeID:   envelopeID,
+		CreatedAt:    timestamp.UTC().Format(time.RFC3339Nano),
+		ContractHash: contractHash,
+		TraceID:      traceID,
 	}
 	_, err := json.Marshal(payloadObj)
 	if err != nil {
@@ -86,26 +87,13 @@ func (h *DummyProviderHandler) HandleMessage(ctx context.Context, topic string, 
 	if err != nil {
 		parsedContractID = uuid.New()
 	}
-	parsedTenantID, err := uuid.Parse(tenantID)
-	if err != nil {
-		parsedTenantID = uuid.New()
-	}
-	parsedIntentID, err := uuid.Parse(intentID)
-	if err != nil {
-		parsedIntentID = uuid.New()
-	}
-	parsedEnvelopeID, err := uuid.Parse(envelopeID)
-	if err != nil {
-		parsedEnvelopeID = uuid.New()
-	}
-
 	_, err = h.db.Exec(`INSERT INTO payout_contracts (contract_id, tenant_id, intent_id, envelope_id, contract_payload, contract_hash, status, created_at, trace_id)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		ON CONFLICT (intent_id) DO NOTHING`,
 		parsedContractID,
-		parsedTenantID,
-		parsedIntentID,
-		parsedEnvelopeID,
+		uuid.MustParse(tenantID),
+		uuid.MustParse(intentID),
+		uuid.MustParse(envelopeID),
 		value,
 		contractHash,
 		"ISSUED",
@@ -179,20 +167,20 @@ func main() {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		var aggID, evType, tenantID, traceID, envID string
-		var payload []byte
-		err := sinkDB.QueryRow(`SELECT aggregate_id, event_type, payload, tenant_id, trace_id, envelope_id FROM dlq_events WHERE envelope_id=$1 ORDER BY created_at DESC LIMIT 1`, envelopeID).Scan(&aggID, &evType, &payload, &tenantID, &traceID, &envID)
-		if err != nil {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		_, err = sourceDB.Exec(`INSERT INTO outbox (outbox_id, aggregate_id, event_type, payload, status, attempts, tenant_id, trace_id, envelope_id, created_at) VALUES ($1,$2,$3,$4,'PENDING',0,$5,$6,$7,NOW())`,
-			uuid.New(), aggID, evType, payload, tenantID, traceID, envID)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
+		// var aggID, evType, tenantID, traceID, envID string
+		// var payload []byte
+		// err := sinkDB.QueryRow(`SELECT aggregate_id, event_type, payload, tenant_id, trace_id, envelope_id FROM dlq_events WHERE envelope_id=$1 ORDER BY created_at DESC LIMIT 1`, envelopeID).Scan(&aggID, &evType, &payload, &tenantID, &traceID, &envID)
+		// if err != nil {
+		// 	w.WriteHeader(http.StatusNotFound)
+		// 	return
+		// }
+		// _, err = sourceDB.Exec(`INSERT INTO outbox (outbox_id, aggregate_id, event_type, payload, status, attempts, tenant_id, trace_id, envelope_id, created_at) VALUES ($1,$2,$3,$4,'PENDING',0,$5,$6,$7,NOW())`,
+		// 	uuid.New(), aggID, evType, payload, tenantID, traceID, envID)
+		// if err != nil {
+		// 	w.WriteHeader(http.StatusInternalServerError)
+		// 	return
+		// }
+		// w.WriteHeader(http.StatusOK)
 	})
 
 	// graceful shutdown

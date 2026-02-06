@@ -83,16 +83,6 @@ func main() {
 			}
 
 			if dlq != nil {
-				// Business failure → DLQ already persisted
-				// err := messaging.ProduceErrorEvent(ctx, config.RedisClient, models.ErrorEvent{
-				// 	TraceID:    incoming.TraceID.String(),
-				// 	ErrorCode:  dlq.ReasonCode,
-				// 	ErrorMsg:   "INTENT_PROCESSED_TO_DLQ",
-				// 	HttpStatus: http.StatusBadRequest,
-				// })
-				// if err != nil {
-				// 	log.Printf("Failed to produce error event: %v\n", err)
-				// }
 				log.Printf(
 					"⚠️ Intent rejected [tenant=%s envelope=%s reason=%s]",
 					incoming.TenantID,

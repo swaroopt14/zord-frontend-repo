@@ -6,6 +6,7 @@ import (
 )
 
 type CanonicalIntent struct {
+	TraceID    string `json:"trace_id"`
 	IntentID   string `json:"intent_id"`
 	EnvelopeID string `json:"envelope_id"`
 	TenantID   string `json:"tenant_id"`

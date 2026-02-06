@@ -209,6 +209,7 @@ func (s *IntentService) ProcessIncomingIntent(
 	// -------- STEP 9: BUILD CANONICAL INTENT --------
 
 	canonical := models.CanonicalIntent{
+		TraceID:    in.TraceID.String(),
 		IntentID:   uuid.NewString(),
 		EnvelopeID: in.EnvelopeID.String(),
 		TenantID:   in.TenantID.String(),

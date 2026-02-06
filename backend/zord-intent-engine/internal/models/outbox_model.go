@@ -14,6 +14,8 @@ type OutboxEvent struct {
 	AggregateType string          `db:"aggregate_type"`
 	AggregateID   uuid.UUID       `db:"aggregate_id"`
 	EventType     string          `db:"event_type"`
+	RetryCount    int             `db:"retry_count"`
+	NextRetryAt   time.Time       `db:"next_attempt_at"`
 	Payload       json.RawMessage `db:"payload"`
 	Status        string          `db:"status"`
 	CreatedAt     time.Time       `db:"created_at"`
