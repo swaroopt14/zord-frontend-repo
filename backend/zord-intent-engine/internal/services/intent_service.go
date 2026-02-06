@@ -226,7 +226,6 @@ func (s *IntentService) ProcessIncomingIntent(
 		EnvelopeID: in.EnvelopeID.String(),
 		TenantID:   in.TenantID.String(),
 
-		TraceID:        in.TraceID.String(),
 		IdempotencyKey: in.IdempotencyKey,
 		SalientHash:    in.PayloadHash,
 

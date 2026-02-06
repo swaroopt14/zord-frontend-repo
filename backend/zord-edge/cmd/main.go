@@ -12,7 +12,6 @@ import (
 	"main.go/db"
 	"main.go/handler"
 	"main.go/routes"
-	"main.go/tracing"
 )
 
 var (

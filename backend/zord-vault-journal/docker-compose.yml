@@ -20,8 +20,6 @@ services: # Define the containers/services to run
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-change-me-in-production} # Encryption key (use strong key in production)
       - STORAGE_PATH=/data/vault # Path for encrypted data storage
       - REDIS_ADDR=zord-edge-redis:6379
-      # - AWS_ACCESS_KEY_ID=AKIARAKMIDK5WPIBKAPD
-      # - AWS_SECRET_ACCESS_KEY=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
       - AWS_REGION=ap-south-1
       - AWS_EC2_METADATA_DISABLED=true
       - S3_BUCKET=arealis-zord-vault

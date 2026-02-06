@@ -16,7 +16,6 @@ func CreateTables() error {
 		envelope_id UUID NOT NULL,
 		tenant_id UUID NOT NULL,
 
-	trace_id TEXT NOT NULL,
     idempotency_key TEXT,
     salient_hash TEXT NOT NULL,
 
@@ -69,9 +68,6 @@ func CreateTables() error {
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     sent_at TIMESTAMPTZ,
 
-    -- tracing / observability
-    trace_id VARCHAR(255),
-    envelope_id VARCHAR(255),
 
     CONSTRAINT fk_outbox_intent
         FOREIGN KEY (aggregate_id)
