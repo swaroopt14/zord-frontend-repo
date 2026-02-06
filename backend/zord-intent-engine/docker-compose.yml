@@ -9,6 +9,8 @@ services:
     container_name: zord-intent-engine-service
     ports:
       - "8083:8083"
+    env_file:
+      - ./.env
     environment:
       - DB_HOST=zord-intent-postgres
       - DB_PORT=5432
@@ -20,6 +22,10 @@ services:
       - VAULT_JOURNAL_URL=http://host.docker.internal:8081
       - PII_TOKEN_SECRET=your-secret-key-for-pii-tokenization-change-in-production
       - ENVIRONMENT=production
+
+      - AWS_REGION=ap-southeast-2
+      - AWS_EC2_METADATA_DISABLED=true
+      - S3_BUCKET=canonical-worm-storage
     depends_on:
       - postgres
     networks:

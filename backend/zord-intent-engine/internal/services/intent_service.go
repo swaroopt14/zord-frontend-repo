@@ -14,12 +14,14 @@ import (
 	"zord-intent-engine/internal/models"
 	"zord-intent-engine/internal/pii"
 	"zord-intent-engine/internal/validator"
+	"zord-intent-engine/storage"
 )
 
 type IntentService struct {
 	validator *validator.Validator
 	tokenizer *pii.Tokenizer
 	repo      CanonicalIntentRepository
+	s3        *storage.S3Store
 }
 
 // Repository abstraction
@@ -35,17 +37,27 @@ type CanonicalIntentRepository interface {
 		tenantID string,
 		envelopeID string,
 	) (*models.CanonicalIntent, error)
+
+	UpdateCanonicalSnapshotMeta(
+		ctx context.Context,
+		intentID string,
+		objectRef string,
+		hash string,
+		prevHash string,
+	) error
 }
 
 func NewIntentService(
 	v *validator.Validator,
 	t *pii.Tokenizer,
 	r CanonicalIntentRepository,
+	s3 *storage.S3Store, // ✅ ADD
 ) *IntentService {
 	return &IntentService{
 		validator: v,
 		tokenizer: t,
 		repo:      r,
+		s3:        s3,
 	}
 }
 
@@ -213,6 +225,10 @@ func (s *IntentService) ProcessIncomingIntent(
 		EnvelopeID: in.EnvelopeID.String(),
 		TenantID:   in.TenantID.String(),
 
+		TraceID:        in.TraceID.String(),
+		IdempotencyKey: in.IdempotencyKey,
+		SalientHash:    in.PayloadHash,
+
 		IntentType:       canonicalInput.IntentType,
 		CanonicalVersion: "v1",
 		SchemaVersion:    canonicalInput.SchemaVersion,
@@ -230,7 +246,7 @@ func (s *IntentService) ProcessIncomingIntent(
 		CreatedAt: time.Now().UTC(),
 	}
 
-	// -------- STEP 10: OUTBOX + PERSISTENCE --------
+	// -------- STEP 10: OUTBOX + PERSISTENCE (ATOMIC DB) --------
 
 	outbox, err := CanonicalIntentToOutboxEvent(canonical, in.Payload)
 	if err != nil {
@@ -242,5 +258,47 @@ func (s *IntentService) ProcessIncomingIntent(
 		return nil, nil, err
 	}
 
+	// -------- STEP 11: WORM SNAPSHOT (S3) --------
+
+	// versioning: v1 for now
+	version := 1
+	prevHash := "" // later: fetch last hash if version > 1
+
+	canonicalBytes, err := json.Marshal(saved)
+	if err != nil {
+		return &saved, nil, err
+	}
+
+	objectRef, hash, err := s.s3.StoreCanonicalSnapshot(
+		ctx,
+		saved.TenantID,
+		saved.IntentID,
+		version,
+		canonicalBytes,
+		prevHash,
+	)
+	if err != nil {
+		// ⚠️ Do NOT rollback DB. Log + alert + retry mechanism later.
+		return &saved, nil, err
+	}
+
+	// -------- STEP 12: UPDATE DB WITH WORM METADATA --------
+
+	err = s.repo.UpdateCanonicalSnapshotMeta(
+		ctx,
+		saved.IntentID,
+		objectRef,
+		hash,
+		prevHash,
+	)
+	if err != nil {
+		return &saved, nil, err
+	}
+
+	saved.CanonicalRef = objectRef
+	saved.CanonicalHash = hash
+	saved.PrevHash = prevHash
+
 	return &saved, nil, nil
+
 }
