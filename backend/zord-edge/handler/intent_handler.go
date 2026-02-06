@@ -22,6 +22,8 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 	tenantId := context.MustGet("tenant_id").(uuid.UUID)
 	IdempotencyKey := context.GetString("idempotency_key")
 
+	//we can add idempotency cache here
+
 	msg := model.RawIntentMessage{
 		TenantID:       tenantId.String(),
 		TraceID:        traceId,
@@ -39,8 +41,8 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 
 	errCh := make(chan *model.ErrorEvent, 1)
 	ackCh := make(chan *model.AckMessage, 1)
-	messaging.ConsumeErrorEvent(context.Request.Context(), msg.TraceID, h.Redis, errCh)
-	messaging.ConsumeAckMessage(context.Request.Context(), msg.TraceID, h.Redis, ackCh)
+	go messaging.ConsumeErrorEvent(context.Request.Context(), msg.TraceID, h.Redis, errCh)
+	go messaging.ConsumeAckMessage(context.Request.Context(), msg.TraceID, h.Redis, ackCh)
 
 	select {
 	case errEvent := <-errCh:
@@ -64,7 +66,7 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 			"Received_At": ack.ReceivedAt})
 	//No error event received
 
-	case <-time.After(10 * time.Second):
+	case <-time.After(3 * time.Second):
 		context.JSON(http.StatusGatewayTimeout, gin.H{
 			"error": "timeout waiting for downstream response",
 		})

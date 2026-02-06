@@ -10,7 +10,6 @@ import (
 
 func Routes(router *gin.Engine, h *handler.Handler) {
 
-	router.Use(gin.Recovery())
 	public := router.Group("/v1")
 	{
 		public.POST("/tenantReg", handler.Tenant_Registry)

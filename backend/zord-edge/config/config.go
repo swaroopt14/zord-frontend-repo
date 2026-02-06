@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -32,6 +33,10 @@ func InitDB() {
 	if err != nil {
 		log.Fatalf("Database Ping Error %v", err)
 	}
+
+	db.DB.SetMaxOpenConns(50)
+	db.DB.SetMaxIdleConns(25)
+	db.DB.SetConnMaxLifetime(5 * time.Minute)
 }
 
 func InitRedisClient() *redis.Client {
@@ -40,9 +45,11 @@ func InitRedisClient() *redis.Client {
 		addr = "localhost:6379"
 	}
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     addr, // or from env
-		Password: "",
-		DB:       0,
+		Addr:         addr, // or from env
+		Password:     "",
+		DB:           0,
+		PoolSize:     100,
+		MinIdleConns: 20,
 	})
 
 	// optional health check

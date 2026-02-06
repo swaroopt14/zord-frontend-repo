@@ -23,7 +23,11 @@ func Authenticate() gin.HandlerFunc {
 			response, err := services.ValidateApiKey(context.Request.Context(), db.DB, apikey)
 			if err != nil {
 				context.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-					"message": "invalid api key",
+					"success": false,
+					"error": gin.H{
+						"code":    "UNAUTHORIZED",
+						"message": "Invalid API key",
+					},
 				})
 				return
 			}

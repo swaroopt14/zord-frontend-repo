@@ -46,6 +46,15 @@ func CreateTables() error {
 	if _, err := DB.Exec(paymentIntents); err != nil {
 		return err
 	}
+
+	// Optimized lookup for idempotency guard (tenant_id + envelope_id)
+	if _, err := DB.Exec(`
+	CREATE INDEX IF NOT EXISTS idx_payment_intents_tenant_envelope
+	    ON payment_intents (tenant_id, envelope_id);
+	`); err != nil {
+		return err
+	}
+
 	//Outbox (OWNED)
 	outbox := `
 	CREATE TABLE IF NOT EXISTS outbox (

@@ -44,9 +44,15 @@ func main() {
 	// cleanup := tracing.InitTracing("zord-edge")
 	// defer cleanup()
 
-	server := gin.Default()
+	gin.SetMode(gin.ReleaseMode)
+	server := gin.New()
+	server.Use(gin.Recovery())
 
 	config.InitDB()
+	if db.DB == nil {
+		log.Fatal("DB is nil after InitDB")
+	}
+
 	db.CreateTable()
 
 	Rdb := config.InitRedisClient()
@@ -57,7 +63,9 @@ func main() {
 	}
 	log.Println("Redis ping latency:", time.Since(t))
 
-	h := &handler.Handler{Redis: Rdb}
+	h := &handler.Handler{
+		Redis: Rdb,
+	}
 
 	routes.Routes(server, h)
 
@@ -74,7 +82,9 @@ func main() {
 	})
 
 	log.Println("Starting Zord Edge service on port 8080 with observability enabled")
-	server.Run(":8080")
+	if err := server.Run(":8080"); err != nil {
+		log.Fatal("Server failed to start:", err)
+	}
 }
 
 // prometheusMiddleware adds Prometheus metrics collection

@@ -53,7 +53,7 @@ func ConsumeErrorEvent(ctx context.Context, traceid string, rdb *redis.Client, o
 						}
 						raw, ok := msg.Values[EventDataKey].(string)
 						if !ok {
-							log.Println("missing data")
+							// no messages right now — totally normal
 							continue
 						}
 						var evt model.ErrorEvent
