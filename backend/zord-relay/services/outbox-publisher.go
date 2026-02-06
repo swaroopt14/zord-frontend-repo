@@ -3,13 +3,14 @@ package services
 import (
 	"context"
 	"database/sql"
-	"time"
 	"math/rand"
-	"github.com/google/uuid"
-	"go.uber.org/zap"
+	"time"
 	"zord-relay/kafka"
 	"zord-relay/model"
 	"zord-relay/utils"
+
+	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type Publisher struct {
@@ -54,7 +55,7 @@ func (p *Publisher) worker(ctx context.Context, id int) {
 		}
 
 		rows, err := tx.QueryContext(ctx, `
-			SELECT outbox_id, aggregate_id, event_type, payload, attempts, tenant_id, trace_id, envelope_id
+			SELECT event_id, aggregate_id, event_type, payload, retry_count, tenant_id, trace_id, envelope_id
 			FROM outbox
 			WHERE status='PENDING' AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
 			FOR UPDATE SKIP LOCKED
@@ -80,9 +81,9 @@ func (p *Publisher) worker(ctx context.Context, id int) {
 
 		for _, e := range events {
 			headers := map[string]string{
-				"trace_id":    e.TraceID.String,
+				"trace_id":    e.TraceID,
 				"tenant_id":   e.TenantID,
-				"envelope_id": e.EnvelopeID.String,
+				"envelope_id": e.EnvelopeID,
 			}
 
 			err := p.producer.Publish(p.cfg.ReadyTopic, e.AggregateID, e.Payload, headers)
@@ -90,33 +91,27 @@ func (p *Publisher) worker(ctx context.Context, id int) {
 				retries := e.RetryCount + 1
 				if retries >= p.cfg.MaxRetries {
 					dlq := map[string]interface{}{
-						"reason_code":        "PUBLISH_FAILED",
-						"error_message":      err.Error(),
+						"reason_code":         "PUBLISH_FAILED",
+						"error_message":       err.Error(),
 						"original_event_type": e.EventType,
-						"tenant_id":          e.TenantID,
-						"trace_id":           e.TraceID.String,
-						"envelope_id":        e.EnvelopeID.String,
-						"schema_subject": "z.intent.ready",
-						"schema_version": "v1",
+						"tenant_id":           e.TenantID,
+						"trace_id":            e.TraceID,
+						"envelope_id":         e.EnvelopeID,
+						"schema_subject":      "z.intent.ready",
+						"schema_version":      "v1",
 					}
 					_ = p.producer.Publish(p.cfg.DLQTopic, e.AggregateID, dlq, headers)
-					
-					envelopeID := e.EnvelopeID.String
-					if !e.EnvelopeID.Valid {
-						envelopeID = uuid.New().String() // Fallback if missing, as dlq_items requires it
-					}
-					
 					_, _ = tx.ExecContext(ctx, `INSERT INTO dlq_items (dlq_id, tenant_id, envelope_id, stage, reason_code, error_detail, replayable, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())`,
-						uuid.New().String(), e.TenantID, envelopeID, "OUTBOX_PUBLISH", "PUBLISH_FAILED", err.Error(), true)
-					_, _ = tx.ExecContext(ctx, `UPDATE outbox SET status='FAILED' WHERE outbox_id=$1`, e.ID)
+						uuid.New().String(), e.TenantID, e.EnvelopeID, "OUTBOX_PUBLISH", "PUBLISH_FAILED", err.Error(), true)
+					_, _ = tx.ExecContext(ctx, `UPDATE outbox SET status='FAILED' WHERE event_id=$1`, e.ID)
 				} else {
 					backoff := p.cfg.RetryBackoff * time.Duration(1<<retries)
 					backoff += time.Duration(rand.Intn(100)) * time.Millisecond
 					ms := int(backoff / time.Millisecond)
-					_, _ = tx.ExecContext(ctx, `UPDATE outbox SET attempts=$1, next_attempt_at=NOW() + ($2::int * interval '1 millisecond') WHERE outbox_id=$3`, retries, ms, e.ID)
+					_, _ = tx.ExecContext(ctx, `UPDATE outbox SET attempts=$1, next_attempt_at=NOW() + ($2::int * interval '1 millisecond') WHERE event_id=$3`, retries, ms, e.ID)
 				}
 			} else {
-				_, _ = tx.ExecContext(ctx, `UPDATE outbox SET status='SENT', sent_at=NOW() WHERE outbox_id=$1`, e.ID)
+				_, _ = tx.ExecContext(ctx, `UPDATE outbox SET status='SENT', sent_at=NOW() WHERE event_id=$1`, e.ID)
 			}
 		}
 

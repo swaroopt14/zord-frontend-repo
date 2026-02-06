@@ -4,8 +4,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/google/uuid"
 	"zord-intent-engine/internal/models"
+
+	"github.com/google/uuid"
 )
 
 func CanonicalIntentToOutboxEvent(
@@ -19,6 +20,8 @@ func CanonicalIntentToOutboxEvent(
 	}
 
 	return models.OutboxEvent{
+		TraceID:       intent.TraceID,
+		EnvelopeID:    intent.EnvelopeID,
 		TenantID:      intent.TenantID,
 		AggregateType: "intent",
 		AggregateID:   intId,
@@ -26,6 +29,5 @@ func CanonicalIntentToOutboxEvent(
 		Payload:       payload,
 		Status:        "PENDING",
 		CreatedAt:     time.Now(),
-		EnvelopeID:    intent.EnvelopeID,
 	}, nil
 }

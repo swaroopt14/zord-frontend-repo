@@ -11,9 +11,10 @@ func CreateTables() error {
 
 	paymentIntents := `
 	CREATE TABLE IF NOT EXISTS payment_intents (
-    intent_id UUID PRIMARY KEY,
-    envelope_id UUID NOT NULL,
-    tenant_id UUID NOT NULL,
+		intent_id UUID PRIMARY KEY,
+		trace_id UUID NOT NULL,
+		envelope_id UUID NOT NULL,
+		tenant_id UUID NOT NULL,
 
 	trace_id TEXT NOT NULL,
     idempotency_key TEXT,
@@ -49,8 +50,9 @@ func CreateTables() error {
 	//Outbox (OWNED)
 	outbox := `
 	CREATE TABLE IF NOT EXISTS outbox (
-    outbox_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
+    event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	trace_id UUID NOT NULL,  
+    envelope_id UUID NOT NULL, 
     tenant_id UUID NOT NULL,
 
     -- intent-specific outbox
@@ -61,7 +63,7 @@ func CreateTables() error {
     payload JSONB NOT NULL,     -- downstream message body (no raw PII)
 
     status TEXT NOT NULL DEFAULT 'PENDING',
-    attempts INT NOT NULL DEFAULT 0,
+    retry_count INT NOT NULL DEFAULT 0,
     next_attempt_at TIMESTAMPTZ,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

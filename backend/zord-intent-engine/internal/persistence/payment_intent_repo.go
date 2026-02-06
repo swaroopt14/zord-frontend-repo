@@ -95,29 +95,35 @@ VALUES (
 
 	outboxQuery := `
 	INSERT INTO outbox (
+		trace_id,
+		envelope_id,
 		tenant_id,
 		aggregate_type,
 		aggregate_id,
 		event_type,
 		payload,
 		status,
-		created_at,
-		envelope_id
+		retry_count,
+		next_attempt_at,
+		created_at
 	) VALUES (
-		$1,$2,$3,$4,$5,$6,$7,$8
+		$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
 	)`
 
 	_, err = tx.ExecContext(
 		ctx,
 		outboxQuery,
+		outbox.TraceID,
+		outbox.EnvelopeID,
 		outbox.TenantID,
 		outbox.AggregateType,
 		outbox.AggregateID,
 		outbox.EventType,
 		outbox.Payload,
 		outbox.Status,
+		outbox.RetryCount,
+		outbox.NextRetryAt,
 		outbox.CreatedAt,
-		outbox.EnvelopeID,
 	)
 	if err != nil {
 		return intent, err

@@ -42,8 +42,8 @@ func init() {
 
 func main() {
 	// Initialize tracing
-	cleanup := tracing.InitTracing("zord-edge")
-	defer cleanup()
+	// cleanup := tracing.InitTracing("zord-edge")
+	// defer cleanup()
 
 	server := gin.Default()
 
