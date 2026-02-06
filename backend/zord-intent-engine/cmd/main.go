@@ -17,6 +17,8 @@ import (
 	"zord-intent-engine/internal/persistence"
 
 	"zord-intent-engine/internal/pii"
+
+	"zord-intent-engine/storage"
 )
 
 func main() {
@@ -44,10 +46,17 @@ func main() {
 	}
 
 	// -------- Intent Service --------
+	//------Initializing s3
+	s3store, err := storage.NewS3Store(ctx, os.Getenv("S3_BUCKET"), os.Getenv("AWS_REGION"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	intentService := services.NewIntentService(
 		intentValidator,
 		tokenizer,
 		intentRepo,
+		s3store,
 	)
 
 	// -------- DLQ HTTP (READ-ONLY) --------
