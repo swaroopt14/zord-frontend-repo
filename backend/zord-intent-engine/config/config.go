@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"zord-intent-engine/db"
 
@@ -35,6 +36,9 @@ func InitDB() {
 	if err != nil {
 		log.Fatalf("Database Ping Error %v", err)
 	}
+	db.DB.SetMaxOpenConns(50)
+	db.DB.SetMaxIdleConns(25)
+	db.DB.SetConnMaxLifetime(5 * time.Minute)
 
 }
 
@@ -42,21 +46,14 @@ func InitRedis() *redis.Client {
 	// Construct the Redis address from environment variables
 	addr := os.Getenv("REDIS_ADDR")
 	if addr == "" {
-		host := os.Getenv("REDIS_HOST")
-		port := os.Getenv("REDIS_PORT")
-		if host == "" {
-			host = "localhost"
-		}
-		if port == "" {
-			port = "6379"
-		}
-		addr = fmt.Sprintf("%s:%s", host, port)
+		addr = "localhost:6379"
 	}
-
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: "",
-		DB:       0,
+		Addr:         addr, // or from env
+		Password:     "",
+		DB:           0,
+		PoolSize:     100,
+		MinIdleConns: 20,
 	})
 
 	// optional health check

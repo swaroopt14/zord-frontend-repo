@@ -111,10 +111,18 @@ func main() {
 
 	// Health check server
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
 
+		response := map[string]interface{}{
+			"service": "zord-relay",
+			"status":  "healthy",
+			"time":    time.Now().UTC(),
+		}
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "failed to encode health response", http.StatusInternalServerError)
+		}
+	})
 	port := os.Getenv("HEALTH_PORT")
 	if port == "" {
 		port = "8082"

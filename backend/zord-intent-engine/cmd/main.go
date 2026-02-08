@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"zord-intent-engine/internal/services"
 	"zord-intent-engine/internal/validator"
@@ -65,8 +67,18 @@ func main() {
 	intentHandler := handlers.NewIntentHandler(intentQueryRepo)
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+
+		response := map[string]interface{}{
+			"service": "zord-intent-engine",
+			"status":  "healthy",
+			"time":    time.Now().UTC(),
+		}
+
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "failed to encode health response", http.StatusInternalServerError)
+		}
 	})
 
 	http.HandleFunc("/v1/dlq", dlqHandler.List)

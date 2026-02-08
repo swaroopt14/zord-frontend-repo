@@ -78,29 +78,32 @@ func main() {
 	}
 
 	// Start message processing worker
-	go messaging.StartRawIntentWorker(ctx, Rdb, func(ctx context.Context, msg model.RawIntentMessage) error {
-		ack, err := services.ProcessRawIntent(ctx, msg, s3store)
-		if err != nil {
-			log.Printf("Error processing intent: %v", err)
-			errEvent := model.ClientErrorEvent{
-				TraceID:    msg.TraceID,
-				ErrorCode:  "INTERNAL_ERROR",
-				ErrorMsg:   err.Error(),
-				HttpStatus: 500,
+	workerCount := 4
+	for i := 0; i < workerCount; i++ {
+		go messaging.StartRawIntentWorker(ctx, Rdb, func(ctx context.Context, msg model.RawIntentMessage) error {
+			ack, err := services.ProcessRawIntent(ctx, msg, s3store)
+			if err != nil {
+				log.Printf("Error processing intent: %v", err)
+				errEvent := model.ClientErrorEvent{
+					TraceID:    msg.TraceID,
+					ErrorCode:  "INTERNAL_ERROR",
+					ErrorMsg:   err.Error(),
+					HttpStatus: 500,
+				}
+				if pubErr := messaging.PublishClientError(ctx, Rdb, errEvent); pubErr != nil {
+					log.Printf("Failed to publish error event: %v", pubErr)
+				}
+				return err
 			}
-			if pubErr := messaging.PublishClientError(ctx, Rdb, errEvent); pubErr != nil {
-				log.Printf("Failed to publish error event: %v", pubErr)
+			if ack == nil {
+				return fmt.Errorf("ack is nil for trace_id=%s", msg.TraceID)
 			}
-			return err
-		}
-		if ack == nil {
-			return fmt.Errorf("ack is nil for trace_id=%s", msg.TraceID)
-		}
-		if err := services.RawIntent(ctx, msg, ack, Rdb); err != nil {
-			return err
-		}
-		return messaging.SendACKMessage(ctx, *ack, Rdb)
-	})
+			if err := services.RawIntent(ctx, msg, ack, Rdb); err != nil {
+				return err
+			}
+			return messaging.SendACKMessage(ctx, *ack, Rdb)
+		})
+	}
 
 	// Start HTTP server for metrics and health checks
 	go startHTTPServer()

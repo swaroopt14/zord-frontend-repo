@@ -20,7 +20,11 @@ func Tenant_Registry(context *gin.Context) {
 	}
 	TenantId, FullApiKey, err := services.TenantReg(context.Request.Context(), db.DB, req.Name)
 	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"Error": "tenant registration failed"})
+		log.Printf("Tenant registration failed: %v", err)
+		context.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "tenant registration failed",
+			"details": err.Error(), // TEMPORARY for debugging
+		})
 		return
 	}
 	context.JSON(http.StatusCreated, gin.H{"Message": "Merchent Registered",

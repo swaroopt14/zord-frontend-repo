@@ -3,10 +3,11 @@ package db
 import (
 	"context"
 	"database/sql"
-	_ "github.com/lib/pq"
 	"log"
 	"strings"
 	"time"
+
+	_ "github.com/lib/pq"
 )
 
 func Connect(dbURL string) *sql.DB {
@@ -21,6 +22,10 @@ func Connect(dbURL string) *sql.DB {
 	if err != nil {
 		log.Fatalf("failed to connect to db: %v", err)
 	}
+
+	db.SetMaxOpenConns(50)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(5 * time.Minute)
 
 	// Retry pinging the database until it becomes available
 	for i := 0; i < 30; i++ {
