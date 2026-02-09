@@ -39,25 +39,8 @@ zord-console                 Up X days (healthy)   0.0.0.0:3000->3000/tcp
 
 ## 🚀 **DEPLOYMENT OPTIONS**
 
-### **Option 1: Automated Deployment with Database Initialization (Recommended)**
 
-Use the new automated deployment script that ensures all database tables are created automatically:
-
-```powershell
-# Run the automated deployment script
-.\deploy-with-db-init.ps1
-```
-
-This script will:
-- ✅ Clean up any existing deployment
-- ✅ Remove old database volumes for fresh initialization
-- ✅ Build and deploy all services
-- ✅ Wait for databases to be ready
-- ✅ Verify all database schemas are created automatically
-- ✅ Test service health endpoints
-- ✅ Provide connection information and next steps
-
-### **Option 2: Use Existing Deployment**
+### **Option 1: Use Existing Deployment**
 
 If your Zord platform is already deployed and running, skip to the [Testing & Verification](#testing--verification) section.
 
@@ -198,7 +181,7 @@ docker exec zord-relay-postgres psql -U relay_user -d zord_relay_db -c "SELECT v
 docker exec zord-redis redis-cli ping && echo "✅ zord-redis: Ready"
 
 # Test Kafka connection
-docker exec zord-kafka kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1 && echo "✅ zord-kafka: Ready"
+docker exec zord-kafka-1 kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1 && echo "✅ zord-kafka: Ready"
 ```
 
 ### **4. Service Integration Tests**

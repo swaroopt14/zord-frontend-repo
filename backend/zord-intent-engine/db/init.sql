@@ -1,0 +1,154 @@
+-- ============================================================================
+-- ZORD INTENT ENGINE - DATABASE INITIALIZATION SCRIPT
+-- This script creates all required tables for the intent processing engine
+-- ============================================================================
+
+-- Enable UUID extension if not already enabled
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ============================================================================
+-- PAYMENT INTENTS TABLE
+-- Stores canonicalized payment intents after processing
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS payment_intents (
+    intent_id UUID PRIMARY KEY,
+    envelope_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
+
+    intent_type TEXT NOT NULL,
+    canonical_version TEXT NOT NULL,
+    schema_version TEXT,
+
+    amount NUMERIC(18,2) NOT NULL,
+    currency CHAR(3) NOT NULL,
+    deadline_at TIMESTAMPTZ,
+
+    constraints JSONB,
+    beneficiary_type TEXT,
+    pii_tokens JSONB,
+    beneficiary JSONB,
+
+    status TEXT NOT NULL,
+    confidence_score NUMERIC(5,2),
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS idx_payment_intents_tenant_id ON payment_intents(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_payment_intents_envelope_id ON payment_intents(envelope_id);
+CREATE INDEX IF NOT EXISTS idx_payment_intents_status ON payment_intents(status);
+CREATE INDEX IF NOT EXISTS idx_payment_intents_created_at ON payment_intents(created_at);
+
+-- ============================================================================
+-- OUTBOX TABLE
+-- Stores events to be published to downstream systems
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS outbox (
+    outbox_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    tenant_id UUID NOT NULL,
+
+    -- intent-specific outbox
+    aggregate_type TEXT NOT NULL DEFAULT 'intent',
+    aggregate_id UUID NOT NULL, -- payment_intents.intent_id
+
+    event_type TEXT NOT NULL,   -- intent.created.v1, intent.updated.v1
+    payload JSONB NOT NULL,     -- downstream message body (no raw PII)
+
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    attempts INT NOT NULL DEFAULT 0,
+    next_attempt_at TIMESTAMPTZ,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    sent_at TIMESTAMPTZ,
+
+    -- tracing / observability
+    trace_id VARCHAR(255),
+    envelope_id VARCHAR(255),
+
+    CONSTRAINT fk_outbox_intent
+        FOREIGN KEY (aggregate_id)
+        REFERENCES payment_intents(intent_id)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT chk_outbox_status
+        CHECK (status IN ('PENDING', 'SENT', 'FAILED')),
+
+    CONSTRAINT chk_outbox_aggregate_type
+        CHECK (aggregate_type = 'intent')
+);
+
+-- Create indexes for outbox processing
+CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox(status);
+CREATE INDEX IF NOT EXISTS idx_outbox_tenant_id ON outbox(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_outbox_created_at ON outbox(created_at);
+CREATE INDEX IF NOT EXISTS idx_outbox_next_attempt_at ON outbox(next_attempt_at);
+
+-- ============================================================================
+-- DLQ ITEMS TABLE
+-- Stores failed processing items for replay and analysis
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS dlq_items (
+    dlq_id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    envelope_id UUID NOT NULL,
+
+    stage TEXT NOT NULL,
+    reason_code TEXT NOT NULL,
+    error_detail TEXT,
+    replayable BOOLEAN NOT NULL,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Create indexes for DLQ analysis
+CREATE INDEX IF NOT EXISTS idx_dlq_items_tenant_id ON dlq_items(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_dlq_items_envelope_id ON dlq_items(envelope_id);
+CREATE INDEX IF NOT EXISTS idx_dlq_items_reason_code ON dlq_items(reason_code);
+CREATE INDEX IF NOT EXISTS idx_dlq_items_replayable ON dlq_items(replayable);
+CREATE INDEX IF NOT EXISTS idx_dlq_items_created_at ON dlq_items(created_at);
+
+-- ============================================================================
+-- VERIFICATION QUERIES
+-- Run these to verify tables were created successfully
+-- ============================================================================
+
+-- Check table creation
+DO $$
+BEGIN
+    RAISE NOTICE '✅ Checking table creation...';
+    
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'payment_intents') THEN
+        RAISE NOTICE '✅ payment_intents table created successfully';
+    ELSE
+        RAISE EXCEPTION '❌ payment_intents table creation failed';
+    END IF;
+    
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'outbox') THEN
+        RAISE NOTICE '✅ outbox table created successfully';
+    ELSE
+        RAISE EXCEPTION '❌ outbox table creation failed';
+    END IF;
+    
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'dlq_items') THEN
+        RAISE NOTICE '✅ dlq_items table created successfully';
+    ELSE
+        RAISE EXCEPTION '❌ dlq_items table creation failed';
+    END IF;
+    
+    RAISE NOTICE '🎉 All zord-intent-engine tables created successfully!';
+END $$;
+
+-- Display table information
+SELECT 
+    schemaname,
+    tablename,
+    tableowner,
+    tablespace,
+    hasindexes,
+    hasrules,
+    hastriggers
+FROM pg_tables 
+WHERE tablename IN ('payment_intents', 'outbox', 'dlq_items')
+ORDER BY tablename;

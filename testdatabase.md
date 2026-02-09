@@ -12,9 +12,8 @@ This guide provides comprehensive step-by-step instructions for connecting to, t
 | **zord-vault-postgres** | zord-vault-journal | 5434 | Immutable envelope storage | zord-vault-postgres |
 | **zord-intent-postgres** | zord-intent-engine | 5436 | Intent processing & outbox | zord-intent-postgres |
 | **zord-relay-postgres** | zord-relay | 5435 | Message relay & contracts | zord-relay-postgres |
-| **Redis** | Message Queues | 6379 | Caching & queuing | zord-vault-redis |
-| **Redis** | Intent Processing | 6380 | Intent queue processing | zord-intent-redis |
-| **Kafka** | Event Streaming | 9092 | Event publishing | zord-kafka |
+| **Redis** | Message Queues | 6379 | Caching & queuing | zord-redis |
+| **Kafka** | Event Streaming | 9092 | Event publishing | zord-kafka-1 |
 
 ## 🚀 **QUICK START - DATABASE CONNECTIVITY TEST**
 
@@ -52,7 +51,7 @@ docker exec zord-intent-redis redis-cli ping && echo "✅ zord-intent-redis: Rea
 
 # Kafka health check
 echo "Testing Kafka..."
-docker exec zord-kafka kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1 && echo "✅ zord-kafka: Ready"
+docker exec zord-kafka-1 kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1 && echo "✅ zord-kafka: Ready"
 ```
 
 ## 📊 **DETAILED DATABASE TESTING**
@@ -65,17 +64,17 @@ docker exec zord-kafka kafka-topics --bootstrap-server localhost:9092 --list > /
 - **Host**: localhost
 - **Port**: 5433
 - **Database**: zord_edge_db
-- **User**: edge_user
-- **Password**: edge_password
+- **User**: zord_user
+- **Password**: zord_password
 - **Container**: zord-edge-postgres
 
 ### **Step 1: Connect to Database**
 ```bash
 # Method 1: Connect via Docker container
-docker exec -it zord-edge-postgres psql -U edge_user -d zord_edge_db
+docker exec -it zord-edge-postgres psql -U zord_user -d zord_edge_db
 
 # Method 2: Connect from host (if psql installed)
-psql -h localhost -p 5433 -U edge_user -d zord_edge_db
+psql -h localhost -p 5433 -U zord_user -d zord_edge_db
 ```
 
 ### **Step 2: Verify Database Schema**
@@ -518,12 +517,12 @@ DELETE FROM outbox WHERE topic = 'test.topic.v1';
 
 ## 🔴 **5. REDIS TESTING**
 
-### **Redis Instance 1: zord-vault-redis (Port 6379)**
+### **Redis Instance: zord-redis (Port 6379)**
 
 ### **Step 1: Connect to Redis**
 ```bash
 # Connect via Docker container
-docker exec -it zord-vault-redis redis-cli
+docker exec -it zord-redis redis-cli
 
 # Connect from host (if redis-cli installed)
 redis-cli -h localhost -p 6379
@@ -604,12 +603,12 @@ EXIT
 ### **Connection Details**
 - **Host**: localhost
 - **Port**: 9092
-- **Container**: zord-kafka
+- **Container**: zord-kafka-1
 
 ### **Step 1: Connect to Kafka**
 ```bash
 # Connect via Docker container
-docker exec -it zord-kafka bash
+docker exec -it zord-kafka-1 bash
 ```
 
 ### **Step 2: Test Kafka Operations**
@@ -645,19 +644,19 @@ exit
 ### **Step 3: Test Zord-specific Topics**
 ```bash
 # Check for Zord topics
-docker exec zord-kafka kafka-topics --bootstrap-server localhost:9092 --list | grep "^z\."
+docker exec zord-kafka-1 kafka-topics --bootstrap-server localhost:9092 --list | grep "^z\."
 
 # Expected topics:
-# z.intent.created.v1
-# z.intent.rejected.v1
-# z.vault.envelope.stored.v1
-# z.relay.publish_failed.v1
+# z.intent.canonical.v1
+# z.intent.dlq.v1
+# z.intent.ingress.v1
+# z.intent.ready.v1
 
 # Describe Zord topics
-docker exec zord-kafka kafka-topics --bootstrap-server localhost:9092 --describe --topic z.intent.created.v1
+docker exec zord-kafka-1 kafka-topics --bootstrap-server localhost:9092 --describe --topic z.intent.ready.v1
 
 # Monitor Zord topic messages
-docker exec zord-kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic z.intent.created.v1 --from-beginning --timeout-ms 5000
+docker exec zord-kafka-1 kafka-console-consumer --bootstrap-server localhost:9092 --topic z.intent.ready.v1 --from-beginning --timeout-ms 5000
 ```
 
 ---
