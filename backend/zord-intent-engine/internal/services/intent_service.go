@@ -84,6 +84,13 @@ func (s *IntentService) ProcessIncomingIntent(
 
 	// -------- STEP 0: Transport guards --------
 
+	log.Printf("ProcessIncomingIntent: Source=%s EnvelopeID=%s", in.Source, in.EnvelopeID)
+
+	if in.Source == "WEBHOOK" {
+		log.Printf("ProcessIncomingIntent: Routing to processWebhook for EnvelopeID=%s", in.EnvelopeID)
+		return s.processWebhook(ctx, in)
+	}
+
 	if len(in.Payload) == 0 {
 		return nil, &models.DLQEntry{ReasonCode: "EMPTY_PAYLOAD"}, nil
 	}
@@ -301,4 +308,95 @@ func (s *IntentService) ProcessIncomingIntent(
 
 	return &saved, nil, nil
 
+}
+
+func (s *IntentService) processWebhook(
+	ctx context.Context,
+	in *models.IncomingIntent,
+) (*models.CanonicalIntent, *models.DLQEntry, error) {
+
+	// 1. Create Canonical Intent (Webhook)
+	canonical := models.CanonicalIntent{
+		TraceID:        in.TraceID.String(),
+		IntentID:       uuid.NewString(),
+		EnvelopeID:     in.EnvelopeID.String(),
+		TenantID:       in.TenantID.String(),
+		IdempotencyKey: in.IdempotencyKey,
+		SalientHash:    in.PayloadHash, // Might be empty
+		IntentType:     "WEBHOOK",
+		SchemaVersion:  "v1",
+		Amount:         0,
+		Currency:       "XXX",
+		Status:         "CREATED",
+		CreatedAt:      time.Now().UTC(),
+		// Initialize JSONB fields to empty JSON object to avoid "invalid input syntax for type json"
+		Constraints: json.RawMessage("{}"),
+		PIITokens:   json.RawMessage("{}"),
+		Beneficiary: json.RawMessage("{}"),
+	}
+
+	// 2. Create Outbox Event
+	// We must use aggregate_type='intent' due to DB constraint
+	payload := in.Payload
+	if len(payload) == 0 {
+		payload = []byte("{}")
+	}
+
+	outbox := models.OutboxEvent{
+		TraceID:       canonical.TraceID,
+		EnvelopeID:    canonical.EnvelopeID,
+		TenantID:      canonical.TenantID,
+		AggregateType: "intent",
+		AggregateID:   uuid.MustParse(canonical.IntentID),
+		EventType:     "WEBHOOK_RECEIVED",
+		Payload:       payload,
+		Status:        "PENDING",
+		CreatedAt:     time.Now(),
+	}
+
+	// 3. Save to DB (Atomic)
+	saved, err := s.repo.Save(ctx, canonical, outbox)
+	if err != nil {
+		log.Printf("processWebhook: Save failed for EnvelopeID=%s: %v", canonical.EnvelopeID, err)
+		return nil, nil, err
+	}
+	log.Printf("processWebhook: Save success for EnvelopeID=%s, IntentID=%s", canonical.EnvelopeID, saved.IntentID)
+
+	// 4. Store Snapshot in S3
+	version := 1
+	prevHash := ""
+	canonicalBytes, err := json.Marshal(saved)
+	if err != nil {
+		return &saved, nil, err
+	}
+
+	objectRef, hash, err := s.s3.StoreCanonicalSnapshot(
+		ctx,
+		saved.TenantID,
+		saved.IntentID,
+		version,
+		canonicalBytes,
+		prevHash,
+	)
+	if err != nil {
+		return &saved, nil, err
+	}
+
+	// 5. Update DB with Snapshot Metadata
+	err = s.repo.UpdateCanonicalSnapshotMeta(
+		ctx,
+		saved.IntentID,
+		objectRef,
+		hash,
+		prevHash,
+	)
+	if err != nil {
+		return &saved, nil, err
+	}
+
+	saved.CanonicalRef = objectRef
+	saved.CanonicalHash = hash
+	saved.PrevHash = prevHash
+
+	return &saved, nil, nil
 }

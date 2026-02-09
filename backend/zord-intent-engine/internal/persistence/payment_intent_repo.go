@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"database/sql"
+	"log"
 
 	"zord-intent-engine/internal/models"
 )
@@ -90,6 +91,7 @@ VALUES (
 	)
 
 	if err != nil {
+		log.Printf("Repo.Save: INSERT payment_intents failed: %v", err)
 		return intent, err
 	}
 
@@ -126,6 +128,7 @@ VALUES (
 		outbox.CreatedAt,
 	)
 	if err != nil {
+		log.Printf("Repo.Save: INSERT outbox failed: %v", err)
 		return intent, err
 	}
 

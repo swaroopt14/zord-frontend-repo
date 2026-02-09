@@ -98,10 +98,38 @@ func main() {
 			if ack == nil {
 				return fmt.Errorf("ack is nil for trace_id=%s", msg.TraceID)
 			}
-			if err := services.RawIntent(ctx, msg, ack, Rdb); err != nil {
+			
+			// Persist to DB and Forward to Intent Engine (API FLOW)
+			if err := services.RawIntent(ctx, msg, ack, Rdb, false); err != nil {
+				log.Printf("Error persisting raw intent: %v", err)
 				return err
 			}
-			return messaging.SendACKMessage(ctx, *ack, Rdb)
+			
+			return nil
+		})
+	}
+	
+	// Start Webhook processing worker
+	webhookWorkerCount := 2
+	for i := 0; i < webhookWorkerCount; i++ {
+		go messaging.StartWebhookWorker(ctx, Rdb, func(ctx context.Context, msg model.RawIntentMessage) error {
+			ack, err := services.ProcessRawIntent(ctx, msg, s3store)
+			if err != nil {
+				log.Printf("Error processing webhook: %v", err)
+				// Webhooks might not have a client to report errors to in the same way, but we log it.
+				return err
+			}
+			if ack == nil {
+				return fmt.Errorf("ack is nil for webhook trace_id=%s", msg.TraceID)
+			}
+			
+			// Persist to DB and Forward to Intent Engine (WEBHOOK FLOW)
+			if err := services.RawIntent(ctx, msg, ack, Rdb, true); err != nil {
+				log.Printf("Error persisting webhook raw intent: %v", err)
+				return err
+			}
+			
+			return nil
 		})
 	}
 
@@ -111,6 +139,7 @@ func main() {
 	log.Println("Zord Vault Journal service started with observability enabled")
 	fmt.Println("Service 2 worker started")
 
+	// Keep main goroutine running
 	select {}
 }
 

@@ -84,6 +84,7 @@ func (p *Publisher) worker(ctx context.Context, id int) {
 				"trace_id":    e.TraceID,
 				"tenant_id":   e.TenantID,
 				"envelope_id": e.EnvelopeID,
+				"event_type":  e.EventType,
 			}
 
 			err := p.producer.Publish(p.cfg.ReadyTopic, e.AggregateID, e.Payload, headers)
