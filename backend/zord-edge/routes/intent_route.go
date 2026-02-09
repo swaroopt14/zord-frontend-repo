@@ -16,6 +16,13 @@ func Routes(router *gin.Engine, h *handler.Handler) {
 		public.GET("/health", handler.HealthCheck)
 	}
 
+	// Webhook routes
+	webhooks := router.Group("/v1/raw/envelopes")
+	webhooks.Use(middleware.VerifyWebhookSignature())
+	{
+		webhooks.POST("/webhooks/:provider", h.WebhookHandler)
+	}
+
 	if err := validator.InitSchemaValidator(); err != nil {
 		panic("Failed to initialize schema validator: " + err.Error())
 	}

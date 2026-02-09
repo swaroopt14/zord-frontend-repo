@@ -41,8 +41,16 @@ type payoutContract struct {
 }
 
 func (h *DummyProviderHandler) HandleMessage(ctx context.Context, topic string, key string, value []byte, headers map[string]string, timestamp time.Time) error {
-	var p map[string]interface{}
+	utils.Logger.Info("HandleMessage: Received message",
+		zap.String("topic", topic),
+		zap.String("key", key),
+		zap.Int("payload_len", len(value)),
+		zap.Any("headers", headers))
+
+	var p interface{} // Use interface{} to accept any JSON type (object, array, string)
 	if err := json.Unmarshal(value, &p); err != nil {
+		utils.Logger.Error("HandleMessage: JSON Unmarshal failed", zap.Error(err), zap.String("payload_preview", string(value)))
+		
 		envelopeID := uuid.New().String()
 		tenantID := uuid.New().String()
 		traceID := headers["trace_id"]
@@ -64,42 +72,59 @@ func (h *DummyProviderHandler) HandleMessage(ctx context.Context, topic string, 
 
 		return nil
 	}
+
 	envelopeID := headers["envelope_id"]
 	tenantID := headers["tenant_id"]
 	intentID := key
 	traceID := headers["trace_id"]
+
+	// Safe UUID parsing
+	parsedTenantID, err := uuid.Parse(tenantID)
+	if err != nil {
+		utils.Logger.Error("HandleMessage: Invalid tenant_id UUID", zap.String("tenant_id", tenantID))
+		parsedTenantID = uuid.Nil
+	}
+	parsedIntentID, err := uuid.Parse(intentID)
+	if err != nil {
+		utils.Logger.Error("HandleMessage: Invalid intent_id UUID", zap.String("intent_id", intentID))
+		parsedIntentID = uuid.Nil
+	}
+	parsedEnvelopeID, err := uuid.Parse(envelopeID)
+	if err != nil {
+		utils.Logger.Error("HandleMessage: Invalid envelope_id UUID", zap.String("envelope_id", envelopeID))
+		parsedEnvelopeID = uuid.Nil
+	}
+
 	contractID := uuid.New().String()
 	contractHashBytes := sha256.Sum256(value)
 	contractHash := hex.EncodeToString(contractHashBytes[:])
-	payloadObj := payoutContract{
-		ContractID:   contractID,
-		IntentID:     intentID,
-		EnvelopeID:   envelopeID,
-		CreatedAt:    timestamp.UTC().Format(time.RFC3339Nano),
-		ContractHash: contractHash,
-		TraceID:      traceID,
-	}
-	_, err := json.Marshal(payloadObj)
-	if err != nil {
-		return err
-	}
-	parsedContractID, err := uuid.Parse(contractID)
-	if err != nil {
-		parsedContractID = uuid.New()
-	}
+
+	// Note: We don't use payloadObj for insertion, we use raw 'value'
+	
+	parsedContractID, _ := uuid.Parse(contractID)
+
+	utils.Logger.Info("HandleMessage: Attempting to insert into payout_contracts",
+		zap.String("contract_id", contractID),
+		zap.String("intent_id", intentID))
+
 	_, err = h.db.Exec(`INSERT INTO payout_contracts (contract_id, tenant_id, intent_id, envelope_id, contract_payload, contract_hash, status, created_at, trace_id)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		ON CONFLICT (intent_id) DO NOTHING`,
 		parsedContractID,
-		uuid.MustParse(tenantID),
-		uuid.MustParse(intentID),
-		uuid.MustParse(envelopeID),
+		parsedTenantID,
+		parsedIntentID,
+		parsedEnvelopeID,
 		value,
 		contractHash,
 		"ISSUED",
 		timestamp.UTC(),
 		traceID,
 	)
+	if err != nil {
+		utils.Logger.Error("HandleMessage: DB Insert failed", zap.Error(err))
+	} else {
+		utils.Logger.Info("HandleMessage: Successfully inserted into payout_contracts")
+	}
 	return err
 }
 

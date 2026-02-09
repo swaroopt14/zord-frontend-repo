@@ -43,3 +43,33 @@ func StartRawIntentWorker(
 		}
 	}
 }
+
+func StartWebhookWorker(
+	ctx context.Context,
+	rdb *redis.Client,
+	handler RawIntentHandler,
+
+) {
+	for {
+		result, err := rdb.BRPop(
+			ctx,
+			0,
+			"Webhook_Data",
+		).Result()
+
+		if err != nil {
+			log.Println("Redis Pop Error (Webhook)", err)
+			continue
+		}
+
+		var msg model.RawIntentMessage
+		if err := json.Unmarshal([]byte(result[1]), &msg); err != nil {
+			log.Println("invalid webhook message:", err)
+			continue
+		}
+
+		if err := handler(ctx, msg); err != nil {
+			log.Println("webhook handler failed:", err)
+		}
+	}
+}
