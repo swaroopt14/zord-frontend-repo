@@ -121,6 +121,7 @@ services:
       retries: 5
       start_period: 10s
 
+  
   # Kafka Cluster (3 brokers for high availability)
   zord-kafka-1:
     image: confluentinc/cp-kafka:7.4.0
@@ -318,8 +319,8 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-arealis-zord-vault-encryption-key-change-in-production}
       - STORAGE_PATH=/data/vault
       - REDIS_ADDR=zord-redis:6379
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-172d5580e513bfbeb090dc2b3a70698c710338d4}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-9452ec452f1aa870c3304258279d0740bffd9bee}
+      - AWS_ACCESS_KEY_ID=AKIARAKMIDK5WPIBKAPD
+      - AWS_SECRET_ACCESS_KEY=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
       - AWS_REGION=${AWS_REGION:-ap-south-1}
       - AWS_EC2_METADATA_DISABLED=true
       - S3_BUCKET=${AWS_S3_BUCKET:-arealis-zord-vault}
@@ -367,6 +368,10 @@ services:
       - VAULT_JOURNAL_URL=http://zord-vault-journal:8081
       - PII_TOKEN_SECRET=${PII_TOKEN_SECRET:-arealis-pii-secret-key}
       - ENVIRONMENT=production
+      - AWS_ACCESS_KEY_ID=AKIARAKMIDK5WPIBKAPD
+      - AWS_SECRET_ACCESS_KEY=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
+      - AWS_REGION=ap-south-1
+      - S3_BUCKET=arealis-zord-vault
     depends_on:
       zord-intent-postgres:
         condition: service_healthy
