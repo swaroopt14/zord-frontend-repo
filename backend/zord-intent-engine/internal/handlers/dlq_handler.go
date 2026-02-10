@@ -3,7 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-
+	"strings"
+	
 	"zord-intent-engine/internal/models"
 	"zord-intent-engine/internal/persistence"
 )
@@ -41,4 +42,41 @@ func (h *DLQHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(items)
+}
+// NEW: GET /v1/dlq/:dlq_id
+// Fetches a single DLQ entry by its primary key
+func (h *DLQHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Extract dlq_id from URL path: /v1/dlq/{dlq_id}
+	dlqID := strings.TrimPrefix(r.URL.Path, "/v1/dlq/")
+	dlqID = strings.TrimSpace(dlqID)
+
+	if dlqID == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "dlq_id is required"})
+		return
+	}
+
+	entry, err := h.repo.GetByID(ctx, dlqID)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":   "Failed to fetch DLQ item",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	if entry == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "DLQ item not found"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(entry)
 }

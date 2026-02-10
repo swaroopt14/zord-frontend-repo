@@ -82,6 +82,13 @@ func main() {
 	})
 
 	http.HandleFunc("/v1/dlq", dlqHandler.List)
+	http.HandleFunc("/v1/dlq/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/dlq" || r.URL.Path == "/v1/dlq/" {
+			dlqHandler.List(w, r)
+		} else {
+			dlqHandler.GetByID(w, r)   // NEW: /v1/dlq/{dlq_id}
+		}
+	})
 	http.HandleFunc("/v1/intents/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/intents" || r.URL.Path == "/v1/intents/" {
 			intentHandler.List(w, r)

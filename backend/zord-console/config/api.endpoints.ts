@@ -9,6 +9,8 @@ export const BACKEND_SERVICES = {
       HEALTH: '/v1/health',
       INGEST: '/v1/ingest',
       TENANT_REGISTER: '/v1/tenantReg',
+      TENANTS: '/v1/tenants',
+      TENANT_BY_ID: (id: string) => `/v1/tenants/${id}`,
     },
   },
 
@@ -20,6 +22,7 @@ export const BACKEND_SERVICES = {
       INTENTS: '/v1/intents',
       INTENT_BY_ID: (id: string) => `/v1/intents/${id}`,
       DLQ: '/v1/dlq',
+      DLQ_BY_ID: (id: string) => `/v1/dlq/${id}`,
     },
   },
 

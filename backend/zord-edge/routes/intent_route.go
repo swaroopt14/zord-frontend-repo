@@ -14,6 +14,8 @@ func Routes(router *gin.Engine, h *handler.Handler) {
 	{
 		public.POST("/tenantReg", handler.Tenant_Registry)
 		public.GET("/health", handler.HealthCheck)
+		public.GET("/tenants", handler.ListTenants)               // NEW
+		public.GET("/tenants/:tenant_id", handler.GetTenantByID)
 	}
 
 	// Webhook routes

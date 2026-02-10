@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"main.go/config"
 	"main.go/db"
+	"main.go/handler"
 	"main.go/messaging"
 	"main.go/model"
 	"main.go/services"
@@ -161,6 +162,13 @@ func startHTTPServer() {
 
 	// Metrics endpoint
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
+
+	// ---- NEW: Envelope query endpoints ----
+	v1 := router.Group("/v1")
+	{
+		v1.GET("/envelopes", handler.ListEnvelopes)
+		v1.GET("/envelopes/:envelope_id", handler.GetEnvelopeByID)
+	}
 
 	log.Println("Starting Zord Vault Journal HTTP server on port 8081")
 	if err := router.Run(":8081"); err != nil {

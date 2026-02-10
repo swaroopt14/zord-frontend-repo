@@ -20,18 +20,20 @@ func NewIntentHandler(queryRepo persistence.IntentQueryRepository) *IntentHandle
 	return &IntentHandler{queryRepo: queryRepo}
 }
 
-// RESPONSE STRUCTURES
+// ----- RESPONSE STRUCTURES -----
+// FIXED: Must match the frontend's IntentListResponse interface in intents.ts
+// Before: { data: [...], total, page, page_size, total_pages }  ← WRONG
+// After:  { items: [...], pagination: { page, page_size, total } }  ← CORRECT
 
-type IntentListResponse struct {
-	Data       []models.CanonicalIntent `json:"data"`
-	Total      int                      `json:"total"`
-	Page       int                      `json:"page"`
-	PageSize   int                      `json:"page_size"`
-	TotalPages int                      `json:"total_pages"`
+type PaginationInfo struct {
+	Page     int `json:"page"`
+	PageSize int `json:"page_size"`
+	Total    int `json:"total"`
 }
 
-type IntentDetailResponse struct {
-	Data models.CanonicalIntent `json:"data"`
+type IntentListResponse struct {
+	Items      []models.CanonicalIntent `json:"items"`
+	Pagination PaginationInfo           `json:"pagination"`
 }
 
 type ErrorResponse struct {
@@ -41,7 +43,7 @@ type ErrorResponse struct {
 	TraceID string `json:"trace_id,omitempty"`
 }
 
-// ENDPOINT 1: LIST INTENTS
+// ENDPOINT 1: LIST INTENTS — GET /v1/intents
 func (h *IntentHandler) List(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -76,16 +78,19 @@ func (h *IntentHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Calculate pagination
-	totalPages := (total + pageSize - 1) / pageSize
+	// Ensure empty array instead of null
+	if intents == nil {
+		intents = []models.CanonicalIntent{}
+	}
 
-	// Build response
+	// FIXED: Build response matching frontend's IntentListResponse
 	response := IntentListResponse{
-		Data:       intents,
-		Total:      total,
-		Page:       page,
-		PageSize:   pageSize,
-		TotalPages: totalPages,
+		Items: intents,
+		Pagination: PaginationInfo{
+			Page:     page,
+			PageSize: pageSize,
+			Total:    total,
+		},
 	}
 
 	// Send response
@@ -94,7 +99,10 @@ func (h *IntentHandler) List(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// ENDPOINT 2: GET BY ID
+// ENDPOINT 2: GET BY ID — GET /v1/intents/:intent_id
+// FIXED: Return the intent directly, NOT wrapped in { "data": ... }
+// Frontend does: const data = await response.json(); return data;
+// So data must BE the intent, not { data: intent }
 func (h *IntentHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -120,15 +128,10 @@ func (h *IntentHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build response
-	response := IntentDetailResponse{
-		Data: intent,
-	}
-
-	// Send response
+	// FIXED: Send intent directly (not wrapped in { data: ... })
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(intent)
 }
 
 //  HELPERS
