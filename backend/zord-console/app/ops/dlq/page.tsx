@@ -12,6 +12,8 @@ export default function DLQPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
 
+  const [items, setItems] = useState<any[]>([])
+
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push('/ops/login')
@@ -22,13 +24,21 @@ export default function DLQPage() {
       router.push('/ops/login')
       return
     }
-    setLoading(false)
+    loadDLQ()
   }, [router])
 
-  const items = [
-    { dlq_id: 'dlq_1001', stage: 'SEMANTIC_VALIDATION', reason_code: 'SEMANTIC_INVALID', replayable: false, envelope_id: 'env_7a10...', created_at: '2026-02-04T10:05:00Z' },
-    { dlq_id: 'dlq_1002', stage: 'EVENT_PUBLISH', reason_code: 'BROKER_UNAVAILABLE', replayable: true, envelope_id: 'env_9f3a...', created_at: '2026-02-04T10:06:00Z' },
-  ]
+  const loadDLQ = async () => {
+    try {
+      const res = await fetch('/api/prod/dlq')
+      if (!res.ok) throw new Error('Failed')
+      const data = await res.json()
+      setItems(data.items || [])
+    } catch (err) {
+      console.error('Failed to load DLQ:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -74,7 +84,7 @@ export default function DLQPage() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {items.map((item) => (
+            {items.map((item: any) => (
               <tr key={item.dlq_id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 font-mono">{item.dlq_id}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.stage}</td>
@@ -85,15 +95,18 @@ export default function DLQPage() {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{item.envelope_id}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{format(new Date(item.created_at), 'HH:mm')}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{format(new Date(item.created_at), 'yyyy-MM-dd HH:mm')}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
                   <Link href={`/ops/dlq/${item.dlq_id}`} className="text-blue-600 hover:text-blue-800">View →</Link>
                 </td>
               </tr>
             ))}
+            {items.length === 0 && (
+              <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-500">No DLQ items found</td></tr>
+            )}
           </tbody>
         </table>
-        <div className="px-4 py-2 border-t border-gray-200 text-sm text-gray-500">Pagination</div>
+        <div className="px-4 py-2 border-t border-gray-200 text-sm text-gray-500">Showing {items.length} DLQ items</div>
       </div>
     </div>
   )

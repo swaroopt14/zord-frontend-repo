@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ServiceMetricsResponse, TimeSeriesPoint, MetricStatus } from '@/types/service-metrics'
 
+export const dynamic = 'force-dynamic'
+
 // Generate realistic time series data
 function generateTimeSeries(
   baseValue: number, 

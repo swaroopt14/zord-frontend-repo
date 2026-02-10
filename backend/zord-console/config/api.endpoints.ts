@@ -64,11 +64,12 @@ export function buildUrl(
   return `${baseUrl}${endpoint}`
 }
 
-// Common fetch options
+// Common fetch options - disable Next.js fetch cache for real-time data
 export const DEFAULT_FETCH_OPTIONS: RequestInit = {
   headers: {
     'Content-Type': 'application/json',
   },
+  cache: 'no-store',
 }
 
 // Timeout for API calls (ms)

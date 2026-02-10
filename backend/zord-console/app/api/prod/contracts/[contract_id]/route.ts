@@ -13,7 +13,7 @@ export async function GET(
 
   // In production, fetch from database
   // For now, return a mock response
-  const response = await fetch(`${request.nextUrl.origin}/api/prod/contracts`)
+  const response = await fetch(`${request.nextUrl.origin}/api/prod/contracts`, { cache: 'no-store' })
   const data = await response.json()
   
   const contract = data.items.find((c: { id: string }) => c.id === contract_id)

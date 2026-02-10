@@ -12,6 +12,8 @@ export default function IngressEnvelopesPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
 
+  const [envelopes, setEnvelopes] = useState<any[]>([])
+
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push('/ops/login')
@@ -22,14 +24,21 @@ export default function IngressEnvelopesPage() {
       router.push('/ops/login')
       return
     }
-    setLoading(false)
+    loadEnvelopes()
   }, [router])
 
-  const envelopes = [
-    { envelope_id: 'env_9f3a...', source: 'api', source_system: 'erp', parse_status: 'OK', signature_status: 'VERIFIED', received_at: '2026-02-04T10:05:33Z' },
-    { envelope_id: 'env_28bd...', source: 'webhook', source_system: 'razorpay', parse_status: 'FAILED', signature_status: 'VERIFIED', received_at: '2026-02-04T10:06:00Z' },
-    { envelope_id: 'env_7a10...', source: 'webhook', source_system: 'hdfc', parse_status: 'OK', signature_status: 'FAILED', received_at: '2026-02-04T10:06:15Z' },
-  ]
+  const loadEnvelopes = async () => {
+    try {
+      const res = await fetch('/api/prod/raw-envelopes')
+      if (!res.ok) throw new Error('Failed')
+      const data = await res.json()
+      setEnvelopes(data.items || [])
+    } catch (err) {
+      console.error('Failed to load envelopes:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -77,41 +86,38 @@ export default function IngressEnvelopesPage() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Envelope ID</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source System</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant ID</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parse Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Signature</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Received At</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {envelopes.map((e) => (
+            {envelopes.map((e: any) => (
               <tr key={e.envelope_id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 font-mono">{e.envelope_id}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{e.source}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{e.source_system}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{e.source_system || e.source || '-'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{e.tenant_id ? e.tenant_id.substring(0, 8) + '...' : '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${e.parse_status === 'OK' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {e.parse_status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${e.signature_status === 'VERIFIED' ? 'bg-green-100 text-green-800' : e.signature_status === 'FAILED' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
-                    {e.signature_status}
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${e.parse_status === 'ACCEPTED' || e.parse_status === 'OK' ? 'bg-green-100 text-green-800' : e.parse_status === 'RECEIVED' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
+                    {e.parse_status || '-'}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{format(new Date(e.received_at), 'yyyy-MM-dd HH:mm')}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
-                  <Link href={`/ops/ingress/envelopes/${e.envelope_id.replace('...', '')}`} className="text-blue-600 hover:text-blue-800">
+                  <Link href={`/ops/ingress/envelopes/${e.envelope_id}`} className="text-blue-600 hover:text-blue-800">
                     View →
                   </Link>
                 </td>
               </tr>
             ))}
+            {envelopes.length === 0 && (
+              <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">No envelopes found</td></tr>
+            )}
           </tbody>
         </table>
-        <div className="px-4 py-2 border-t border-gray-200 text-sm text-gray-500">Pagination</div>
+        <div className="px-4 py-2 border-t border-gray-200 text-sm text-gray-500">Showing {envelopes.length} envelopes</div>
       </div>
     </div>
   )
