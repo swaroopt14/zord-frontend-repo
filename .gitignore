@@ -10,6 +10,7 @@ frontend/.vscode/
 # --- Backend ---
 backend/bin/
 backend/*.exe
+backend/.env*
 
 # --- OS ---
 .DS_Store
