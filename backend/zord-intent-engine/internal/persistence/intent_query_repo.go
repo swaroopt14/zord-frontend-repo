@@ -85,20 +85,21 @@ func (r *IntentQueryRepo) ListIntents(
 	offset := (filter.Page - 1) * filter.PageSize
 
 	dataQuery := fmt.Sprintf(`
-		SELECT 
-			intent_id, envelope_id, tenant_id,
-			intent_type, canonical_version, 
-			COALESCE(schema_version, '') as schema_version,
-			amount, currency, deadline_at,
-			constraints, 
-			COALESCE(beneficiary_type, '') as beneficiary_type,
-			pii_tokens, beneficiary,
-			status, confidence_score, created_at
-		FROM payment_intents
-		%s
-		ORDER BY created_at DESC
-		LIMIT $%d OFFSET $%d
-	`, whereClause, argPosition, argPosition+1)
+	SELECT 
+		intent_id, envelope_id, tenant_id,
+		intent_type, canonical_version, 
+		COALESCE(schema_version, '') as schema_version,
+		amount, currency, deadline_at,
+		COALESCE(constraints, '{}'::jsonb) as constraints, 
+		COALESCE(beneficiary_type, '') as beneficiary_type,
+		COALESCE(pii_tokens, '{}'::jsonb) as pii_tokens,
+		COALESCE(beneficiary, '{}'::jsonb) as beneficiary,
+		status, confidence_score, created_at
+	FROM payment_intents
+	%s
+	ORDER BY created_at DESC
+	LIMIT $%d OFFSET $%d
+`, whereClause, argPosition, argPosition+1)
 
 	args = append(args, filter.PageSize, offset)
 
@@ -153,18 +154,19 @@ func (r *IntentQueryRepo) GetIntentByID(
 ) (models.CanonicalIntent, error) {
 
 	query := `
-		SELECT 
-			intent_id, envelope_id, tenant_id,
-			intent_type, canonical_version,
-			COALESCE(schema_version, '') as schema_version,
-			amount, currency, deadline_at,
-			constraints,
-			COALESCE(beneficiary_type, '') as beneficiary_type,
-			pii_tokens, beneficiary,
-			status, confidence_score, created_at
-		FROM payment_intents
-		WHERE intent_id = $1
-	`
+	SELECT 
+		intent_id, envelope_id, tenant_id,
+		intent_type, canonical_version,
+		COALESCE(schema_version, '') as schema_version,
+		amount, currency, deadline_at,
+		COALESCE(constraints, '{}'::jsonb) as constraints,
+		COALESCE(beneficiary_type, '') as beneficiary_type,
+		COALESCE(pii_tokens, '{}'::jsonb) as pii_tokens,
+		COALESCE(beneficiary, '{}'::jsonb) as beneficiary,
+		status, confidence_score, created_at
+	FROM payment_intents
+	WHERE intent_id = $1
+`
 
 	var intent models.CanonicalIntent
 

@@ -15,6 +15,7 @@ type DLQRepository interface {
 	ListAll(ctx context.Context) ([]models.DLQEntry, error)
 	ListByTenant(ctx context.Context, tenantID string) ([]models.DLQEntry, error)
 	GetByTenantAndID(ctx context.Context, tenantID, dlqID string) (*models.DLQEntry, error)
+	GetByID(ctx context.Context, dlqID string) (*models.DLQEntry, error)
 }
 
 // Concrete Postgres implementation
@@ -216,6 +217,47 @@ func (r *DLQPostgresRepo) GetByTenantAndID(
 
 	if err == sql.ErrNoRows {
 		return nil, nil // frontend can show "not found"
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &e, nil
+}
+// NEW: GetByID fetches a single DLQ entry by primary key (no tenant required)
+// Used by the /v1/dlq/:dlq_id endpoint for the console frontend
+func (r *DLQPostgresRepo) GetByID(
+	ctx context.Context,
+	dlqID string,
+) (*models.DLQEntry, error) {
+
+	var e models.DLQEntry
+
+	err := r.db.QueryRowContext(ctx, `
+		SELECT
+			dlq_id,
+			tenant_id,
+			envelope_id,
+			stage,
+			reason_code,
+			error_detail,
+			replayable,
+			created_at
+		FROM dlq_items
+		WHERE dlq_id = $1
+	`, dlqID).Scan(
+		&e.DLQID,
+		&e.TenantID,
+		&e.EnvelopeID,
+		&e.Stage,
+		&e.ReasonCode,
+		&e.ErrorDetail,
+		&e.Replayable,
+		&e.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
 	}
 	if err != nil {
 		return nil, err

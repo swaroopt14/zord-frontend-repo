@@ -4,7 +4,7 @@ import { BACKEND_SERVICES, buildUrl, DEFAULT_FETCH_OPTIONS, API_TIMEOUT } from '
 export interface BackendTenant {
   tenant_id: string
   tenant_name: string
-  api_key?: string // Masked in responses
+  api_key?: string // Not returned by backend (only hash is stored)
   status: 'ACTIVE' | 'DISABLED'
   created_at: string
 }
@@ -20,29 +20,95 @@ export interface TenantListResponse {
 
 /**
  * Fetch tenants from zord-edge
- * Note: This endpoint may need to be added to the backend
  * Endpoint: GET http://localhost:8080/v1/tenants
+ * 
+ * WHY we build query params dynamically:
+ * The Go handler supports optional filters (page, page_size, status).
+ * We only append params that are provided, keeping the URL clean.
  */
-export async function fetchTenants(): Promise<TenantListResponse> {
-  // TODO: Add /v1/tenants endpoint in zord-edge
-  // For now, return empty response
-  return {
-    items: [],
-    pagination: {
-      page: 1,
-      page_size: 50,
-      total: 0,
-    },
+export async function fetchTenants(params: {
+  page?: number
+  page_size?: number
+  status?: string
+} = {}): Promise<TenantListResponse> {
+  const { page = 1, page_size = 50, status } = params
+
+  const queryParams = new URLSearchParams()
+  queryParams.set('page', String(page))
+  queryParams.set('page_size', String(page_size))
+  if (status) queryParams.set('status', status)
+
+  const url = buildUrl('EDGE', BACKEND_SERVICES.EDGE.ENDPOINTS.TENANTS)
+  const fullUrl = `${url}?${queryParams.toString()}`
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+
+  try {
+    const response = await fetch(fullUrl, {
+      ...DEFAULT_FETCH_OPTIONS,
+      method: 'GET',
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch tenants: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout: Edge service not responding')
+    }
+    throw error
   }
 }
 
 /**
  * Fetch single tenant by ID
- * Note: This endpoint may need to be added to the backend
+ * Endpoint: GET http://localhost:8080/v1/tenants/:id
+ * 
+ * WHY we return null on 404:
+ * The Next.js API route checks for null and returns a proper 404 to the frontend.
+ * This is the same pattern used in fetchIntentById() and fetchEnvelopeById().
  */
 export async function fetchTenantById(tenantId: string): Promise<BackendTenant | null> {
-  // TODO: Add /v1/tenants/:id endpoint in zord-edge
-  return null
+  
+  const url = buildUrl('EDGE', BACKEND_SERVICES.EDGE.ENDPOINTS.TENANT_BY_ID(tenantId))
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+
+  try {
+    const response = await fetch(url, {
+      ...DEFAULT_FETCH_OPTIONS,
+      method: 'GET',
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+
+    if (response.status === 404) {
+      return null
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch tenant: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout: Edge service not responding')
+    }
+    throw error
+  }
 }
 
 /**

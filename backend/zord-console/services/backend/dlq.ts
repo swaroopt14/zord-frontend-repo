@@ -58,11 +58,42 @@ export async function fetchDLQItems(params: DLQListParams = {}): Promise<Backend
 
 /**
  * Fetch single DLQ item by ID
- * Note: This may need a dedicated endpoint in the backend
+ * Endpoint: GET http://localhost:8083/v1/dlq/:id
+ * FIXED: Now uses dedicated backend endpoint instead of fetching all and filtering
  */
 export async function fetchDLQItemById(dlqId: string): Promise<BackendDLQItem | null> {
-  // Fetch all DLQ items and find by ID
-  // TODO: Add dedicated endpoint in backend for single DLQ fetch
-  const items = await fetchDLQItems()
-  return items.find(item => item.dlq_id === dlqId) || null
+  const url = buildUrl(
+    'INTENT_ENGINE',
+    BACKEND_SERVICES.INTENT_ENGINE.ENDPOINTS.DLQ_BY_ID(dlqId)
+  )
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+
+  try {
+    const response = await fetch(url, {
+      ...DEFAULT_FETCH_OPTIONS,
+      method: 'GET',
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+
+    if (response.status === 404) {
+      return null
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch DLQ item: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout: Intent engine not responding')
+    }
+    throw error
+  }
 }

@@ -12,6 +12,8 @@ export default function OpsTenantsPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
 
+  const [tenants, setTenants] = useState<any[]>([])
+
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push('/ops/login')
@@ -22,13 +24,21 @@ export default function OpsTenantsPage() {
       router.push('/ops/login')
       return
     }
-    setLoading(false)
+    loadTenants()
   }, [router])
 
-  const tenants = [
-    { tenant_id: 'tnt_12345', tenant_name: 'Acme NBFC', api_key: 'sk_live••••abcd', status: 'ACTIVE', created_at: '2025-11-01T10:00:00Z' },
-    { tenant_id: 'tnt_67890', tenant_name: 'Foo PSP', api_key: 'sk_test••••efgh', status: 'DISABLED', created_at: '2025-12-12T14:30:00Z' },
-  ]
+  const loadTenants = async () => {
+    try {
+      const res = await fetch('/api/prod/tenants')
+      if (!res.ok) throw new Error('Failed')
+      const data = await res.json()
+      setTenants(data.items || [])
+    } catch (err) {
+      console.error('Failed to load tenants:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -67,18 +77,16 @@ export default function OpsTenantsPage() {
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant ID</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">API Key</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">⋯</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {tenants.map((t) => (
+            {tenants.map((t: any) => (
               <tr key={t.tenant_id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 font-mono">{t.tenant_id}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{t.tenant_name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{t.api_key}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 py-1 text-xs font-medium rounded ${t.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                     {t.status}
@@ -92,10 +100,13 @@ export default function OpsTenantsPage() {
                 </td>
               </tr>
             ))}
+            {tenants.length === 0 && (
+              <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">No tenants found</td></tr>
+            )}
           </tbody>
         </table>
         <div className="px-4 py-2 border-t border-gray-200 text-sm text-gray-500">
-          Pagination: « Prev | 1 | 2 | 3 | Next
+          Showing {tenants.length} tenants
         </div>
       </div>
     </div>

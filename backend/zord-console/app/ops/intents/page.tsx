@@ -12,6 +12,8 @@ export default function IntentsPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
 
+  const [intents, setIntents] = useState<any[]>([])
+
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push('/ops/login')
@@ -22,14 +24,21 @@ export default function IntentsPage() {
       router.push('/ops/login')
       return
     }
-    setLoading(false)
+    loadIntents()
   }, [router])
 
-  const intents = [
-    { intent_id: 'intent_abc123', intent_type: 'PAYOUT', amount: 5000, currency: 'INR', status: 'DONE', confidence_score: 0.98, created_at: '2026-02-04T10:00:01Z' },
-    { intent_id: 'intent_def456', intent_type: 'PAYOUT', amount: 50000, currency: 'INR', status: 'REJECTED', confidence_score: 1.0, created_at: '2026-02-04T10:05:00Z' },
-    { intent_id: 'intent_ghi789', intent_type: 'REFUND', amount: 1000, currency: 'INR', status: 'PROCESSING', confidence_score: 1.0, created_at: '2026-02-04T10:06:00Z' },
-  ]
+  const loadIntents = async () => {
+    try {
+      const res = await fetch('/api/prod/intents')
+      if (!res.ok) throw new Error('Failed')
+      const data = await res.json()
+      setIntents(data.items || [])
+    } catch (err) {
+      console.error('Failed to load intents:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -80,27 +89,30 @@ export default function IntentsPage() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {intents.map((i) => (
+            {intents.map((i: any) => (
               <tr key={i.intent_id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 font-mono">{i.intent_id}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{i.intent_type}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{i.amount.toLocaleString()}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{i.currency}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{i.intent_type || i.source || '-'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{typeof i.amount === 'number' ? i.amount.toLocaleString() : i.amount || '-'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{i.currency || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 py-1 text-xs font-medium rounded ${statusColors[i.status] ?? 'bg-gray-100 text-gray-800'}`}>
                     {i.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{i.confidence_score}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{i.confidence_score || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{format(new Date(i.created_at), 'yyyy-MM-dd HH:mm')}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
                   <Link href={`/ops/intents/${i.intent_id}`} className="text-blue-600 hover:text-blue-800">View →</Link>
                 </td>
               </tr>
             ))}
+            {intents.length === 0 && (
+              <tr><td colSpan={8} className="px-6 py-12 text-center text-sm text-gray-500">No intents found</td></tr>
+            )}
           </tbody>
         </table>
-        <div className="px-4 py-2 border-t border-gray-200 text-sm text-gray-500">Pagination</div>
+        <div className="px-4 py-2 border-t border-gray-200 text-sm text-gray-500">Showing {intents.length} intents</div>
       </div>
     </div>
   )

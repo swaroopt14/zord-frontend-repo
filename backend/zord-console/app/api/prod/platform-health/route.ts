@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PlatformHealthResponse } from '@/types/platform-health'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   await new Promise(resolve => setTimeout(resolve, 80))
 

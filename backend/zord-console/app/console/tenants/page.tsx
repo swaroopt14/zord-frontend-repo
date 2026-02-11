@@ -1,106 +1,68 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { isAuthenticated } from '@/services/auth'
 import { Layout } from '@/components/aws/Layout'
+import { format } from 'date-fns'
 
-type TenantStatus = 'HEALTHY' | 'AT_RISK' | 'IMPACTED'
-type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH'
-type TenantTier = 'STANDARD' | 'PREMIUM' | 'ENTERPRISE'
-
-interface TenantSummary {
+interface Tenant {
   tenant_id: string
   tenant_name: string
-  display_name: string
-  tier: TenantTier
-  risk_level: RiskLevel
-  status: TenantStatus
-  success_rate: number
-  dlq_count: number
-  last_activity: string
+  status: string
+  created_at: string
 }
 
-// Mock data
-const mockTenants: TenantSummary[] = [
-  { tenant_id: 't_91af', tenant_name: 'acme_fintech', display_name: 'Acme_Fintech', tier: 'ENTERPRISE', risk_level: 'HIGH', status: 'IMPACTED', success_rate: 82.1, dlq_count: 47, last_activity: '2m ago' },
-  { tenant_id: 't_77bd', tenant_name: 'zenpay', display_name: 'ZenPay', tier: 'PREMIUM', risk_level: 'MEDIUM', status: 'AT_RISK', success_rate: 95.4, dlq_count: 8, last_activity: '5m ago' },
-  { tenant_id: 't_12ac', tenant_name: 'novabank', display_name: 'NovaBank', tier: 'ENTERPRISE', risk_level: 'LOW', status: 'HEALTHY', success_rate: 99.2, dlq_count: 2, last_activity: '1m ago' },
-  { tenant_id: 't_99dd', tenant_name: 'alpharetail', display_name: 'AlphaRetail', tier: 'STANDARD', risk_level: 'LOW', status: 'HEALTHY', success_rate: 99.1, dlq_count: 1, last_activity: '8m ago' },
-  { tenant_id: 't_34ef', tenant_name: 'paycore', display_name: 'PayCore', tier: 'PREMIUM', risk_level: 'LOW', status: 'HEALTHY', success_rate: 99.8, dlq_count: 0, last_activity: '3m ago' },
-  { tenant_id: 't_56gh', tenant_name: 'finserve', display_name: 'FinServe', tier: 'STANDARD', risk_level: 'LOW', status: 'HEALTHY', success_rate: 100, dlq_count: 0, last_activity: '12m ago' },
-]
-
-function StatusBadge({ status }: { status: TenantStatus }) {
-  const config = {
-    HEALTHY: { bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-500' },
-    AT_RISK: { bg: 'bg-yellow-100', text: 'text-yellow-700', dot: 'bg-yellow-500' },
-    IMPACTED: { bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500' },
-  }
-  const c = config[status]
+function StatusBadge({ status }: { status: string }) {
+  const isActive = status === 'ACTIVE'
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${c.bg} ${c.text}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${c.dot} mr-1.5`} />
-      {status === 'AT_RISK' ? 'At Risk' : status.charAt(0) + status.slice(1).toLowerCase()}
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-green-500' : 'bg-red-500'} mr-1.5`} />
+      {status}
     </span>
   )
 }
 
-function RiskBadge({ level }: { level: RiskLevel }) {
-  const config = {
-    LOW: { bg: 'bg-green-50', text: 'text-green-700' },
-    MEDIUM: { bg: 'bg-yellow-50', text: 'text-yellow-700' },
-    HIGH: { bg: 'bg-red-50', text: 'text-red-700' },
-  }
-  const c = config[level]
-  return <span className={`px-2 py-0.5 text-[10px] font-semibold rounded ${c.bg} ${c.text}`}>{level}</span>
-}
-
-function TierBadge({ tier }: { tier: TenantTier }) {
-  const config = {
-    STANDARD: { bg: 'bg-gray-100', text: 'text-gray-600' },
-    PREMIUM: { bg: 'bg-blue-50', text: 'text-blue-700' },
-    ENTERPRISE: { bg: 'bg-purple-50', text: 'text-purple-700' },
-  }
-  const c = config[tier]
-  return <span className={`px-2 py-0.5 text-[10px] font-semibold rounded ${c.bg} ${c.text}`}>{tier}</span>
-}
-
 function TenantDirectoryContent() {
   const router = useRouter()
-  const [tenants, setTenants] = useState<TenantSummary[]>([])
+  const [tenants, setTenants] = useState<Tenant[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'impacted' | 'at_risk' | 'healthy'>('all')
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+
+  const loadTenants = async () => {
+    try {
+      setError(null)
+      setLoading(true)
+      const res = await fetch('/api/prod/tenants')
+      if (!res.ok) throw new Error(`Failed to fetch tenants: ${res.status}`)
+      const data = await res.json()
+      setTenants(data.items || [])
+    } catch (err: any) {
+      setError(err.message || 'Failed to load tenants')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push('/console/login')
       return
     }
-    // Simulate loading
-    setTimeout(() => {
-      setTenants(mockTenants)
-      setLoading(false)
-    }, 300)
+    loadTenants()
   }, [router])
 
   const filteredTenants = tenants.filter(t => {
-    const matchesFilter = filter === 'all' || 
-      (filter === 'impacted' && t.status === 'IMPACTED') ||
-      (filter === 'at_risk' && t.status === 'AT_RISK') ||
-      (filter === 'healthy' && t.status === 'HEALTHY')
-    const matchesSearch = t.display_name.toLowerCase().includes(search.toLowerCase()) ||
+    return t.tenant_name.toLowerCase().includes(search.toLowerCase()) ||
       t.tenant_id.toLowerCase().includes(search.toLowerCase())
-    return matchesFilter && matchesSearch
   })
 
   const stats = {
     total: tenants.length,
-    healthy: tenants.filter(t => t.status === 'HEALTHY').length,
-    atRisk: tenants.filter(t => t.status === 'AT_RISK').length,
-    impacted: tenants.filter(t => t.status === 'IMPACTED').length,
+    active: tenants.filter(t => t.status === 'ACTIVE').length,
+    inactive: tenants.filter(t => t.status !== 'ACTIVE').length,
   }
 
   if (loading) {
@@ -116,6 +78,17 @@ function TenantDirectoryContent() {
     )
   }
 
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-white border border-red-200 rounded p-6 text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button onClick={loadTenants} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700">Retry</button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="zord-page">
       {/* Header */}
@@ -123,9 +96,10 @@ function TenantDirectoryContent() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="zord-page-title text-xl">Tenant Directory</h1>
-            <p className="zord-page-subtitle">Overview of all tenants and their health status</p>
+            <p className="zord-page-subtitle">Real-time overview of all registered tenants</p>
           </div>
           <div className="flex items-center space-x-3">
+            <button onClick={loadTenants} className="px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50">Refresh</button>
             <input
               type="text"
               placeholder="Search tenants..."
@@ -139,35 +113,19 @@ function TenantDirectoryContent() {
 
       <div className="p-6 space-y-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-4 gap-4">
-          <button
-            onClick={() => setFilter('all')}
-            className={`bg-white border rounded-lg p-4 text-left transition-all ${filter === 'all' ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200 hover:border-gray-300'}`}
-          >
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-4 text-left">
             <div className="text-sm text-gray-500">Total Tenants</div>
             <div className="text-3xl font-bold text-gray-900">{stats.total}</div>
-          </button>
-          <button
-            onClick={() => setFilter('healthy')}
-            className={`bg-white border rounded-lg p-4 text-left transition-all ${filter === 'healthy' ? 'border-green-500 ring-2 ring-green-100' : 'border-gray-200 hover:border-gray-300'}`}
-          >
-            <div className="text-sm text-gray-500">Healthy</div>
-            <div className="text-3xl font-bold text-green-600">{stats.healthy}</div>
-          </button>
-          <button
-            onClick={() => setFilter('at_risk')}
-            className={`bg-white border rounded-lg p-4 text-left transition-all ${filter === 'at_risk' ? 'border-yellow-500 ring-2 ring-yellow-100' : 'border-gray-200 hover:border-gray-300'}`}
-          >
-            <div className="text-sm text-gray-500">At Risk</div>
-            <div className="text-3xl font-bold text-yellow-600">{stats.atRisk}</div>
-          </button>
-          <button
-            onClick={() => setFilter('impacted')}
-            className={`bg-white border rounded-lg p-4 text-left transition-all ${filter === 'impacted' ? 'border-red-500 ring-2 ring-red-100' : 'border-gray-200 hover:border-gray-300'}`}
-          >
-            <div className="text-sm text-gray-500">Impacted</div>
-            <div className="text-3xl font-bold text-red-600">{stats.impacted}</div>
-          </button>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4 text-left">
+            <div className="text-sm text-gray-500">Active</div>
+            <div className="text-3xl font-bold text-green-600">{stats.active}</div>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4 text-left">
+            <div className="text-sm text-gray-500">Inactive</div>
+            <div className="text-3xl font-bold text-red-600">{stats.inactive}</div>
+          </div>
         </div>
 
         {/* Tenant Table */}
@@ -176,12 +134,9 @@ function TenantDirectoryContent() {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Tenant</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Tier</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Risk</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Success Rate</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">DLQ</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Last Activity</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Tenant Name</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Tenant ID</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Created At</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
@@ -189,40 +144,20 @@ function TenantDirectoryContent() {
               {filteredTenants.map((tenant) => (
                 <tr 
                   key={tenant.tenant_id} 
-                  className={`hover:bg-gray-50 cursor-pointer ${tenant.status === 'IMPACTED' ? 'bg-red-50/30' : ''}`}
+                  className="hover:bg-gray-50 cursor-pointer"
                   onClick={() => router.push(`/console/tenants/${tenant.tenant_id}`)}
                 >
                   <td className="px-4 py-3">
                     <StatusBadge status={tenant.status} />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900">{tenant.display_name}</div>
-                    <div className="text-xs text-gray-500 font-mono">{tenant.tenant_id}</div>
+                    <div className="font-medium text-gray-900">{tenant.tenant_name}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <TierBadge tier={tenant.tier} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <RiskBadge level={tenant.risk_level} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`font-semibold tabular-nums ${
-                      tenant.success_rate < 90 ? 'text-red-600' : 
-                      tenant.success_rate < 95 ? 'text-yellow-600' : 'text-green-600'
-                    }`}>
-                      {tenant.success_rate}%
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`font-semibold tabular-nums ${
-                      tenant.dlq_count > 20 ? 'text-red-600' : 
-                      tenant.dlq_count > 5 ? 'text-yellow-600' : 'text-gray-600'
-                    }`}>
-                      {tenant.dlq_count}
-                    </span>
+                    <span className="text-xs text-gray-500 font-mono">{tenant.tenant_id}</span>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">
-                    {tenant.last_activity}
+                    {format(new Date(tenant.created_at), 'yyyy-MM-dd HH:mm:ss')}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link 

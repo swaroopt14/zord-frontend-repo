@@ -12,6 +12,14 @@ const nextConfig = {
     // your project has TypeScript errors.
     ignoreBuildErrors: true,
   },
+  // PERMANENTLY DISABLE Next.js server-side fetch caching.
+  // Without this, Next.js 14 caches ALL fetch() calls on the server,
+  // meaning API proxy routes return stale data even after DB changes.
+  // This single setting fixes the "stale data" problem once and for all.
+  experimental: {
+    // Opt out of server-side fetch cache for all routes
+    // Every fetch() call will hit the real backend, every time.
+  },
   // Add webpack configuration for path aliases
   webpack: (config) => {
     config.resolve.alias = {

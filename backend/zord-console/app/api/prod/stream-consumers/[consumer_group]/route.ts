@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ConsumerGroupDetail, StreamName, ConsumerStatus } from '@/types/stream-consumer'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ consumer_group: string }> }

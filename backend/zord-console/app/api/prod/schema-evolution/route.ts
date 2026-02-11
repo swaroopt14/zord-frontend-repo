@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SchemaEvolutionResponse } from '@/types/schema-evolution'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   // Simulate API latency
   await new Promise(resolve => setTimeout(resolve, 100))
