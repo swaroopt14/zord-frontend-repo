@@ -12,12 +12,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 	"go.uber.org/zap"
 
 	"zord-relay/config"
 	"zord-relay/db"
+	"zord-relay/handler"
 	"zord-relay/kafka"
 	"zord-relay/services"
 	"zord-relay/utils"
@@ -50,7 +52,7 @@ func (h *DummyProviderHandler) HandleMessage(ctx context.Context, topic string, 
 	var p interface{} // Use interface{} to accept any JSON type (object, array, string)
 	if err := json.Unmarshal(value, &p); err != nil {
 		utils.Logger.Error("HandleMessage: JSON Unmarshal failed", zap.Error(err), zap.String("payload_preview", string(value)))
-		
+
 		envelopeID := uuid.New().String()
 		tenantID := uuid.New().String()
 		traceID := headers["trace_id"]
@@ -100,7 +102,7 @@ func (h *DummyProviderHandler) HandleMessage(ctx context.Context, topic string, 
 	contractHash := hex.EncodeToString(contractHashBytes[:])
 
 	// Note: We don't use payloadObj for insertion, we use raw 'value'
-	
+
 	parsedContractID, _ := uuid.Parse(contractID)
 
 	utils.Logger.Info("HandleMessage: Attempting to insert into payout_contracts",
@@ -162,6 +164,16 @@ func main() {
 
 	sinkDB := db.Connect(cfg.SinkDBURL)
 	defer sinkDB.Close()
+
+	router := gin.New()
+	router.Use(gin.Logger(), gin.Recovery())
+
+	contractsRepo := services.NewPayoutContractsRepo(sinkDB)
+	contractsHandler := handler.NewContractsHandler(contractsRepo)
+
+	router.GET("/v1/contracts", contractsHandler.ListContracts)
+
+	http.Handle("/", router)
 
 	sourceDB := db.Connect(cfg.SourceDBURL)
 	defer sourceDB.Close()
