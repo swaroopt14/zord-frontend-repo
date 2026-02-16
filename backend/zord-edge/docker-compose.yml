@@ -9,6 +9,8 @@ services: # Define the containers/services to run
     container_name: zord-edge-service # Name of the running container
     ports: # Port mapping (host:container)
       - "8080:8080" # Map host port 8080 to container port 8080
+    env_file:
+      - .env
     environment: # Environment variables for the application
       - DB_HOST=postgres # Database host (references postgres service)
       - DB_PORT=5432 # Database port
@@ -19,9 +21,14 @@ services: # Define the containers/services to run
       - ENVIRONMENT=production # Environment setting
       - JAEGER_ENDPOINT=http://host.docker.internal:14268/api/traces # Jaeger tracing endpoint
       - REDIS_ADDR=zord-edge-redis:6379 # Redis address (Shared Redis)
-    depends_on: # Service dependencies (start postgres first)
-      - postgres
-      - redis
+      - AWS_REGION=ap-south-1
+      - AWS_EC2_METADATA_DISABLED=true
+      - S3_BUCKET=arealis-zord-vault
+    depends_on: # Service dependencies (wait for health checks)
+      postgres:
+        condition: service_healthy # Wait for PostgreSQL to be healthy
+      redis:
+        condition: service_healthy # Wait for Redis to be healthy
     networks: # Networks this service connects to
       - zord-network
     restart: unless-stopped # Restart policy (restart unless manually stopped)

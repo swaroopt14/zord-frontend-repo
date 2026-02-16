@@ -23,8 +23,8 @@ func Connect(dbURL string) *sql.DB {
 		log.Fatalf("failed to connect to db: %v", err)
 	}
 
-	db.SetMaxOpenConns(50)
-	db.SetMaxIdleConns(25)
+	db.SetMaxOpenConns(100)
+	db.SetMaxIdleConns(50)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	// Retry pinging the database until it becomes available

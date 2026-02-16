@@ -25,7 +25,7 @@ type Config struct {
 }
 
 func Load() *Config {
-	workerCount, err := strconv.Atoi(getEnv("OUTBOX_WORKER_COUNT", "5"))
+	workerCount, err := strconv.Atoi(getEnv("OUTBOX_WORKER_COUNT", "24"))
 	if err != nil {
 		log.Fatalf("Invalid OUTBOX_WORKER_COUNT: %v", err)
 	}

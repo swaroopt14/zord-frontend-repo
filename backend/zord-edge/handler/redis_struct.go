@@ -1,7 +1,11 @@
 package handler
 
-import "github.com/redis/go-redis/v9"
+import (
+	"github.com/redis/go-redis/v9"
+	"main.go/storage"
+)
 
 type Handler struct {
-	Redis *redis.Client
+	Redis   *redis.Client
+	S3store *storage.S3Store
 }

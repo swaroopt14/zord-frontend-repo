@@ -14,7 +14,7 @@ func Routes(router *gin.Engine, h *handler.Handler) {
 	{
 		public.POST("/tenantReg", handler.Tenant_Registry)
 		public.GET("/health", handler.HealthCheck)
-		public.GET("/tenants", handler.ListTenants)               // NEW
+		public.GET("/tenants", handler.ListTenants) // NEW
 		public.GET("/tenants/:tenant_id", handler.GetTenantByID)
 	}
 
@@ -22,7 +22,7 @@ func Routes(router *gin.Engine, h *handler.Handler) {
 	webhooks := router.Group("/v1/raw/envelopes")
 	webhooks.Use(middleware.VerifyWebhookSignature())
 	{
-		webhooks.POST("/webhooks/:provider", h.WebhookHandler)
+		//webhooks.POST("/webhooks/:provider", h.WebhookHandler)
 	}
 
 	if err := validator.InitSchemaValidator(); err != nil {

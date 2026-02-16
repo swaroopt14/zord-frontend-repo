@@ -1,13 +1,14 @@
 package handler
 
 import (
+	"errors"
+	"log"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"main.go/messaging"
 	"main.go/model"
+	"main.go/services"
 )
 
 func (h *Handler) IntentHandler(context *gin.Context) {
@@ -31,48 +32,96 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 		IdempotencyKey: IdempotencyKey,
 	}
 
-	err := messaging.ProduceIntentMessage(context.Request.Context(), msg, h.Redis)
+	data, err := services.ProcessRawIntent(msg, h.S3store)
 	if err != nil {
+		log.Printf("Error processing intent: %v", err)
 		context.JSON(http.StatusInternalServerError, gin.H{
-			"error": "failed to enqueue intent",
+			"TraceID":   msg.TraceID,
+			"ErrorCode": "INTERNAL_ERROR",
+			"ErrorMsg":  err.Error(),
 		})
 		return
 	}
 
-	errCh := make(chan *model.ErrorEvent, 1)
-	ackCh := make(chan *model.AckMessage, 1)
-	go messaging.ConsumeErrorEvent(context.Request.Context(), msg.TraceID, h.Redis, errCh)
-	go messaging.ConsumeAckMessage(context.Request.Context(), msg.TraceID, h.Redis, ackCh)
-
-	select {
-	case errEvent := <-errCh:
-		context.JSON(errEvent.HttpStatus, gin.H{
-			"Error_code": errEvent.ErrorCode,
-			"Error_msg":  errEvent.ErrorMsg,
-			"Trace_id":   errEvent.TraceID,
+	if data == nil {
+		log.Printf("S3 Data is nil for trace_id=%s", msg.TraceID)
+		context.JSON(http.StatusInternalServerError, gin.H{
+			"TraceID":   msg.TraceID,
+			"ErrorCode": "INTERNAL_ERROR",
+			"ErrorMsg":  "S3 data is nil",
 		})
 		return
+	}
 
-	case ack := <-ackCh:
-		if ack == nil {
-			context.JSON(http.StatusInternalServerError, gin.H{
-				"error": "ack is nil",
+	if err := services.RawIntent(context.Request.Context(), msg, data, h.Redis, false); err != nil {
+		if errors.Is(err, services.ErrDuplicateIdempotencyKey) {
+			context.JSON(http.StatusConflict, gin.H{
+				"TraceID":    msg.TraceID,
+				"ErrorCode":  "DUPLICATE_IDEMPOTENCY_KEY",
+				"ErrorMsg":   "An envelope with the same idempotency key already exists.",
+				"HttpStatus": 409,
 			})
 			return
 		}
-		context.JSON(http.StatusAccepted, gin.H{
-			"EnvelopeID":  ack.EnvelopeId,
-			"Trace_id":    ack.TraceID,
-			"Received_At": ack.ReceivedAt})
-	//No error event received
-
-	case <-time.After(3 * time.Second):
-		context.JSON(http.StatusGatewayTimeout, gin.H{
-			"error": "timeout waiting for downstream response",
+		log.Printf("Error persisting raw intent: %v", err)
+		context.JSON(http.StatusInternalServerError, gin.H{
+			"TraceID":    msg.TraceID,
+			"ErrorCode":  "INTERNAL_SERVER_ERROR",
+			"ErrorMsg":   "Failed to persist raw intent.",
+			"HttpStatus": http.StatusInternalServerError,
 		})
 		return
-
 	}
+	context.JSON(http.StatusAccepted, gin.H{
+		"EnvelopeID":  data.EnvelopeId,
+		"Trace_id":    msg.TraceID,
+		"Received_At": data.ReceivedAt,
+	})
+
+	// Send to intent engine asynchronously AFTER 202 response
+	// Use background context to prevent cancellation when HTTP request completes
+	go services.SendToIntentEngine(context.Copy(), msg, data, h.Redis, false)
+
+	// err := messaging.ProduceIntentMessage(context.Request.Context(), msg, h.Redis)
+	// if err != nil {
+	// 	context.JSON(http.StatusInternalServerError, gin.H{
+	// 		"error": "failed to enqueue intent",
+	// 	})
+	// 	return
+	// }
+
+	// errCh := make(chan *model.ErrorEvent, 1)
+	// ackCh := make(chan *model.AckMessage, 1)
+	// go messaging.ConsumeErrorEvent(context.Request.Context(), msg.TraceID, h.Redis, errCh)
+	// go messaging.ConsumeAckMessage(context.Request.Context(), msg.TraceID, h.Redis, ackCh)
+
+	// select {
+	// case errEvent := <-errCh:
+	// 	context.JSON(errEvent.HttpStatus, gin.H{
+	// 		"Error_code": errEvent.ErrorCode,
+	// 		"Error_msg":  errEvent.ErrorMsg,
+	// 		"Trace_id":   errEvent.TraceID,
+	// 	})
+	// 	return
+
+	// case ack := <-ackCh:
+	// 	if ack == nil {
+	// 		context.JSON(http.StatusInternalServerError, gin.H{
+	// 			"error": "ack is nil",
+	// 		})
+	// 		return
+	// 	}
+	// context.JSON(http.StatusAccepted, gin.H{
+	// 	"EnvelopeID":  ack.EnvelopeId,
+	// 	"Trace_id":    ack.TraceID,
+	// 	"Received_At": ack.ReceivedAt})
+	//No error event received
+
+	// case <-time.After(3 * time.Second):
+	// 	context.JSON(http.StatusGatewayTimeout, gin.H{
+	// 		"error": "timeout waiting for downstream response",
+	// 	})
+	// 	return
 
 	//Need to change this err process with go routine to listen error event
 

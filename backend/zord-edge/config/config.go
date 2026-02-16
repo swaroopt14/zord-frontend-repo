@@ -29,11 +29,25 @@ func InitDB() {
 	if err != nil {
 		log.Fatalf("Database configuration failed: %v", err)
 	}
-	err = db.DB.Ping()
-	if err != nil {
-		log.Fatalf("Database Ping Error %v", err)
-	}
 
+	maxRetries := 10
+	retryDelay := 1 * time.Second
+
+	for i := 0; i < maxRetries; i++ {
+		err = db.DB.Ping()
+		if err == nil {
+			log.Println("Database connection established successfully")
+			break
+		}
+
+		if i < maxRetries-1 {
+			log.Printf("Database Ping Error (attempt %d/%d): %v - retrying in %v", i+1, maxRetries, err, retryDelay)
+			time.Sleep(retryDelay)
+			retryDelay *= 2 // Exponential backoff
+		} else {
+			log.Fatalf("Database Ping Error after %d attempts: %v", maxRetries, err)
+		}
+	}
 	db.DB.SetMaxOpenConns(50)
 	db.DB.SetMaxIdleConns(25)
 	db.DB.SetConnMaxLifetime(5 * time.Minute)

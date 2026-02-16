@@ -21,7 +21,7 @@ func SaveRawIntent(
 	//log.Printf("%+v\n", envelope)
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		log.Fatalf("SaveRawIntent Trasaction Error: %v", err)
+		log.Printf("SaveRawIntent Trasaction Error: %v", err)
 		return err
 	}
 

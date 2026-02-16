@@ -25,11 +25,11 @@ type TenantListResponse struct {
 	Pagination PaginationInfo   `json:"pagination"`
 }
 
-type PaginationInfo struct {
-	Page     int `json:"page"`
-	PageSize int `json:"page_size"`
-	Total    int `json:"total"`
-}
+// type PaginationInfo struct {
+// 	Page     int `json:"page"`
+// 	PageSize int `json:"page_size"`
+// 	Total    int `json:"total"`
+// }
 
 // ----- LIST TENANTS -----
 // Called by handler for GET /v1/tenants?page=1&page_size=50&status=ACTIVE

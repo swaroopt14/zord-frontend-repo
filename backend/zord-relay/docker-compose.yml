@@ -18,6 +18,7 @@ services:
       - SERVICE_NAME=zord-relay
       - OUTBOX_POLL_INTERVAL=5s
       - OUTBOX_BATCH_SIZE=10
+      - OUTBOX_WORKER_COUNT=24
     depends_on:
       - broker1
       - broker2
