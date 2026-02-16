@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type Intent struct {
+type IncomingIntentRequestV1 struct {
 	Tenant_id      uuid.UUID `json:"tenant_id"`
 	IdempotencyKey string    `json:"idempotency_key"`
 	Source         string    `json:"source"`

@@ -29,18 +29,18 @@ func (h *Handler) WebhookHandler(context *gin.Context) {
 	if tenantIdStr == "" {
 		// context.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id is required"})
 		// return
-        // Ideally we map provider/secret to tenant. For now, using a placeholder.
-        tenantIdStr = "00000000-0000-0000-0000-000000000000"
+		// Ideally we map provider/secret to tenant. For now, using a placeholder.
+		tenantIdStr = "00000000-0000-0000-0000-000000000000"
 	}
 
-    // Determine Idempotency Key
-    // PSPs send unique event IDs. We should try to extract it.
-    // If not, hash the payload.
-    idempotencyKey := extractIdempotencyKey(rawPayload, provider)
-    if idempotencyKey == "" {
-        hash := sha256.Sum256(rawPayload)
-        idempotencyKey = hex.EncodeToString(hash[:])
-    }
+	// Determine Idempotency Key
+	// PSPs send unique event IDs. We should try to extract it.
+	// If not, hash the payload.
+	idempotencyKey := extractIdempotencyKey(rawPayload, provider)
+	if idempotencyKey == "" {
+		hash := sha256.Sum256(rawPayload)
+		idempotencyKey = hex.EncodeToString(hash[:])
+	}
 
 	traceId := uuid.New().String()
 
@@ -59,46 +59,46 @@ func (h *Handler) WebhookHandler(context *gin.Context) {
 		return
 	}
 
-    // Webhooks usually expect a 200/202 OK quickly.
-    // We don't necessarily need to wait for full processing unless we want to return synchronous errors.
-    // The requirement says "ACK (202)".
-    
+	// Webhooks usually expect a 200/202 OK quickly.
+	// We don't necessarily need to wait for full processing unless we want to return synchronous errors.
+	// The requirement says "ACK (202)".
+
 	context.JSON(http.StatusAccepted, gin.H{
-		"status": "received",
-        "trace_id": traceId,
+		"status":   "received",
+		"trace_id": traceId,
 	})
 }
 
 func extractIdempotencyKey(payload []byte, provider string) string {
-    // Simple attempt to parse common fields
-    var data map[string]interface{}
-    if err := json.Unmarshal(payload, &data); err != nil {
-        return ""
-    }
+	// Simple attempt to parse common fields
+	var data map[string]interface{}
+	if err := json.Unmarshal(payload, &data); err != nil {
+		return ""
+	}
 
-    // Razorpay often has "event" and payload.entity.id
-    if provider == "razorpay" {
-        if payloadMap, ok := data["payload"].(map[string]interface{}); ok {
-             // Iterate keys to find the entity (e.g. "payout")
-             for _, v := range payloadMap {
-                 if entity, ok := v.(map[string]interface{}); ok {
-                     if entityInner, ok := entity["entity"].(map[string]interface{}); ok {
-                         if id, ok := entityInner["id"].(string); ok {
-                             return id
-                         }
-                     }
-                 }
-             }
-        }
-    }
-    
-    // Generic fallback: check "id", "event_id"
-    if id, ok := data["id"].(string); ok {
-        return id
-    }
-    if id, ok := data["event_id"].(string); ok {
-        return id
-    }
+	// Razorpay often has "event" and payload.entity.id
+	if provider == "razorpay" {
+		if payloadMap, ok := data["payload"].(map[string]interface{}); ok {
+			// Iterate keys to find the entity (e.g. "payout")
+			for _, v := range payloadMap {
+				if entity, ok := v.(map[string]interface{}); ok {
+					if entityInner, ok := entity["entity"].(map[string]interface{}); ok {
+						if id, ok := entityInner["id"].(string); ok {
+							return id
+						}
+					}
+				}
+			}
+		}
+	}
 
-    return ""
+	// Generic fallback: check "id", "event_id"
+	if id, ok := data["id"].(string); ok {
+		return id
+	}
+	if id, ok := data["event_id"].(string); ok {
+		return id
+	}
+
+	return ""
 }

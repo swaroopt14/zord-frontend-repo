@@ -86,7 +86,7 @@ func main() {
 		if r.URL.Path == "/v1/dlq" || r.URL.Path == "/v1/dlq/" {
 			dlqHandler.List(w, r)
 		} else {
-			dlqHandler.GetByID(w, r)   // NEW: /v1/dlq/{dlq_id}
+			dlqHandler.GetByID(w, r) // NEW: /v1/dlq/{dlq_id}
 		}
 	})
 	http.HandleFunc("/v1/intents/", func(w http.ResponseWriter, r *http.Request) {
@@ -99,6 +99,7 @@ func main() {
 	http.HandleFunc("/v1/intents", intentHandler.List)
 
 	// -------- REDIS CONSUMER (PRIMARY ENTRYPOINT) --------
+
 	go func() {
 		log.Println("Ingress consumer started")
 

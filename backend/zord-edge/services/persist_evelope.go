@@ -3,9 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"log"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
@@ -17,7 +15,7 @@ import (
 
 func RawIntent(ctx context.Context,
 	msg model.RawIntentMessage, ack *model.AckMessage, rdb *redis.Client, isWebhook bool) error {
-	
+
 	envelopeID, err := uuid.Parse(ack.EnvelopeId)
 	if err != nil {
 		log.Printf("Invalid EnvelopeId: %s", ack.EnvelopeId)
@@ -43,8 +41,8 @@ func RawIntent(ctx context.Context,
 			TraceID:        trace_id,
 			EnvelopeID:     envelopeID,
 			TenantID:       tenantUUID,
-			Source:         "WEBHOOK", 
-			SourceSystem:   "",        
+			Source:         "WEBHOOK",
+			SourceSystem:   "",
 			IdempotencyKey: msg.IdempotencyKey,
 			PayloadHash:    "",
 			ObjectRef:      ObjRef,
@@ -54,13 +52,13 @@ func RawIntent(ctx context.Context,
 		}
 	} else {
 		// API Flow - Strict Separation
-		var req dto.Intent
+		var req dto.IncomingIntentRequestV1
 		err := json.Unmarshal([]byte(msg.RawPayload), &req)
 		if err != nil {
 			// If it's the API queue, it MUST be valid JSON conforming to schema
 			return err
 		}
-		
+
 		envelope = model.IngressEnvolope{
 			TraceID:        trace_id,
 			EnvelopeID:     envelopeID,
@@ -82,21 +80,73 @@ func RawIntent(ctx context.Context,
 		&envelope,
 	)
 	if err != nil {
-		if errors.Is(err, ErrDuplicateIdempotencyKey) {
-			// log.Printf("Duplicate entry for Idempotency Key: %s", envelope.IdempotencyKey)
-			_ = messaging.PublishClientError(ctx, rdb, model.ClientErrorEvent{
-				TraceID:    envelope.TraceID.String(),
-				ErrorCode:  "DUPLICATE_IDEMPOTENCY_KEY",
-				ErrorMsg:   "An envelope with the same idempotency key already exists.",
-				HttpStatus: 409,
-			})
-
-			return err
-
-		}
 		return err
 	}
+	return nil
+}
 
+// SendToIntentEngine sends the envelope to the intent engine via Redis
+// This function should be called asynchronously in a goroutine AFTER sending 202 response
+func SendToIntentEngine(ctx context.Context,
+	msg model.RawIntentMessage, ack *model.AckMessage, rdb *redis.Client, isWebhook bool) {
+
+	envelopeID, err := uuid.Parse(ack.EnvelopeId)
+	if err != nil {
+		log.Printf("Invalid EnvelopeId: %s", ack.EnvelopeId)
+		return
+	}
+	trace_id, err := uuid.Parse(msg.TraceID)
+	if err != nil {
+		log.Printf("Invalid TraceID: %s", msg.TraceID)
+		return
+	}
+	tenantUUID, err := uuid.Parse(msg.TenantID)
+	if err != nil {
+		log.Printf("Invalid TenantId: %s", msg.TenantID)
+		return
+	}
+	ObjRef := ack.ObjectRef
+
+	var envelope model.IngressEnvolope
+
+	if isWebhook {
+		envelope = model.IngressEnvolope{
+			TraceID:        trace_id,
+			EnvelopeID:     envelopeID,
+			TenantID:       tenantUUID,
+			Source:         "WEBHOOK",
+			SourceSystem:   "",
+			IdempotencyKey: msg.IdempotencyKey,
+			PayloadHash:    "",
+			ObjectRef:      ObjRef,
+			AmountValue:    "0",
+			AmountCurrency: "XXX",
+			ParseStatus:    "RECEIVED",
+		}
+	} else {
+		var req dto.IncomingIntentRequestV1
+		err := json.Unmarshal([]byte(msg.RawPayload), &req)
+		if err != nil {
+			log.Printf("Failed to unmarshal payload for intent engine: %v", err)
+			return
+		}
+
+		envelope = model.IngressEnvolope{
+			TraceID:        trace_id,
+			EnvelopeID:     envelopeID,
+			TenantID:       tenantUUID,
+			Source:         req.Source,
+			SourceSystem:   req.SourceSystem,
+			IdempotencyKey: msg.IdempotencyKey,
+			PayloadHash:    req.PayloadHash,
+			ObjectRef:      ObjRef,
+			AmountValue:    req.Amount.Value,
+			AmountCurrency: req.Amount.Currency,
+			ParseStatus:    "RECEIVED",
+		}
+	}
+
+	// Prepare payload for intent engine
 	if isWebhook {
 		if !json.Valid([]byte(msg.RawPayload)) {
 			// Not valid JSON, quote it to ensure it's a valid JSON string
@@ -108,21 +158,12 @@ func RawIntent(ctx context.Context,
 	} else {
 		envelope.Payload = json.RawMessage(msg.RawPayload)
 	}
-	// Send to Intent Engine via Redis
+
+	//Send to Intent Engine via Redis
+
 	err = messaging.SendRawIntentMessage(ctx, envelope, rdb)
 	if err != nil {
 		log.Printf("Failed to send raw intent message: %v", err)
-		return err
 	}
-
-	// Send ACK to zord-edge to prevent 504 Timeout
-	ack.ReceivedAt = time.Now()
-	err = messaging.SendACKMessage(ctx, *ack, rdb)
-	if err != nil {
-		log.Printf("Failed to send ACK message: %v", err)
-		// We don't return error here because the intent is already persisted and sent to engine
-	}
-
-	return nil
 
 }

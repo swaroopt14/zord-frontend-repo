@@ -3,15 +3,18 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"main.go/config"
 	"main.go/db"
 	"main.go/handler"
 	"main.go/routes"
+	"main.go/storage"
 )
 
 var (
@@ -54,6 +57,10 @@ func main() {
 	}
 
 	db.CreateTable()
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("No .env file found")
+	}
 
 	Rdb := config.InitRedisClient()
 	//Need to remove this
@@ -63,8 +70,22 @@ func main() {
 	}
 	log.Println("Redis ping latency:", time.Since(t))
 
+	//Need to add this news3store in config
+	bucket := os.Getenv("S3_BUCKET")
+	region := os.Getenv("AWS_REGION")
+
+	if bucket == "" || region == "" {
+		log.Fatal("S3_BUCKET or S3_REGION not set in environment")
+	}
+
+	s3store, err := storage.NewS3Store(context.Background(), bucket, region)
+	if err != nil {
+		log.Fatal("Failed to init S3", err)
+	}
+
 	h := &handler.Handler{
-		Redis: Rdb,
+		Redis:   Rdb,
+		S3store: s3store,
 	}
 
 	routes.Routes(server, h)

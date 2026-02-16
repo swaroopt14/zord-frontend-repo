@@ -1,6 +1,0 @@
-{
-    "tenant_id": "123e4567-e89b-12d3-a456-426614174000",
-    "trace_id": "987fcdeb-51a2-43d1-b789-123456789abc",
-    "idempotency_key": "test-message-2026-01-29",
-    "raw_payload": "{\"tenant_id\":\"123e4567-e89b-12d3-a456-426614174000\",\"source\":\"test-client\",\"source_system\":\"test-system\",\"intent_type\":\"payment\",\"amount\":{\"value\":\"100.00\",\"currency\":\"USD\"},\"beneficiary\":{\"type\":\"individual\",\"instrument\":{\"kind\":\"bank_account\"},\"country\":\"US\"},\"constraints\":{\"allow_partial\":false}}"
-}

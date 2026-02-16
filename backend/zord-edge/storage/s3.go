@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *S3Store) StoreRawPayload(ctx context.Context, RawPayload []byte, TenatId string) (string, time.Time, string, error) {
+func (s *S3Store) StoreRawPayload(RawPayload []byte, TenatId string) (string, time.Time, string, error) {
 	EnvelopeID := uuid.New().String()
 	receivedTime := time.Now().UTC()
 	year, month, day := receivedTime.Date()
@@ -22,7 +22,12 @@ func (s *S3Store) StoreRawPayload(ctx context.Context, RawPayload []byte, TenatI
 		day,
 		EnvelopeID)
 
-	_, err := s.Client.PutObject(ctx, &s3.PutObjectInput{
+	// Use background context with timeout to prevent cancellation when HTTP response completes
+	// This ensures S3 upload completes even after the client receives 202 Accepted
+	s3Ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := s.Client.PutObject(s3Ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(s.BucketName),
 		Key:         aws.String(ObjectKey),
 		Body:        bytes.NewReader(RawPayload),
