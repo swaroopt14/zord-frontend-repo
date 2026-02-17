@@ -36,8 +36,8 @@ func InitDB() {
 	if err != nil {
 		log.Fatalf("Database Ping Error %v", err)
 	}
-	db.DB.SetMaxOpenConns(50)
-	db.DB.SetMaxIdleConns(25)
+	db.DB.SetMaxOpenConns(100)
+	db.DB.SetMaxIdleConns(50)
 	db.DB.SetConnMaxLifetime(5 * time.Minute)
 
 }
@@ -62,4 +62,11 @@ func InitRedis() *redis.Client {
 	}
 
 	return rdb
+}
+func GetWorkerPoolSize() int {
+	size := 50
+	if val := os.Getenv("WORKER_POOL_SIZE"); val != "" {
+		fmt.Sscanf(val, "%d", &size)
+	}
+	return size
 }

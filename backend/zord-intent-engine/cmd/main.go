@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"zord-intent-engine/internal/models"
 	"zord-intent-engine/internal/services"
 	"zord-intent-engine/internal/validator"
 	"zord-intent-engine/messaging"
@@ -100,8 +101,42 @@ func main() {
 
 	// -------- REDIS CONSUMER (PRIMARY ENTRYPOINT) --------
 
+	workerPoolSize := config.GetWorkerPoolSize()
+	jobChan := make(chan *models.IncomingIntent, 100)
+
+	// Worker function
+	worker := func(id int, jobs <-chan *models.IncomingIntent) {
+		for job := range jobs {
+			canonical, dlq, err := intentService.ProcessIncomingIntent(ctx, job)
+
+			if err != nil {
+				// System failure → retry (do NOT ack yet)
+				log.Printf("Worker %d: System error processing intent: %v\n", id, err)
+				continue
+			}
+
+			if dlq != nil {
+				log.Printf("Worker %d: ⚠️ Intent rejected [tenant=%s envelope=%s reason=%s]",
+					id, job.TenantID, job.EnvelopeID, dlq.ReasonCode)
+				continue
+			}
+
+			log.Printf("Worker %d: Intent processed successfully [intent_id=%s envelope=%s]",
+				id, canonical.IntentID, job.EnvelopeID)
+
+			// ACK logic would go here
+		}
+	}
+
+	// Start workers
+	for i := 0; i < workerPoolSize; i++ {
+		go worker(i, jobChan)
+	}
+
+	log.Printf("Started %d workers for Ingress processing", workerPoolSize)
+
 	go func() {
-		log.Println("Ingress consumer started")
+		log.Println("Ingress consumer started (Dispatcher)")
 
 		for {
 			incoming, err := messaging.ConsumeIngressMessage(ctx, Rdb)
@@ -109,37 +144,7 @@ func main() {
 				log.Printf("Error consuming ingress message: %v\n", err)
 				continue
 			}
-
-			canonical, dlq, err := intentService.ProcessIncomingIntent(
-				ctx,
-				incoming,
-			)
-
-			if err != nil {
-				// System failure → retry (do NOT ack yet)
-				log.Printf("System error processing intent: %v\n", err)
-				continue
-			}
-
-			if dlq != nil {
-				log.Printf(
-					"⚠️ Intent rejected [tenant=%s envelope=%s reason=%s]",
-					incoming.TenantID,
-					incoming.EnvelopeID,
-					dlq.ReasonCode,
-				)
-
-				continue
-			}
-
-			log.Printf(
-				"Intent processed successfully [intent_id=%s envelope=%s]",
-				canonical.IntentID,
-				incoming.EnvelopeID,
-			)
-
-			// STEP 11 — ACK Redis message
-			// (to be implemented inside messaging layer)
+			jobChan <- incoming
 		}
 	}()
 
