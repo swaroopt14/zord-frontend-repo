@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
@@ -87,8 +88,10 @@ func RawIntent(ctx context.Context,
 
 // SendToIntentEngine sends the envelope to the intent engine via Redis
 // This function should be called asynchronously in a goroutine AFTER sending 202 response
-func SendToIntentEngine(ctx context.Context,
+func SendToIntentEngine(
 	msg model.RawIntentMessage, ack *model.AckMessage, rdb *redis.Client, isWebhook bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	envelopeID, err := uuid.Parse(ack.EnvelopeId)
 	if err != nil {

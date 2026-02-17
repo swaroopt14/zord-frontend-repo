@@ -80,7 +80,7 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 
 	// Send to intent engine asynchronously AFTER 202 response
 	// Use background context to prevent cancellation when HTTP request completes
-	go services.SendToIntentEngine(context.Copy(), msg, data, h.Redis, false)
+	go services.SendToIntentEngine(msg, data, h.Redis, false)
 
 	// err := messaging.ProduceIntentMessage(context.Request.Context(), msg, h.Redis)
 	// if err != nil {
