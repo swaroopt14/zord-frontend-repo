@@ -6,11 +6,29 @@ import Link from 'next/link'
 import { isAuthenticated, getCurrentUser } from '@/services/auth'
 import { RoleSwitcher } from '@/components/auth'
 import { canAccessDLQ } from '@/utils/permissions'
-
+import { fetchContracts, ContractsListParams } from '@/services/backend/contracts'
+import { ContractInstance } from '@/types/contract-instance'
 export default function ContractsPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [contracts, setContracts] = useState<ContractInstance[]>([])
+  const [error, setError] = useState<string | null>(null)
+  
 
+  const loadContracts = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await fetchContracts()
+      setContracts(data.contracts || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load contracts')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+    // REPLACE lines 31-37 with:
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push('/ops/login')
@@ -21,13 +39,12 @@ export default function ContractsPage() {
       router.push('/ops/login')
       return
     }
-    setLoading(false)
-  }, [router])
 
-  const contracts = [
-    { contract_id: 'ctr_777', intent_id: 'intent_abc123', status: 'ISSUED', created_at: '2026-02-04T10:00:03Z' },
-    { contract_id: 'ctr_778', intent_id: 'intent_def456', status: 'FAILED', created_at: '2026-02-04T11:00:00Z' },
-  ]
+    loadContracts()
+  }, [router])
+ 
+
+ 
 
   if (loading) {
     return (
@@ -46,7 +63,17 @@ export default function ContractsPage() {
           Read-only view of contracts derived from intents. Immutable artifacts.
         </p>
       </div>
-
+      {error && (
+  <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+    <p className="text-sm text-red-600">{error}</p>
+    <button 
+      onClick={() => window.location.reload()} 
+      className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+    >
+      Retry
+    </button>
+  </div>
+)}
       <div className="mb-4 flex flex-wrap gap-2">
         <select className="px-3 py-2 border border-gray-300 rounded-md text-sm">Time</select>
         <select className="px-3 py-2 border border-gray-300 rounded-md text-sm">Status ▾</select>
@@ -63,14 +90,21 @@ export default function ContractsPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
             </tr>
-          </thead>
+          </thead>  
           <tbody className="bg-white divide-y divide-gray-200">
             {contracts.map((c) => (
               <tr key={c.contract_id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 font-mono">{c.contract_id}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{c.intent_id}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${c.status === 'ISSUED' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${
+                    c.status === 'ISSUED' ? 'bg-green-100 text-green-800' : 
+                    c.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
+                    c.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                    c.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                    c.status === 'PROCESSING' ? 'bg-purple-100 text-purple-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
                     {c.status}
                   </span>
                 </td>
