@@ -38,7 +38,7 @@ export const BACKEND_SERVICES = {
 
   // zord-contracts: Contract Service (Port 8084)
   CONTRACTS: {
-    BASE_URL: process.env.ZORD_CONTRACTS_URL || 'http://localhost:8084',
+    BASE_URL: process.env.ZORD_CONTRACTS_URL || 'http://localhost:8082',
     ENDPOINTS: {
       HEALTH: '/health',
       CONTRACTS: '/v1/contracts',
@@ -46,15 +46,7 @@ export const BACKEND_SERVICES = {
     },
   },
 
-  // zord-contracts-runtime: Runtime Contract Instances (Port 8082)
-  CONTRACTS_RUNTIME: {
-  BASE_URL: process.env.ZORD_CONTRACTS_RUNTIME_URL || 'http://localhost:8082',
-  ENDPOINTS: {
-    HEALTH: '/health',
-    CONTRACTS: '/v1/contracts',
-    CONTRACT_BY_ID: (id: string) => `/v1/contracts/${id}`,
-  },
-},
+  
 
   // zord-pii-enclave: PII Protection (Port 8085)
   PII_ENCLAVE: {
