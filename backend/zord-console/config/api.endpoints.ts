@@ -14,6 +14,17 @@ export const BACKEND_SERVICES = {
     },
   },
 
+  // zord-relay: Message Relay / Provider Contracts (Port 8082)
+  // Used by Ops "Payout Contracts" UI.
+  RELAY: {
+    BASE_URL: process.env.ZORD_RELAY_URL || 'http://localhost:8082',
+    ENDPOINTS: {
+      HEALTH: '/health',
+      CONTRACTS: '/v1/contracts',
+      CONTRACT_BY_ID: (id: string) => `/v1/contracts/${id}`,
+    },
+  },
+
   // zord-intent-engine: Intent Processing (Port 8083)
   INTENT_ENGINE: {
     BASE_URL: process.env.ZORD_INTENT_ENGINE_URL || 'http://localhost:8083',
