@@ -13,8 +13,8 @@ export interface ContractsListParams {
  * Fetch list of contract instances from runtime service
  */
 export async function fetchContracts(params?: ContractsListParams): Promise<ContractInstanceListResponse> {
-  const baseUrl = BACKEND_SERVICES.CONTRACTS_RUNTIME.BASE_URL
-  const contractsEndpoint = BACKEND_SERVICES.CONTRACTS_RUNTIME.ENDPOINTS.CONTRACTS
+  const baseUrl = BACKEND_SERVICES.CONTRACTS.BASE_URL
+  const contractsEndpoint = BACKEND_SERVICES.CONTRACTS.ENDPOINTS.CONTRACTS
   
   // Build query string from params
   const searchParams = new URLSearchParams()
@@ -56,7 +56,7 @@ export async function fetchContracts(params?: ContractsListParams): Promise<Cont
  * Fetch single contract instance by ID
  */
 export async function fetchContractById(contractId: string): Promise<ContractInstance> {
-  const url = buildUrl('CONTRACTS_RUNTIME', BACKEND_SERVICES.CONTRACTS_RUNTIME.ENDPOINTS.CONTRACT_BY_ID(contractId))
+  const url = buildUrl('CONTRACTS', BACKEND_SERVICES.CONTRACTS.ENDPOINTS.CONTRACT_BY_ID(contractId))
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
