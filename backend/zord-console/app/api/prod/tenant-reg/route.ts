@@ -24,7 +24,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     // Never log api keys or request bodies.
     const msg = error instanceof Error ? error.message : 'Tenant registration failed'
+    if (msg === 'TENANT_NAME_EXISTS') {
+      return NextResponse.json(
+        { error: 'TENANT_NAME_EXISTS', message: 'Tenant name is already registered. Choose a different name.' },
+        { status: 409 }
+      )
+    }
     return NextResponse.json({ error: msg }, { status: 502 })
   }
 }
-

@@ -135,7 +135,26 @@ export async function registerTenant(merchantName: string): Promise<{
     clearTimeout(timeoutId)
 
     if (!response.ok) {
-      throw new Error(`Failed to register tenant: ${response.status} ${response.statusText}`)
+      const text = await response.text().catch(() => '')
+      let data: any = null
+      try {
+        data = JSON.parse(text)
+      } catch {
+        // ignore
+      }
+
+      const details = typeof data?.details === 'string' ? data.details : ''
+      if (details.includes('tenants_tenant_name_key') || details.toLowerCase().includes('duplicate key')) {
+        throw new Error('TENANT_NAME_EXISTS')
+      }
+
+      const errMsg =
+        typeof data?.error === 'string'
+          ? data.error
+          : typeof data?.message === 'string'
+            ? data.message
+            : text || response.statusText
+      throw new Error(`Failed to register tenant: ${response.status} ${errMsg}`)
     }
 
     const data = await response.json()

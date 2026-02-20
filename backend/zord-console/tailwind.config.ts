@@ -41,6 +41,52 @@ const config: Config = {
           bg: '#7F1D1D',
           text: '#FECACA',
         },
+
+        // Customer UI palette (used by /customer/* pages)
+        // These are static hex values to ensure Tailwind generates the classes
+        // (e.g. bg-cx-purple-600). Customer dark-mode tokens are handled via
+        // CSS variables in app/customer/layout.tsx.
+        'cx-text': '#1F2937',
+        'cx-neutral': '#6B7280',
+        'cx-danger': {
+          500: '#EF4444',
+          600: '#DC2626',
+          700: '#B91C1C',
+        },
+        'cx-energy': {
+          500: '#F97316',
+          600: '#EA580C',
+          700: '#C2410C',
+        },
+        'cx-success': {
+          500: '#14B8A6',
+          600: '#0D9488',
+          700: '#0F766E',
+        },
+        'cx-purple': {
+          50: '#F5F3FF',
+          100: '#EDE9FE',
+          200: '#DDD6FE',
+          300: '#C4B5FD',
+          400: '#A78BFA',
+          500: '#8B5CF6',
+          600: '#7C3AED',
+          700: '#6D28D9',
+          800: '#5B21B6',
+          900: '#4C1D95',
+        },
+        'cx-teal': {
+          50: '#F0FDFA',
+          100: '#CCFBF1',
+          200: '#99F6E4',
+          300: '#5EEAD4',
+          400: '#2DD4BF',
+          500: '#14B8A6',
+          600: '#0D9488',
+          700: '#0F766E',
+          800: '#115E59',
+          900: '#134E4A',
+        },
       },
       borderRadius: {
         'zord': '4px', // Consistent 4px radius

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 type TenantRegResponse = {
   APIKEY?: string
@@ -22,11 +22,17 @@ function safeJsonParse(input: string): unknown {
 }
 
 export default function CustomerTenantRegisterPage() {
-  const [name, setName] = useState('abcd211')
+  const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resp, setResp] = useState<TenantRegResponse | null>(null)
   const [copied, setCopied] = useState<'apikey' | 'tenant' | null>(null)
+
+  useEffect(() => {
+    // Avoid duplicate-tenant 500s by defaulting to a unique name on first mount.
+    const ts = new Date().toISOString().replace(/[:.]/g, '').slice(0, 15)
+    setName(`merchant_${ts}`)
+  }, [])
 
   const canSubmit = useMemo(() => name.trim().length >= 3, [name])
 
@@ -51,7 +57,11 @@ export default function CustomerTenantRegisterPage() {
       const data = (safeJsonParse(text) || {}) as TenantRegResponse
 
       if (!res.ok) {
-        throw new Error((data as any)?.error || `Tenant registration failed: ${res.status}`)
+        const friendly =
+          (data as any)?.error === 'TENANT_NAME_EXISTS'
+            ? 'Tenant name already exists. Update the name and try again.'
+            : (data as any)?.message || (data as any)?.error || `Tenant registration failed: ${res.status}`
+        throw new Error(friendly)
       }
 
       setResp(data)
@@ -114,6 +124,16 @@ export default function CustomerTenantRegisterPage() {
             {loading ? 'Registering…' : 'Register Tenant'}
           </button>
           <button
+            type="button"
+            onClick={() => {
+              const ts = new Date().toISOString().replace(/[:.]/g, '').slice(0, 15)
+              setName(`merchant_${ts}`)
+            }}
+            className="px-4 py-2 text-sm font-semibold bg-white text-cx-text border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Generate Name
+          </button>
+          <button
             onClick={() => {
               setResp(null)
               setError(null)
@@ -168,4 +188,3 @@ export default function CustomerTenantRegisterPage() {
     </div>
   )
 }
-
