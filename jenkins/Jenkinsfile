@@ -8,9 +8,11 @@ pipeline {
 
   parameters {
     string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Git branch to deploy')
+    string(name: 'GIT_CREDENTIALS_ID', defaultValue: 'github-pat', description: 'Jenkins credential ID for cloning the private GitHub repo over HTTPS')
   }
 
   environment {
+    GIT_URL = 'https://github.com/Arealis-network/Arealis-Zord.git'
     COMPOSE_FILE = 'docker-compose.ec2.yml'
     APP_ENV_FILE = 'backend/zord-intent-engine/.env'
     AWS_REGION = 'ap-south-1'
@@ -23,12 +25,17 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
-        checkout scm
-        sh '''
-          git fetch --all --prune
-          git checkout "${BRANCH_NAME}"
-          git pull --ff-only origin "${BRANCH_NAME}"
-        '''
+        // Don't run raw `git` in a shell for private repos; it will prompt for creds and fail.
+        // Use Jenkins-managed credentials for a non-interactive checkout of the requested branch.
+        checkout([
+          $class: 'GitSCM',
+          branches: [[name: "*/${params.BRANCH_NAME}"]],
+          userRemoteConfigs: [[url: env.GIT_URL, credentialsId: params.GIT_CREDENTIALS_ID]],
+          extensions: [
+            [$class: 'PruneStaleBranch'],
+            [$class: 'CleanBeforeCheckout']
+          ]
+        ])
       }
     }
 
