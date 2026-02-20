@@ -14,7 +14,6 @@ type IngestResponse = {
 
 type IntentRequestV1 = {
   schema_version: 'intent.request.v1'
-  intent_type: string
   account_number: string
   amount: { value: string; currency: string }
   beneficiary: { instrument: { kind: string }; country: string }
@@ -65,15 +64,12 @@ function validatePayload(p: IntentRequestV1): ValidationError[] {
   if (!p.purpose_code.trim()) errs.push({ code: 'REQUIRED', field: 'purpose_code', message: 'Purpose Code is required.' })
   if (!p.source.trim()) errs.push({ code: 'REQUIRED', field: 'source', message: 'Source is required.' })
   if (!p.source_system.trim()) errs.push({ code: 'REQUIRED', field: 'source_system', message: 'Source System is required.' })
-  if (!p.intent_type.trim()) errs.push({ code: 'REQUIRED', field: 'intent_type', message: 'Intent Type is required.' })
 
   return errs
 }
 
 export default function CustomerCreateIntentPage() {
-  const [apiKey, setApiKey] = useState<string>('')
   const [tenantName, setTenantName] = useState<string>('')
-  const [idempotencyKey, setIdempotencyKey] = useState<string>(genIdempotencyKey())
 
   const [accountNumber, setAccountNumber] = useState('ACC55knkn5000')
   const [amountValue, setAmountValue] = useState('1555.009')
@@ -85,25 +81,23 @@ export default function CustomerCreateIntentPage() {
   const [purposeCode, setPurposeCode] = useState('TREASURY')
   const [source, setSource] = useState('UPI')
   const [sourceSystem, setSourceSystem] = useState('Razorpay')
-  const [intentType, setIntentType] = useState('FX')
 
   const [validatedOnce, setValidatedOnce] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [resp, setResp] = useState<IngestResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [lastIdempotencyKey, setLastIdempotencyKey] = useState<string | null>(null)
 
   useEffect(() => {
     const k = localStorage.getItem('cx_api_key') || ''
     const t = localStorage.getItem('cx_tenant_name') || ''
-    setApiKey(k)
     setTenantName(t)
   }, [])
 
   const payload: IntentRequestV1 = useMemo(
     () => ({
       schema_version: 'intent.request.v1',
-      intent_type: intentType,
       account_number: accountNumber,
       amount: { value: amountValue, currency },
       beneficiary: { instrument: { kind: instrumentKind }, country },
@@ -114,7 +108,6 @@ export default function CustomerCreateIntentPage() {
       source_system: sourceSystem,
     }),
     [
-      intentType,
       accountNumber,
       amountValue,
       currency,
@@ -153,8 +146,9 @@ export default function CustomerCreateIntentPage() {
     setError(null)
     setResp(null)
 
+    const apiKey = localStorage.getItem('cx_api_key') || ''
     if (!apiKey) {
-      setError('Missing API key. Register a tenant first.')
+      setError('Missing API key. Register a tenant first (Tenant Registration page).')
       return
     }
 
@@ -165,12 +159,15 @@ export default function CustomerCreateIntentPage() {
 
     setSubmitting(true)
     try {
+      const idem = genIdempotencyKey()
+      setLastIdempotencyKey(idem)
+
       const res = await fetch('/api/prod/ingest', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
-          'X-Idempotency-Key': idempotencyKey,
+          'X-Idempotency-Key': idem,
         },
         body: JSON.stringify(payload),
       })
@@ -188,7 +185,6 @@ export default function CustomerCreateIntentPage() {
       }
 
       setResp(data)
-      setIdempotencyKey(genIdempotencyKey())
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ingest failed')
     } finally {
@@ -229,49 +225,7 @@ export default function CustomerCreateIntentPage() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-100 p-6 shadow-[var(--cx-card-shadow)]">
           <div className="space-y-6">
-            <section>
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-cx-text">Auth</h2>
-                <span className="text-[11px] text-cx-neutral">
-                  API key is read from <span className="font-mono">localStorage</span>
-                </span>
-              </div>
-              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-semibold text-cx-neutral uppercase tracking-wider mb-2">API Key</label>
-                  <input
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="(from tenant registration)"
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg text-cx-text placeholder-gray-400 focus:ring-1 focus:ring-cx-purple-500 focus:border-cx-purple-500 outline-none"
-                  />
-                  <p className="mt-2 text-[11px] text-cx-neutral">
-                    Stored as <span className="font-mono">cx_api_key</span>. Keep this secret.
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold text-cx-neutral uppercase tracking-wider mb-2">
-                    X-Idempotency-Key <span className="text-red-600">*</span>
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      value={idempotencyKey}
-                      onChange={(e) => setIdempotencyKey(e.target.value)}
-                      className="flex-1 px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg text-cx-text placeholder-gray-400 focus:ring-1 focus:ring-cx-purple-500 focus:border-cx-purple-500 outline-none font-mono"
-                    />
-                    <button
-                      onClick={() => setIdempotencyKey(genIdempotencyKey())}
-                      className="px-3 py-2 text-xs font-semibold bg-white text-cx-text border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                      title="Generate a new unique key"
-                    >
-                      Generate
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <div className="h-px bg-gray-100" />
+            {/* Customer input starts here: keep minimal and system fills the rest. */}
 
             <section>
               <h2 className="text-sm font-semibold text-cx-text">Account Info</h2>
@@ -386,35 +340,19 @@ export default function CustomerCreateIntentPage() {
 
             <section>
               <h2 className="text-sm font-semibold text-cx-text">Meta</h2>
-              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-semibold text-cx-neutral uppercase tracking-wider mb-2">
-                    Purpose Code <span className="text-red-600">*</span>
-                  </label>
-                  <select
-                    value={purposeCode}
-                    onChange={(e) => setPurposeCode(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg text-cx-text focus:ring-1 focus:ring-cx-purple-500 focus:border-cx-purple-500 outline-none"
-                  >
-                    {['TREASURY', 'SALARY', 'VENDOR', 'REFUND'].map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold text-cx-neutral uppercase tracking-wider mb-2">
-                    Intent Type <span className="text-red-600">*</span>
-                  </label>
-                  <select
-                    value={intentType}
-                    onChange={(e) => setIntentType(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg text-cx-text focus:ring-1 focus:ring-cx-purple-500 focus:border-cx-purple-500 outline-none"
-                  >
-                    {['FX', 'PAYOUT'].map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="mt-3">
+                <label className="block text-[10px] font-semibold text-cx-neutral uppercase tracking-wider mb-2">
+                  Purpose Code <span className="text-red-600">*</span>
+                </label>
+                <select
+                  value={purposeCode}
+                  onChange={(e) => setPurposeCode(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg text-cx-text focus:ring-1 focus:ring-cx-purple-500 focus:border-cx-purple-500 outline-none"
+                >
+                  {['TREASURY', 'SALARY', 'VENDOR', 'REFUND'].map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -537,6 +475,25 @@ export default function CustomerCreateIntentPage() {
             </div>
           </div>
 
+          <div className="mt-3 rounded-xl border border-gray-100 bg-white px-3 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-cx-neutral">System</span>
+              <span className="text-[10px] text-cx-neutral">
+                Headers: <span className="font-mono">Authorization</span>, <span className="font-mono">X-Idempotency-Key</span>
+              </span>
+            </div>
+            <div className="mt-1 text-[11px] text-cx-neutral">
+              {lastIdempotencyKey ? (
+                <>
+                  Last Idempotency Key:{' '}
+                  <span className="font-mono text-cx-text">{lastIdempotencyKey}</span>
+                </>
+              ) : (
+                <>Idempotency Key is generated automatically on Submit.</>
+              )}
+            </div>
+          </div>
+
           <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50/60 overflow-hidden">
             <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-cx-neutral">JSON</span>
@@ -562,4 +519,3 @@ export default function CustomerCreateIntentPage() {
     </div>
   )
 }
-
