@@ -1,0 +1,103 @@
+pipeline {
+  agent any
+
+  options {
+    disableConcurrentBuilds()
+    timestamps()
+    ansiColor('xterm')
+  }
+
+  parameters {
+    string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Git branch to deploy')
+  }
+
+  environment {
+    COMPOSE_FILE = 'docker-compose.ec2.yml'
+    APP_ENV_FILE = 'backend/zord-intent-engine/.env'
+    AWS_REGION = 'ap-south-1'
+    CANONICAL_REGION = 'ap-southeast-2'
+    EDGE_BUCKET = 'arealis-zord-vault'
+    INTENT_BUCKET = 'canonical-worm-storage'
+    AWS_EC2_METADATA_DISABLED = 'true'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+        sh '''
+          git fetch --all --prune
+          git checkout "${BRANCH_NAME}"
+          git pull --ff-only origin "${BRANCH_NAME}"
+        '''
+      }
+    }
+
+    stage('Preflight') {
+      steps {
+        sh '''
+          set -eux
+          test -f "${COMPOSE_FILE}"
+          docker --version
+          docker compose version
+        '''
+      }
+    }
+
+    stage('Prepare Runtime Secrets') {
+      steps {
+        withCredentials([
+          string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+          string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+        ]) {
+          sh '''
+            set -eu
+            cat > "${APP_ENV_FILE}" <<EOF
+AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+AWS_REGION=${AWS_REGION}
+S3_BUCKET=${EDGE_BUCKET}
+CANONICAL_AWS_REGION=${CANONICAL_REGION}
+CANONICAL_S3_BUCKET=${INTENT_BUCKET}
+AWS_EC2_METADATA_DISABLED=${AWS_EC2_METADATA_DISABLED}
+EOF
+          '''
+        }
+      }
+    }
+
+    stage('Deploy') {
+      steps {
+        sh '''
+          set -eux
+          docker compose -f "${COMPOSE_FILE}" down --remove-orphans || true
+          docker compose -f "${COMPOSE_FILE}" up -d --build
+        '''
+      }
+    }
+
+    stage('Post Deploy Check') {
+      steps {
+        sh '''
+          set -eux
+          docker compose -f "${COMPOSE_FILE}" ps
+          curl -fsS http://127.0.0.1/api/health
+        '''
+      }
+    }
+  }
+
+  post {
+    always {
+      sh '''
+        docker compose -f "${COMPOSE_FILE}" ps || true
+      '''
+    }
+    success {
+      echo 'Deployment succeeded'
+    }
+    failure {
+      echo 'Deployment failed'
+    }
+  }
+}
