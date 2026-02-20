@@ -11,8 +11,13 @@ export async function GET(
 
   try {
     // Preferred: direct GET by id (if backend supports it)
-    const direct = await fetchPayoutContractById(contract_id)
-    if (direct) return NextResponse.json(direct)
+    // If direct lookup fails (network / unsupported endpoint), continue with list fallback.
+    try {
+      const direct = await fetchPayoutContractById(contract_id)
+      if (direct) return NextResponse.json(direct)
+    } catch {
+      // Continue to list fallback below.
+    }
 
     // Fallback: list + filter (works even if backend only exposes /v1/contracts)
     const list = await fetchPayoutContracts()
@@ -28,4 +33,3 @@ export async function GET(
     )
   }
 }
-

@@ -1,132 +1,87 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { isAuthenticated, getCurrentUser } from '@/services/auth'
-import { getAllReceipts } from '@/services/api'
-import { Receipt } from '@/types/receipt'
-import { StatusBadge } from '@/components/ingestion'
-import { format } from 'date-fns'
-import { Layout, PageHeader, DataTable, type Column } from '@/components/aws'
-import { canViewEvidence } from '@/utils/permissions'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { format } from 'date-fns'
+import { Layout, PageHeader } from '@/components/aws'
+import { getCurrentUser, isAuthenticated } from '@/services/auth'
 
-export default function EvidenceExplorerPage() {
+type ContractRow = {
+  contract_id: string
+  intent_id: string
+  envelope_id: string
+  status: string
+  contract_hash?: string
+  created_at: string
+}
+
+type EnvelopeRow = {
+  envelope_id: string
+  parse_status?: string
+}
+
+export default function EvidencePage() {
   const router = useRouter()
-  const [receipts, setReceipts] = useState<Receipt[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [contracts, setContracts] = useState<ContractRow[]>([])
+  const [envelopeIndex, setEnvelopeIndex] = useState<Record<string, EnvelopeRow>>({})
 
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push('/console/login')
       return
     }
-
-    const user = getCurrentUser()
-    if (user && !canViewEvidence(user.role)) {
-      router.push('/console/ingestion')
-      return
-    }
-
-    loadReceipts()
+    void load()
   }, [router])
 
-  const loadReceipts = async () => {
+  const load = async () => {
+    setLoading(true)
+    setError(null)
     try {
-      const user = getCurrentUser()
-      const allReceipts = await getAllReceipts(user?.tenant)
-      const withEvidence = allReceipts
-        .filter(r => r.evidenceExists)
-        .sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime())
-      setReceipts(withEvidence)
-    } catch (error) {
-      console.error('Failed to load receipts with evidence:', error)
+      const [contractsRes, envelopesRes] = await Promise.all([
+        fetch('/api/prod/payout-contracts', { cache: 'no-store' }),
+        fetch('/api/prod/raw-envelopes?page=1&page_size=200', { cache: 'no-store' }),
+      ])
+
+      if (!contractsRes.ok) {
+        throw new Error(`Contracts API failed: ${contractsRes.status}`)
+      }
+
+      const contractsBody = (await contractsRes.json()) as { items?: ContractRow[] }
+      const envelopesBody = envelopesRes.ok
+        ? ((await envelopesRes.json()) as { items?: EnvelopeRow[] })
+        : { items: [] }
+
+      const c = Array.isArray(contractsBody.items) ? contractsBody.items : []
+      const e = Array.isArray(envelopesBody.items) ? envelopesBody.items : []
+      const idx: Record<string, EnvelopeRow> = {}
+      for (const item of e) idx[item.envelope_id] = item
+
+      setContracts(c)
+      setEnvelopeIndex(idx)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load evidence')
     } finally {
       setLoading(false)
     }
   }
 
-  const columns: Column<Receipt>[] = [
-    {
-      key: 'receiptId',
-      header: 'Receipt ID',
-      sortable: true,
-      render: (receipt) => (
-        <Link
-          href={`/console/ingestion/evidence/${receipt.id}`}
-          className="text-blue-600 hover:text-blue-800"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {receipt.receiptId}
-        </Link>
-      ),
-    },
-    {
-      key: 'source',
-      header: 'Source',
-      sortable: true,
-      filterable: true,
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      sortable: true,
-      filterable: true,
-      render: (receipt) => <StatusBadge status={receipt.status} />,
-    },
-    {
-      key: 'receivedAt',
-      header: 'Received At',
-      sortable: true,
-      render: (receipt) => format(new Date(receipt.receivedAt), 'yyyy-MM-dd HH:mm:ss'),
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      render: (receipt) => (
-        <div className="flex items-center space-x-2">
-          <Link
-            href={`/console/ingestion/evidence/${receipt.id}`}
-            className="text-blue-600 hover:text-blue-800 text-sm"
-            onClick={(e) => e.stopPropagation()}
-            title="View evidence trail"
-          >
-            View Evidence
-          </Link>
-          <span className="text-gray-300">|</span>
-          <Link
-            href={`/console/ingestion/receipt/${receipt.id}`}
-            className="text-blue-600 hover:text-blue-800 text-sm"
-            onClick={(e) => e.stopPropagation()}
-            title="View receipt details"
-          >
-            Receipt
-          </Link>
-        </div>
-      ),
-    },
-  ]
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
-      </div>
-    )
-  }
-
-  const user = getCurrentUser()
+  const rows = useMemo(
+    () =>
+      contracts
+        .filter((c) => !!c.contract_id)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+    [contracts]
+  )
 
   return (
-    <Layout
-      serviceName="Ingestion"
-      breadcrumbs={['Evidence Explorer']}
-      tenant={user?.tenant}
-    >
+    <Layout serviceName="Ingestion" breadcrumbs={['Evidence Explorer']} tenant={getCurrentUser()?.tenant}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <PageHeader
           title="Evidence Explorer"
-          description="Browse audit trails and evidence for ingestion receipts"
+          description="Contract and envelope evidence links"
           breadcrumbs={[
             { label: 'Home', href: '/' },
             { label: 'Ingestion', href: '/console/ingestion' },
@@ -134,16 +89,81 @@ export default function EvidenceExplorerPage() {
           ]}
         />
 
-        <DataTable
-          data={receipts}
-          columns={columns}
-          getRowKey={(receipt) => receipt.id}
-          onRowClick={(receipt) => {
-            router.push(`/console/ingestion/evidence/${receipt.id}`)
-          }}
-          filterPlaceholder="Filter by receipt ID, source, or status..."
-          emptyMessage="No evidence found. Evidence is created when receipts are processed."
-        />
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-sm text-gray-600">{rows.length} linked evidence records</p>
+          <button
+            onClick={() => void load()}
+            className="px-3 py-2 text-sm border border-gray-300 rounded bg-white hover:bg-gray-50"
+          >
+            Refresh
+          </button>
+        </div>
+
+        {error ? (
+          <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {error}
+          </div>
+        ) : null}
+
+        <div className="bg-white border border-gray-200 rounded shadow-sm overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Intent</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Envelope</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parse Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-sm text-gray-500">Loading...</td>
+                </tr>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-sm text-gray-500">No evidence records found.</td>
+                </tr>
+              ) : (
+                rows.map((row) => (
+                  <tr key={row.contract_id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-mono text-xs">{row.contract_id}</td>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/console/ingestion/intents/${encodeURIComponent(row.intent_id)}`}
+                        className="font-mono text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        {row.intent_id}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/console/ingestion/raw-envelopes/${encodeURIComponent(row.envelope_id)}`}
+                        className="font-mono text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        {row.envelope_id}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-xs">{row.status || '-'}</td>
+                    <td className="px-4 py-3 text-xs">{envelopeIndex[row.envelope_id]?.parse_status || '-'}</td>
+                    <td className="px-4 py-3 text-xs">{format(new Date(row.created_at), 'yyyy-MM-dd HH:mm:ss')}</td>
+                    <td className="px-4 py-3 text-xs">
+                      <Link
+                        href={`/console/contracts/${encodeURIComponent(row.contract_id)}`}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        View Contract
+                      </Link>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </Layout>
   )

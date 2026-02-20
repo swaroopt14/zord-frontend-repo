@@ -23,11 +23,13 @@ export async function GET(request: NextRequest) {
     // Transform backend response to match frontend types
     const items = response.items.map((intent) => ({
       intent_id: intent.intent_id,
+      intent_type: intent.intent_type,
       source: intent.intent_type || 'API', // Map intent_type or default
       amount: intent.amount,
       currency: intent.currency,
       instrument: intent.beneficiary_type || 'BANK',
       status: intent.status,
+      confidence_score: intent.confidence_score,
       created_at: intent.created_at,
       envelope_id: intent.envelope_id,
       tenant_id: intent.tenant_id,

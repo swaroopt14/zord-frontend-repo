@@ -23,6 +23,21 @@ export interface PayoutContractListResponse {
   }
 }
 
+async function fetchWithTimeout(url: string): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+
+  try {
+    return await fetch(url, {
+      ...DEFAULT_FETCH_OPTIONS,
+      method: 'GET',
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 function normalizeContractsResponse(data: unknown): PayoutContractListResponse {
   if (Array.isArray(data)) {
     return { items: data as BackendPayoutContract[] }
@@ -47,31 +62,32 @@ function normalizeContractsResponse(data: unknown): PayoutContractListResponse {
  * Endpoint: GET http://localhost:8082/v1/contracts
  */
 export async function fetchPayoutContracts(): Promise<PayoutContractListResponse> {
-  const url = buildUrl('RELAY', BACKEND_SERVICES.RELAY.ENDPOINTS.CONTRACTS)
-
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+  const urls = [
+    buildUrl('RELAY', BACKEND_SERVICES.RELAY.ENDPOINTS.CONTRACTS),
+    buildUrl('CONTRACTS', BACKEND_SERVICES.CONTRACTS.ENDPOINTS.CONTRACTS),
+  ]
 
   try {
-    const response = await fetch(url, {
-      ...DEFAULT_FETCH_OPTIONS,
-      method: 'GET',
-      signal: controller.signal,
-    })
-
-    clearTimeout(timeoutId)
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch payout contracts: ${response.status} ${response.statusText}`)
+    let lastError: Error | null = null
+    for (const url of urls) {
+      try {
+        const response = await fetchWithTimeout(url)
+        if (!response.ok) {
+          lastError = new Error(`Failed to fetch payout contracts: ${response.status} ${response.statusText}`)
+          continue
+        }
+        const data = await response.json()
+        return normalizeContractsResponse(data)
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          lastError = new Error('Request timeout while fetching payout contracts')
+          continue
+        }
+        lastError = error instanceof Error ? error : new Error('Failed to fetch payout contracts')
+      }
     }
-
-    const data = await response.json()
-    return normalizeContractsResponse(data)
+    throw lastError ?? new Error('Failed to fetch payout contracts')
   } catch (error) {
-    clearTimeout(timeoutId)
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Request timeout: relay not responding')
-    }
     throw error
   }
 }
@@ -81,36 +97,36 @@ export async function fetchPayoutContracts(): Promise<PayoutContractListResponse
  * Endpoint: GET http://localhost:8082/v1/contracts/:id
  */
 export async function fetchPayoutContractById(contractId: string): Promise<BackendPayoutContract | null> {
-  const url = buildUrl('RELAY', BACKEND_SERVICES.RELAY.ENDPOINTS.CONTRACT_BY_ID(contractId))
-
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+  const urls = [
+    buildUrl('RELAY', BACKEND_SERVICES.RELAY.ENDPOINTS.CONTRACT_BY_ID(contractId)),
+    buildUrl('CONTRACTS', BACKEND_SERVICES.CONTRACTS.ENDPOINTS.CONTRACT_BY_ID(contractId)),
+  ]
 
   try {
-    const response = await fetch(url, {
-      ...DEFAULT_FETCH_OPTIONS,
-      method: 'GET',
-      signal: controller.signal,
-    })
-
-    clearTimeout(timeoutId)
-
-    if (response.status === 404) return null
-    if (!response.ok) {
-      throw new Error(`Failed to fetch payout contract: ${response.status} ${response.statusText}`)
+    let lastError: Error | null = null
+    for (const url of urls) {
+      try {
+        const response = await fetchWithTimeout(url)
+        if (response.status === 404) continue
+        if (!response.ok) {
+          lastError = new Error(`Failed to fetch payout contract: ${response.status} ${response.statusText}`)
+          continue
+        }
+        const data = await response.json()
+        if (data && typeof data === 'object' && typeof (data as any).contract_id === 'string') {
+          return data as BackendPayoutContract
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          lastError = new Error('Request timeout while fetching payout contract')
+          continue
+        }
+        lastError = error instanceof Error ? error : new Error('Failed to fetch payout contract')
+      }
     }
-
-    const data = await response.json()
-    if (data && typeof data === 'object' && typeof (data as any).contract_id === 'string') {
-      return data as BackendPayoutContract
-    }
+    if (lastError) throw lastError
     return null
   } catch (error) {
-    clearTimeout(timeoutId)
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Request timeout: relay not responding')
-    }
     throw error
   }
 }
-

@@ -286,7 +286,7 @@ export default function RawEnvelopeDetailPage() {
               {error || 'Envelope not found'}
             </h3>
             <p className="text-sm text-gray-600 mb-4">
-              The envelope you're looking for doesn't exist or has been removed.
+              The envelope you&apos;re looking for doesn&apos;t exist or has been removed.
             </p>
             <button
               onClick={() => router.push('/console/ingestion/raw-envelopes')}

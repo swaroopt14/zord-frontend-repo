@@ -405,7 +405,7 @@ export default function IngestionServiceHomePage() {
             </svg>
             <div className="flex-1">
               <p className="text-sm text-blue-900 leading-relaxed">
-                Easily ingest, normalize, and persist financial intents using Zord's unified ingestion platform. Ensure
+                Easily ingest, normalize, and persist financial intents using Zord&apos;s unified ingestion platform. Ensure
                 regulatory compliance with built-in evidence plane and audit trails.{' '}
                 <Link href="/console/ingestion" className="font-semibold underline hover:text-blue-950">
                   Learn more
