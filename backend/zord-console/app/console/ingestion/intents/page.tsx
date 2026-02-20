@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { isAuthenticated, getCurrentUser } from '@/services/auth'
 import { Layout } from '@/components/aws'
 import { format } from 'date-fns'
@@ -416,16 +417,28 @@ export default function IntentLedgerPage() {
                       onClick={() => router.push(`/console/ingestion/intents/${intent.intent_id}`)}
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <button
-                          onClick={e => {
-                            e.stopPropagation()
-                            navigator.clipboard.writeText(intent.intent_id)
-                          }}
-                          className="text-blue-600 hover:text-blue-800 font-mono text-sm underline"
-                          title="Click to copy"
-                        >
-                          {intent.intent_id}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/console/ingestion/intents/${encodeURIComponent(intent.intent_id)}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-blue-600 hover:text-blue-800 font-mono text-sm underline"
+                            title="View intent detail"
+                          >
+                            {intent.intent_id}
+                          </Link>
+                          <button
+                            onClick={e => {
+                              e.stopPropagation()
+                              navigator.clipboard.writeText(intent.intent_id)
+                            }}
+                            className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
+                            title="Copy Intent ID"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          </button>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {intent.source}

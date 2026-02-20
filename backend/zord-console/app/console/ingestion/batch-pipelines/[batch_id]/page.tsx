@@ -354,7 +354,7 @@ export default function BatchDetailPage() {
               {error || 'Batch not found'}
             </h3>
             <p className="text-sm text-gray-600 mb-4">
-              The batch you're looking for doesn't exist or has been removed.
+              The batch you&apos;re looking for doesn&apos;t exist or has been removed.
             </p>
             <button
               onClick={() => router.push('/console/ingestion/batch-pipelines')}

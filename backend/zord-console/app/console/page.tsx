@@ -220,14 +220,7 @@ function SystemHealthCard({ overviewData, loading }: { overviewData: OverviewDat
         minute: '2-digit',
         second: '2-digit',
       })
-    : new Date().toLocaleString('en-GB', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })
+    : '—'
 
   const scoreColor = healthScore >= 90 ? 'text-green-600' : healthScore >= 70 ? 'text-yellow-600' : 'text-orange-600'
 
@@ -391,7 +384,7 @@ function WelcomeCard() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold text-blue-600 group-hover:text-blue-700 group-hover:underline flex items-center space-x-1.5 mb-1">
-                <span>What's new with Zord?</span>
+                <span>What&apos;s new with Zord?</span>
                 <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
                     strokeLinecap="round"
