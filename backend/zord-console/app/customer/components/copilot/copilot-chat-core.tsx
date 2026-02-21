@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { PromptInput } from './prompt-input'
 
 type ChatItem =
   | { id: string; type: 'user'; text: string; created_at: string | null }
@@ -351,13 +350,41 @@ export function CopilotChatCore({
         </div>
       </div>
 
-      <PromptInput
-        value={draft}
-        onChange={setDraft}
-        onSubmit={submit}
-        disabled={!canSend}
-        placeholder="Type a prompt (live query to Prompt Layer)..."
-      />
+      <div className="p-4 border-t" style={{ borderColor: 'var(--glass-border)' }}>
+        <div className="flex items-end gap-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Type a prompt (live query to Prompt Layer)..."
+            className="flex-1 rounded-xl px-3 py-2 text-sm resize-none outline-none"
+            style={{
+              background: 'var(--glass-panel)',
+              border: '1px solid var(--glass-border)',
+              color: 'var(--text)',
+              minHeight: 72,
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                if (canSend) submit()
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!canSend}
+            className="rounded-xl px-4 py-2 text-sm font-semibold"
+            style={{
+              background: canSend ? 'var(--cx-primary, #6d5efc)' : 'var(--glass-item-hover-bg)',
+              color: canSend ? '#fff' : 'var(--glass-item-disabled)',
+              border: '1px solid var(--glass-border)',
+            }}
+          >
+            Send
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
