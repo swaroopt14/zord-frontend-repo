@@ -51,5 +51,6 @@ export default function CustomerCopilotPage({
         <CopilotChatCore intentFromUrl={intentFromUrl} variant="page" />
       </div>
     </div>
-  )`n}`nf89bf04 (fallback api key implementation done)
+  )
 
+}
