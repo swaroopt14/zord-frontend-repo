@@ -16,7 +16,6 @@ type BackendIntentRow = {
   currency?: string
   instrument?: string
   status?: IntentStatus
-  confidence_score?: number
   created_at?: string
 }
 
@@ -154,7 +153,6 @@ export default function CustomerIntentJournalPage() {
               <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Amount</th>
               <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Currency</th>
               <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Status</th>
-              <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Confidence</th>
               <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Created</th>
               <th className="px-5 py-3 text-right text-[10px] font-semibold text-cx-neutral uppercase tracking-wider"></th>
             </tr>
@@ -181,9 +179,6 @@ export default function CustomerIntentJournalPage() {
                       <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-cx-text">
                         {i.status || '-'}
                       </span>
-                    </td>
-                    <td className="px-5 py-3 text-xs font-mono text-cx-neutral tabular-nums">
-                      {typeof i.confidence_score === 'number' ? i.confidence_score.toFixed(2) : '-'}
                     </td>
                     <td className="px-5 py-3 text-xs text-cx-neutral">
                       {created ? format(created, 'yyyy-MM-dd HH:mm:ss') : '-'}

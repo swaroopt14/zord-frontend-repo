@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { MOCK_INTENT_IDS } from '../mock'
 
 type Priority = 'critical' | 'high' | 'medium' | 'low'
 type WorkItemStatus = 'pending' | 'in_progress' | 'resolved'
@@ -19,15 +20,15 @@ interface WorkItem {
 }
 
 const workItems: WorkItem[] = [
-  { id: 'WQ-001', title: 'Webhook endpoint returning 503', description: '/webhooks/payment-status consistently failing', priority: 'critical', status: 'pending', category: 'Webhook', age: '2m', intentId: 'pi_20260210_A1XK' },
+  { id: 'WQ-001', title: 'Webhook endpoint returning 503', description: '/webhooks/payment-status consistently failing', priority: 'critical', status: 'pending', category: 'Webhook', age: '2m', intentId: MOCK_INTENT_IDS[0] },
   { id: 'WQ-002', title: 'SLA breach on P95 ack latency', description: 'P95 ack latency at 480ms, threshold 450ms', priority: 'critical', status: 'in_progress', category: 'SLA', age: '15m', assignee: 'ops@acmepay.com' },
   { id: 'WQ-003', title: 'Schema validation spike', description: '47 intents failed payment_v3 schema in 1h', priority: 'high', status: 'pending', category: 'Validation', age: '45m' },
   { id: 'WQ-004', title: 'Settlement file delayed', description: 'Bank file processing lagging by 15+ min', priority: 'high', status: 'pending', category: 'Settlement', age: '22m' },
-  { id: 'WQ-005', title: 'Stuck intent needs replay', description: 'pi_20260210_C3ZM pending > 35 minutes', priority: 'medium', status: 'pending', category: 'Replay', age: '35m', intentId: 'pi_20260210_C3ZM' },
+  { id: 'WQ-005', title: 'Stuck intent needs replay', description: 'Intent pending_ack > 35 minutes', priority: 'medium', status: 'pending', category: 'Replay', age: '35m', intentId: MOCK_INTENT_IDS[1] },
   { id: 'WQ-006', title: 'Discrepancy detected', description: 'Provider says success, bank file missing for 2 intents', priority: 'high', status: 'pending', category: 'Recon', age: '1h' },
   { id: 'WQ-007', title: 'Evidence pack generation failed', description: 'EP-2850 failed: missing vault hash', priority: 'medium', status: 'pending', category: 'Evidence', age: '52m' },
   { id: 'WQ-008', title: 'API rate limit approaching', description: '85% of rate limit consumed for /v1/intents', priority: 'low', status: 'pending', category: 'API', age: '2h' },
-  { id: 'WQ-009', title: 'Refund intent timeout', description: 'Refund pi_20260210_B2YL provider timeout after 30s', priority: 'medium', status: 'pending', category: 'Timeout', age: '38m', intentId: 'pi_20260210_B2YL' },
+  { id: 'WQ-009', title: 'Refund intent timeout', description: 'Provider timeout after 30s', priority: 'medium', status: 'pending', category: 'Timeout', age: '38m', intentId: MOCK_INTENT_IDS[2] },
   { id: 'WQ-010', title: 'Duplicate intent detected', description: 'Possible duplicate for merchant_ref MR-88921', priority: 'low', status: 'resolved', category: 'Idempotency', age: '3h' },
   { id: 'WQ-011', title: 'Certificate expiry warning', description: 'mTLS cert for adapter_razorpay expires in 7 days', priority: 'low', status: 'pending', category: 'Security', age: '6h' },
   { id: 'WQ-012', title: 'Provider error spike', description: 'HDFC adapter returning 429 (rate limited)', priority: 'high', status: 'in_progress', category: 'Provider', age: '10m', assignee: 'ops@acmepay.com' },
