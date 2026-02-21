@@ -268,7 +268,9 @@ services:
     ports:
       - "8086:8086"
     env_file:
-      - ./backend/zord-prompt-layer/.env
+      # Use committed defaults so `docker compose -f docker-compose.ec2.yml up` works on a fresh clone.
+      # Override by exporting env vars in your shell or by editing `.env.example` locally.
+      - ./backend/zord-prompt-layer/.env.example
     depends_on:
       zord-edge-postgres:
         condition: service_healthy
