@@ -31,6 +31,11 @@ export function clearAuth(): void {
   localStorage.removeItem(ROLE_KEY)
 }
 
+// Convenience alias used by UI components.
+export function logout(): void {
+  clearAuth()
+}
+
 export function getCurrentRole(): UserRole | null {
   if (typeof window === 'undefined') return null
   const role = localStorage.getItem(ROLE_KEY)

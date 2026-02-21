@@ -49,12 +49,62 @@ export default function ContractDetailPage() {
     loadContract()
   }, [router, id])
 
+  const loadContract = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/prod/payout-contracts/${encodeURIComponent(id)}`, { cache: 'no-store' })
+      if (res.status === 404) {
+        setContract(null)
+        setError('Contract not found')
+        return
+      }
+      if (!res.ok) throw new Error(`Failed: ${res.status}`)
+      const data = await res.json()
+      setContract(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load contract')
+      setContract(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-gray-600">Loading...</div>
       </div>
     )
+  }
+
+  if (error && !contract) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <RoleSwitcher />
+        <div className="mb-4">
+          <Link href="/ops/contracts" className="text-sm text-gray-500 hover:text-gray-700">
+            Contracts
+          </Link>
+          <span className="mx-2 text-gray-400">▸</span>
+          <span className="text-sm font-medium text-gray-900">{id}</span>
+        </div>
+        <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
+      </div>
+    )
+  }
+
+  const decoded = contract?.contract_payload ? tryDecodeBase64Payload(contract.contract_payload) : null
+  let prettyPayload = ''
+  if (decoded) {
+    try {
+      const parsed = JSON.parse(decoded)
+      const redacted = redactPII(parsed)
+      prettyPayload = JSON.stringify(redacted, null, 2)
+    } catch {
+      // Non-JSON payload: display decoded but still avoid leaking obvious PII-like strings.
+      prettyPayload = decoded
+    }
   }
 
   return (
@@ -121,7 +171,15 @@ export default function ContractDetailPage() {
 
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-sm font-semibold text-gray-900">Contract Payload</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-900">Contract Payload (redacted)</h2>
+            <button
+              onClick={() => setPayloadExpanded((v) => !v)}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              {payloadExpanded ? 'Collapse' : 'Expand'}
+            </button>
+          </div>
         </div>
         <div className="px-6 py-4">
           {decodedPayload ? (

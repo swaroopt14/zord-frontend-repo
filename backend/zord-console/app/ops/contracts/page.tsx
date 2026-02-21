@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { format } from 'date-fns'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { isAuthenticated, getCurrentUser } from '@/services/auth'
 import { RoleSwitcher } from '@/components/auth'
 import { canAccessDLQ } from '@/utils/permissions'
-import { fetchContracts, ContractsListParams } from '@/services/backend/contracts'
+import { fetchContracts } from '@/services/backend/contracts'
 import { ContractInstance } from '@/types/contract-instance'
 export default function ContractsPage() {
   const router = useRouter()
@@ -28,7 +29,7 @@ export default function ContractsPage() {
     }
   }
 
-    // REPLACE lines 31-37 with:
+    
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push('/ops/login')
@@ -78,6 +79,12 @@ export default function ContractsPage() {
         <select className="px-3 py-2 border border-gray-300 rounded-md text-sm">Time</select>
         <select className="px-3 py-2 border border-gray-300 rounded-md text-sm">Status ▾</select>
         <select className="px-3 py-2 border border-gray-300 rounded-md text-sm">Type ▾</select>
+        <button
+          onClick={loadContracts}
+          className="ml-auto px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50"
+        >
+          Refresh
+        </button>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
@@ -108,15 +115,26 @@ export default function ContractsPage() {
                     {c.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{c.created_at}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {c.created_at ? format(new Date(c.created_at), 'yyyy-MM-dd HH:mm:ss') : '-'}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
                   <Link href={`/ops/contracts/${c.contract_id}`} className="text-blue-600 hover:text-blue-800">View →</Link>
                 </td>
               </tr>
             ))}
+            {contracts.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
+                  No contracts found
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
-        <div className="px-4 py-2 border-t border-gray-200 text-sm text-gray-500">Pagination</div>
+        <div className="px-4 py-2 border-t border-gray-200 text-sm text-gray-500">
+          Showing {contracts.length} contracts
+        </div>
       </div>
     </div>
   )

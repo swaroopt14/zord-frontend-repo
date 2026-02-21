@@ -135,7 +135,7 @@ export default function AdminLoginPage() {
           <>
             <h1 className="text-3xl font-bold text-white mb-2">Sign in to Zord</h1>
             <p className="text-gray-400 mb-8">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <button
                 onClick={handleSignUpClick}
                 className="text-purple-500 hover:text-purple-400 underline"

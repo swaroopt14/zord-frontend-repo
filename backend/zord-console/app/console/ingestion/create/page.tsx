@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { isAuthenticated } from '@/services/auth'
+import { getCurrentUser, isAuthenticated } from '@/services/auth'
 import { createReceipt } from '@/services/api'
 import { TopBar } from '@/components/aws'
 
@@ -13,6 +13,8 @@ export const dynamic = 'force-dynamic'
 export default function CreateIntentPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [user, setUser] = useState<any>(null)
+  const [authorized, setAuthorized] = useState(true)
   const [formData, setFormData] = useState({
     customer_id: '',
     order_id: '',
@@ -20,10 +22,14 @@ export default function CreateIntentPage() {
     description: '',
   })
 
-  if (typeof window !== 'undefined' && !isAuthenticated()) {
-    router.push('/console/login')
-    return null
-  }
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      setAuthorized(false)
+      router.push('/console/login')
+      return
+    }
+    setUser(getCurrentUser())
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,11 +51,7 @@ export default function CreateIntentPage() {
     }
   }
 
-  const [user, setUser] = useState(null)
-
-  useEffect(() => {
-    setUser(getCurrentUser())
-  }, [])
+  if (!authorized) return null
 
   return (
     <div className="min-h-screen bg-gray-50">

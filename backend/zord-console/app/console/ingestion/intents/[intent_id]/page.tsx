@@ -250,7 +250,9 @@ export default function IntentDetailAdminPage() {
   }
 
   const user = getCurrentUser()
-  const createdTime = intentDetail.lifecycle[0]?.time || new Date().toISOString()
+  // Avoid non-deterministic SSR values (e.g. `new Date()` fallback) which cause hydration mismatches.
+  // If backend doesn't provide a lifecycle time, show an explicit placeholder.
+  const createdTime: string | null = intentDetail.lifecycle[0]?.time ?? null
   const isFailed = intentDetail.status === 'REJECTED_PREACC'
   const displayStatus = intentDetail.status === 'RECEIVED' ? 'CANONICALIZED' : intentDetail.status
 
@@ -307,12 +309,19 @@ export default function IntentDetailAdminPage() {
                   <div>
                     <span className="text-gray-500">Created:</span>{' '}
                     <span className="font-mono text-gray-900">
-                      {format(new Date(createdTime), 'yyyy-MM-dd HH:mm:ss')} UTC
+                      {createdTime ? `${format(new Date(createdTime), 'yyyy-MM-dd HH:mm:ss')} UTC` : '—'}
                     </span>
                   </div>
                 </div>
               </div>
               <div className="flex items-center space-x-2 ml-4">
+                <Link
+                  href={`/console/intents/${encodeURIComponent(intentDetail.intent_id)}/contract`}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded text-gray-700 bg-white hover:bg-gray-50"
+                  title="View contract(s) derived from this intent"
+                >
+                  View Contract
+                </Link>
                 <button
                   onClick={() => copyToClipboard(intentDetail.intent_id, 'intent-id')}
                   className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
@@ -597,7 +606,7 @@ export default function IntentDetailAdminPage() {
                     <p className="text-sm text-blue-800">
                       <strong>What Zord understood:</strong> This is the normalized, PII-safe
                       canonical JSON representation after processing the raw envelope. This data is
-                      immutable and represents the system's interpretation of the intent.
+                      immutable and represents the system&apos;s interpretation of the intent.
                     </p>
                   </div>
                   <div className="flex items-center justify-between mb-4">

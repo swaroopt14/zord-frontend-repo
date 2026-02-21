@@ -1,7 +1,8 @@
-﻿'use client'
+'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+
 
 type ChatItem =
   | { id: string; type: 'user'; text: string; created_at: string | null }

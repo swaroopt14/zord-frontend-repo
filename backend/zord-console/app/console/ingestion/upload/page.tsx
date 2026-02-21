@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { isAuthenticated } from '@/services/auth'
+import { getCurrentUser, isAuthenticated } from '@/services/auth'
 import { createReceipt } from '@/services/api'
 import { TopBar } from '@/components/aws'
 
@@ -14,11 +14,17 @@ export default function UploadPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [file, setFile] = useState<File | null>(null)
+  const [user, setUser] = useState<any>(null)
+  const [authorized, setAuthorized] = useState(true)
 
-  if (typeof window !== 'undefined' && !isAuthenticated()) {
-    router.push('/console/login')
-    return null
-  }
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      setAuthorized(false)
+      router.push('/console/login')
+      return
+    }
+    setUser(getCurrentUser())
+  }, [router])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -62,11 +68,7 @@ export default function UploadPage() {
     }
   }
 
-  const [user, setUser] = useState(null)
-
-  useEffect(() => {
-    setUser(getCurrentUser())
-  }, [])
+  if (!authorized) return null
 
   return (
     <div className="min-h-screen bg-gray-50">

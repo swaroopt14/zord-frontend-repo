@@ -1,0 +1,109 @@
+pipeline {
+  agent any
+
+  options {
+    disableConcurrentBuilds()
+    timestamps()
+  }
+
+  parameters {
+    string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Git branch to deploy')
+    string(name: 'GIT_CREDENTIALS_ID', defaultValue: 'github-pat', description: 'Jenkins credential ID for cloning the private GitHub repo over HTTPS')
+  }
+
+  environment {
+    GIT_URL = 'https://github.com/Arealis-network/Arealis-Zord.git'
+    COMPOSE_FILE = 'docker-compose.ec2.yml'
+    APP_ENV_FILE = 'backend/zord-intent-engine/.env'
+    AWS_REGION = 'ap-south-1'
+    CANONICAL_REGION = 'ap-southeast-2'
+    EDGE_BUCKET = 'arealis-zord-vault'
+    INTENT_BUCKET = 'canonical-worm-storage'
+    AWS_EC2_METADATA_DISABLED = 'true'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        // Don't run raw `git` in a shell for private repos; it will prompt for creds and fail.
+        // Use Jenkins-managed credentials for a non-interactive checkout of the requested branch.
+        checkout([
+          $class: 'GitSCM',
+          branches: [[name: "*/${params.BRANCH_NAME}"]],
+          userRemoteConfigs: [[url: env.GIT_URL, credentialsId: params.GIT_CREDENTIALS_ID]],
+          extensions: [
+            [$class: 'PruneStaleBranch'],
+            [$class: 'CleanBeforeCheckout']
+          ]
+        ])
+      }
+    }
+
+    stage('Preflight') {
+      steps {
+        sh '''
+          set -eux
+          test -f "${COMPOSE_FILE}"
+          docker --version
+          docker compose version
+        '''
+      }
+    }
+
+    stage('Prepare Runtime Secrets') {
+      steps {
+        withCredentials([
+          string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+          string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+        ]) {
+          sh '''
+            set -eu
+            cat > "${APP_ENV_FILE}" <<EOF
+AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+AWS_REGION=${AWS_REGION}
+S3_BUCKET=${EDGE_BUCKET}
+CANONICAL_AWS_REGION=${CANONICAL_REGION}
+CANONICAL_S3_BUCKET=${INTENT_BUCKET}
+AWS_EC2_METADATA_DISABLED=${AWS_EC2_METADATA_DISABLED}
+EOF
+          '''
+        }
+      }
+    }
+
+    stage('Deploy') {
+      steps {
+        sh '''
+          set -eux
+          docker compose -f "${COMPOSE_FILE}" down --remove-orphans || true
+          docker compose -f "${COMPOSE_FILE}" up -d --build
+        '''
+      }
+    }
+
+    stage('Post Deploy Check') {
+      steps {
+        sh '''
+          set -eux
+          docker compose -f "${COMPOSE_FILE}" ps
+          curl -fsS http://127.0.0.1/api/health
+        '''
+      }
+    }
+  }
+
+  post {
+    always {
+      sh '''
+        docker compose -f "${COMPOSE_FILE}" ps || true
+      '''
+    }
+    success {
+      echo 'Deployment succeeded'
+    }
+    failure {
+      echo 'Deployment failed'
+    }
+  }
+}

@@ -12,8 +12,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    // Some browser extensions inject attributes into <html>/<body> which causes
+    // React hydration warnings in dev (e.g. data-liner-extension-version).
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   )
 }
