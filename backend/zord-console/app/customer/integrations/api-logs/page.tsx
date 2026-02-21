@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { MOCK_INTENT_IDS } from '../../mock'
 
 interface ApiLog {
   id: string
@@ -17,7 +18,7 @@ interface ApiLog {
 const logs: ApiLog[] = [
   { id: 'log_001', method: 'POST', path: '/v1/ingest', statusCode: 200, latency: '45ms', timestamp: '14:23:45.123', source: 'merchant-sdk', requestSize: '1.2 KB', responseSize: '0.3 KB' },
   { id: 'log_002', method: 'POST', path: '/v1/ingest', statusCode: 200, latency: '52ms', timestamp: '14:23:44.891', source: 'merchant-sdk', requestSize: '1.4 KB', responseSize: '0.3 KB' },
-  { id: 'log_003', method: 'GET', path: '/v1/intents/pi_20260210_82WJ', statusCode: 200, latency: '12ms', timestamp: '14:23:44.500', source: 'merchant-dashboard', requestSize: '0.1 KB', responseSize: '2.1 KB' },
+  { id: 'log_003', method: 'GET', path: `/v1/intents/${MOCK_INTENT_IDS[0]}`, statusCode: 200, latency: '12ms', timestamp: '14:23:44.500', source: 'merchant-dashboard', requestSize: '0.1 KB', responseSize: '2.1 KB' },
   { id: 'log_004', method: 'POST', path: '/v1/ingest', statusCode: 422, latency: '8ms', timestamp: '14:23:43.200', source: 'merchant-sdk', requestSize: '0.9 KB', responseSize: '0.4 KB' },
   { id: 'log_005', method: 'GET', path: '/v1/intents', statusCode: 200, latency: '78ms', timestamp: '14:23:42.100', source: 'merchant-dashboard', requestSize: '0.2 KB', responseSize: '12.4 KB' },
   { id: 'log_006', method: 'POST', path: '/v1/ingest', statusCode: 200, latency: '38ms', timestamp: '14:23:41.800', source: 'api-batch', requestSize: '8.2 KB', responseSize: '0.5 KB' },
@@ -34,14 +35,21 @@ const methodColors: Record<string, string> = {
 
 export default function ApiLogsPage() {
   const [methodFilter, setMethodFilter] = useState<string>('all')
+  const [query, setQuery] = useState<string>('')
+  const [selected, setSelected] = useState<ApiLog | null>(null)
 
-  const filtered = methodFilter === 'all' ? logs : logs.filter(l => l.method === methodFilter)
+  const filtered = useMemo(() => {
+    const base = methodFilter === 'all' ? logs : logs.filter(l => l.method === methodFilter)
+    const q = query.trim().toLowerCase()
+    if (!q) return base
+    return base.filter((l) => `${l.path} ${l.source} ${l.method} ${l.statusCode}`.toLowerCase().includes(q))
+  }, [methodFilter, query])
 
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-xl font-bold text-cx-text">API Logs</h1>
-        <p className="text-sm text-cx-neutral mt-0.5">Tenant-visible API request/response logs</p>
+        <p className="text-sm text-cx-neutral mt-0.5">Tenant-visible API request/response logs (simulated)</p>
       </div>
 
       {/* Stats */}
@@ -80,14 +88,18 @@ export default function ApiLogsPage() {
           </svg>
           <input
             type="text"
-            placeholder="Filter by path or source..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter by path, status, or source..."
             className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-gray-200 rounded-lg text-cx-text placeholder-gray-400 focus:ring-1 focus:ring-cx-purple-500 focus:border-cx-purple-500 outline-none"
           />
         </div>
+        <span className="text-xs text-cx-neutral ml-auto">{filtered.length} rows</span>
       </div>
 
       {/* Logs Table */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-4">
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="bg-gray-50/50">
@@ -102,7 +114,12 @@ export default function ApiLogsPage() {
           </thead>
           <tbody className="divide-y divide-gray-50">
             {filtered.map((log) => (
-              <tr key={log.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer">
+              <tr
+                key={log.id}
+                className="hover:bg-gray-50/50 transition-colors cursor-pointer"
+                onClick={() => setSelected(log)}
+                title="View details"
+              >
                 <td className="px-5 py-3 text-xs font-mono text-cx-neutral">{log.timestamp}</td>
                 <td className="px-5 py-3">
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${methodColors[log.method] || 'bg-gray-100 text-gray-600'}`}>
@@ -126,6 +143,111 @@ export default function ApiLogsPage() {
             ))}
           </tbody>
         </table>
+        </div>
+
+        <aside className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-cx-text">Request Detail</h3>
+              <p className="text-xs text-cx-neutral mt-0.5">Click a row to inspect</p>
+            </div>
+            {selected ? (
+              <button
+                onClick={() => setSelected(null)}
+                className="text-xs font-semibold text-cx-purple-600 hover:text-cx-purple-700"
+              >
+                Clear
+              </button>
+            ) : null}
+          </div>
+          <div className="p-5">
+            {!selected ? (
+              <div className="text-sm text-cx-neutral">
+                No request selected.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${methodColors[selected.method] || 'bg-gray-100 text-gray-600'}`}>
+                    {selected.method}
+                  </span>
+                  <span className="text-xs font-mono text-cx-text break-all">{selected.path}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <div className="text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Status</div>
+                    <div className="mt-1 font-mono font-bold text-cx-text tabular-nums">{selected.statusCode}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <div className="text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Latency</div>
+                    <div className="mt-1 font-mono font-bold text-cx-text tabular-nums">{selected.latency}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <div className="text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Source</div>
+                    <div className="mt-1 text-cx-text">{selected.source}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <div className="text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Size</div>
+                    <div className="mt-1 font-mono text-cx-text tabular-nums">{selected.requestSize} / {selected.responseSize}</div>
+                  </div>
+                </div>
+
+                <details className="rounded-xl border border-gray-100 overflow-hidden" open>
+                  <summary className="px-4 py-3 text-sm font-semibold text-cx-text cursor-pointer bg-white hover:bg-gray-50 transition-colors">
+                    Request / Response
+                  </summary>
+                  <div className="px-4 py-3 border-t border-gray-100">
+                    <div className="space-y-3">
+                      <div className="rounded-lg border border-gray-100 overflow-hidden">
+                        <div className="px-3 py-2 flex items-center justify-between bg-gray-50/60">
+                          <div className="text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Request</div>
+                          <span className="text-[10px] font-mono text-cx-neutral">
+                            {selected.method} {selected.path}
+                          </span>
+                        </div>
+                        <pre className="text-[11px] font-mono text-cx-neutral bg-white p-3 overflow-x-auto">
+{JSON.stringify(
+  {
+    method: selected.method,
+    path: selected.path,
+    headers: {
+      authorization: 'Bearer ***',
+      'x-idempotency-key': 'idem_***',
+      'content-type': 'application/json',
+    },
+    body:
+      selected.method === 'POST'
+        ? { schema_version: 'intent.request.v1', intent_type: 'FX', amount: { value: '1555.009', currency: 'INR' } }
+        : null,
+  },
+  null,
+  2
+)}
+                        </pre>
+                      </div>
+
+                      <div className="rounded-lg border border-gray-100 overflow-hidden">
+                        <div className="px-3 py-2 flex items-center justify-between bg-gray-50/60">
+                          <div className="text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Response</div>
+                          <span className="text-[10px] font-mono text-cx-neutral">HTTP {selected.statusCode}</span>
+                        </div>
+                        <pre className="text-[11px] font-mono text-cx-neutral bg-white p-3 overflow-x-auto">
+{JSON.stringify(
+  selected.statusCode < 300
+    ? { success: true }
+    : { success: false, error: { code: selected.statusCode === 401 ? 'UNAUTHORIZED' : 'VALIDATION_FAILED', message: 'Request rejected' } },
+  null,
+  2
+)}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            )}
+          </div>
+        </aside>
       </div>
     </div>
   )
