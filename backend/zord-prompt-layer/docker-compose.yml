@@ -1,0 +1,24 @@
+services:
+  zord-prompt-layer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zord-prompt-layer
+    ports:
+      - "8086:8086"
+    env_file:
+      - .env
+    environment:
+      - ONNXRUNTIME_SHARED_LIBRARY_PATH=/opt/onnxruntime/lib/libonnxruntime.so
+      - LD_LIBRARY_PATH=/opt/onnxruntime/lib
+      - CHROMA_URL=http://chroma:8000
+    depends_on:
+      - chroma
+    restart: unless-stopped
+
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
