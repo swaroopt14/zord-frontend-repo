@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 type AppConfig struct {
@@ -32,6 +33,19 @@ type AppConfig struct {
 
 	ChromaTenant   string
 	ChromaDatabase string
+	GeminiAPIKeys  []string
+}
+
+func parseCSVKeys(v string) []string {
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		k := strings.TrimSpace(p)
+		if k != "" {
+			out = append(out, k)
+		}
+	}
+	return out
 }
 
 func Load() AppConfig {
@@ -55,6 +69,7 @@ func Load() AppConfig {
 		HTTPPort:    get("HTTP_PORT", "8086"),
 
 		GeminiAPIKey:  os.Getenv("GEMINI_API_KEY"),
+		GeminiAPIKeys: parseCSVKeys(os.Getenv("GEMINI_API_KEYS")),
 		GeminiModel:   get("GEMINI_MODEL", "gemini-2.5-flash"),
 		GeminiBaseURL: get("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta"),
 		EdgeReadDSN:   os.Getenv("EDGE_READ_DSN"),

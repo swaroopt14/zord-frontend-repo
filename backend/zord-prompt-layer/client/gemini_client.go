@@ -10,15 +10,15 @@ import (
 )
 
 type GeminiClient struct {
-	APIKey  string
+	APIKeys []string
 	Model   string
 	BaseURL string
 	HTTP    *http.Client
 }
 
-func NewGeminiClient(apiKey, model, baseURL string) *GeminiClient {
+func NewGeminiClient(apiKeys []string, model, baseURL string) *GeminiClient {
 	return &GeminiClient{
-		APIKey:  apiKey,
+		APIKeys: apiKeys,
 		Model:   model,
 		BaseURL: baseURL,
 		HTTP:    &http.Client{Timeout: 30 * time.Second},
@@ -44,8 +44,8 @@ type generateResponse struct {
 }
 
 func (c *GeminiClient) Generate(prompt string) (string, error) {
-	if c.APIKey == "" {
-		return "", fmt.Errorf("missing GEMINI_API_KEY")
+	if len(c.APIKeys) == 0 {
+		return "", fmt.Errorf("missing GEMINI_API_KEY/GEMINI_API_KEYS")
 	}
 
 	reqBody := generateRequest{
@@ -69,31 +69,50 @@ func (c *GeminiClient) Generate(prompt string) (string, error) {
 		return "", err
 	}
 
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", c.BaseURL, c.Model, c.APIKey)
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(bodyBytes))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json")
+	var lastErr error
 
-	resp, err := c.HTTP.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
+	for _, key := range c.APIKeys {
+		url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", c.BaseURL, c.Model, key)
+		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(bodyBytes))
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
 
-	raw, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode >= 300 {
-		return "", fmt.Errorf("gemini error: status=%d body=%s", resp.StatusCode, string(raw))
+		resp, err := c.HTTP.Do(req)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		raw, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode >= 300 {
+			// fallback to next key for quota/rate/server issues
+			if resp.StatusCode == 429 || resp.StatusCode >= 500 || resp.StatusCode == 403 {
+				lastErr = fmt.Errorf("gemini error: status=%d body=%s", resp.StatusCode, string(raw))
+				continue
+			}
+			return "", fmt.Errorf("gemini error: status=%d body=%s", resp.StatusCode, string(raw))
+		}
+
+		var out generateResponse
+		if err := json.Unmarshal(raw, &out); err != nil {
+			lastErr = err
+			continue
+		}
+		if len(out.Candidates) == 0 || len(out.Candidates[0].Content.Parts) == 0 {
+			lastErr = fmt.Errorf("empty response from gemini")
+			continue
+		}
+
+		return out.Candidates[0].Content.Parts[0].Text, nil
 	}
 
-	var out generateResponse
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return "", err
+	if lastErr != nil {
+		return "", lastErr
 	}
-	if len(out.Candidates) == 0 || len(out.Candidates[0].Content.Parts) == 0 {
-		return "", fmt.Errorf("empty response from gemini")
-	}
-
-	return out.Candidates[0].Content.Parts[0].Text, nil
+	return "", fmt.Errorf("all gemini api keys failed")
 }

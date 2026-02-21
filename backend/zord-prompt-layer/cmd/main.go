@@ -22,7 +22,11 @@ func main() {
 	_ = godotenv.Load(".env", "../.env")
 
 	cfg := config.Load()
-	log.Printf("model=%s base_url=%s api_key_present=%t", cfg.GeminiModel, cfg.GeminiBaseURL, cfg.GeminiAPIKey != "")
+	keys := cfg.GeminiAPIKeys
+	if len(keys) == 0 && strings.TrimSpace(cfg.GeminiAPIKey) != "" {
+		keys = []string{cfg.GeminiAPIKey}
+	}
+	log.Printf("model=%s base_url=%s gemini_keys=%d", cfg.GeminiModel, cfg.GeminiBaseURL, len(keys))
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -31,7 +35,8 @@ func main() {
 
 	healthHandler := handler.NewHealthHandler(cfg.ServiceName)
 
-	geminiClient := client.NewGeminiClient(cfg.GeminiAPIKey, cfg.GeminiModel, cfg.GeminiBaseURL)
+	geminiClient := client.NewGeminiClient(keys, cfg.GeminiModel, cfg.GeminiBaseURL)
+
 	llmService := services.NewLLMService(geminiClient)
 
 	edgeDB := mustOpenReadOnlyDB("edge", cfg.EdgeReadDSN)
