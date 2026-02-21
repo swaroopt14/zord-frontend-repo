@@ -2,11 +2,29 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { PromptInput } from './prompt-input'
+
 
 type ChatItem =
   | { id: string; type: 'user'; text: string; created_at: string | null }
   | { id: string; type: 'system'; text: string; created_at: string | null }
+type CopilotCitation = {
+  source_type: string
+  record_id: string
+  chunk_id: string
+  snippet: string
+  score: number
+}
+
+type CopilotResponse = {
+  answer: string
+  confidence: string
+  entities_found?: {
+    intent_id?: string
+    trace_id?: string
+  }
+  citations?: CopilotCitation[]
+  next_actions?: string[]
+}
 
 function nowIso() {
   return new Date().toISOString()
@@ -24,6 +42,8 @@ export function CopilotChatCore({
   onRequestClose?: () => void
 }) {
   const [mounted, setMounted] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+
   const [draft, setDraft] = useState('')
   const [items, setItems] = useState<ChatItem[]>(() => {
     // Important: keep the initial render deterministic between server and client to avoid hydration mismatches.
@@ -32,7 +52,8 @@ export function CopilotChatCore({
         id: 'sys_0',
         type: 'system',
         created_at: null,
-        text: 'Zord Copilot UI is available in this build, but no backend chat contract is configured. Prompts are not sent anywhere.',
+        text: 'Zord Copilot is connected to Prompt Layer. Ask using tenant, intent, or trace context.',
+
       },
     ]
     if (intentFromUrl) {
@@ -54,25 +75,91 @@ export function CopilotChatCore({
     )
   }, [])
 
-  const canSend = useMemo(() => draft.trim().length > 0, [draft])
+  const canSend = useMemo(() => draft.trim().length > 0 && !isSending, [draft, isSending])
   const hasUserMessages = useMemo(() => items.some((it) => it.type === 'user'), [items])
   const densityPad = compact ? 'px-4 py-3' : 'px-5 py-4'
+  const formatResponseText = useCallback((resp: CopilotResponse) => {
+  const lines: string[] = []
+  lines.push(resp.answer || 'No answer returned.')
+  lines.push('')
+  lines.push(`Confidence: ${resp.confidence || 'unknown'}`)
 
-  const submit = useCallback(() => {
-    const text = draft.trim()
-    if (!text) return
-    setDraft('')
+  if (resp.entities_found?.intent_id || resp.entities_found?.trace_id) {
+    lines.push(
+      `Entities: intent_id=${resp.entities_found?.intent_id || '-'}, trace_id=${resp.entities_found?.trace_id || '-'}`
+    )
+  }
+
+  if (resp.citations?.length) {
+    lines.push('')
+    lines.push('Citations:')
+    resp.citations.forEach((c, i) => {
+      lines.push(`${i + 1}. ${c.source_type} | record=${c.record_id} | score=${Number(c.score || 0).toFixed(2)}`)
+      lines.push(`   ${c.snippet}`)
+    })
+  }
+
+  if (resp.next_actions?.length) {
+    lines.push('')
+    lines.push('Next actions:')
+    resp.next_actions.forEach((n, i) => lines.push(`${i + 1}. ${n}`))
+  }
+
+  return lines.join('\n')
+}, [])
+
+  const submit = useCallback(async () => {
+  const text = draft.trim()
+  if (!text || isSending) return
+
+  setIsSending(true)
+  setDraft('')
+  setItems((prev) => [...prev, { id: `u_${Date.now()}`, type: 'user', created_at: nowIso(), text }])
+
+  try {
+    const tenantMatch = text.match(/tenant(?:\s+id)?\s*(?:is|=|:)?\s*([0-9a-fA-F-]{36})/i)
+    const tenantId = tenantMatch?.[1] ?? null
+
+    const baseUrl = process.env.NEXT_PUBLIC_PROMPT_LAYER_URL || 'http://localhost:8086'
+    const payload: Record<string, unknown> = { query: text }
+    if (tenantId) payload.tenant_id = tenantId
+    if (intentFromUrl) payload.intent_id = intentFromUrl
+
+
+    const res = await fetch(`${baseUrl}/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    const raw = await res.text()
+    let body: any = {}
+    try {
+      body = raw ? JSON.parse(raw) : {}
+    } catch {
+      body = { details: raw }
+    }
+    if (!res.ok) {
+      const details = body?.details ? `\nDetails: ${String(body.details)}` : ''
+      throw new Error(`Prompt query failed.${details}`)
+    }
+
+    const formatted = formatResponseText(body as CopilotResponse)
     setItems((prev) => [
       ...prev,
-      { id: `u_${Date.now()}`, type: 'user', created_at: nowIso(), text },
-      {
-        id: `sys_${Date.now()}_no_backend`,
-        type: 'system',
-        created_at: nowIso(),
-        text: 'No response: backend contract not configured.',
-      },
+      { id: `sys_${Date.now()}_response`, type: 'system', created_at: nowIso(), text: formatted },
     ])
-  }, [draft])
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Unknown error'
+    setItems((prev) => [
+      ...prev,
+      { id: `sys_${Date.now()}_error`, type: 'system', created_at: nowIso(), text: `Query failed.\n${msg}` },
+    ])
+  } finally {
+    setIsSending(false)
+  }
+}, [draft, formatResponseText, intentFromUrl, isSending])
+
 
   const clear = useCallback(() => {
     setDraft('')
@@ -149,9 +236,9 @@ export function CopilotChatCore({
             <div
               className="px-2 py-1 rounded-full text-[10px] font-bold"
               style={{ background: 'var(--glass-badge-bg)', color: 'var(--glass-badge-text)' }}
-              title="No backend chat contract is configured"
+              title="Connected to Prompt Layer"
             >
-              LOCAL ONLY
+              LIVE
             </div>
             {onRequestClose ? (
               <button
@@ -264,13 +351,42 @@ export function CopilotChatCore({
         </div>
       </div>
 
-      <PromptInput
-        value={draft}
-        onChange={setDraft}
-        onSubmit={submit}
-        disabled={!canSend}
-        placeholder="Type a prompt (not sent anywhere in this build)…"
-      />
+      <div className="p-4 border-t" style={{ borderColor: 'var(--glass-border)' }}>
+        <div className="flex items-end gap-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Type a prompt (live query to Prompt Layer)..."
+            className="flex-1 rounded-xl px-3 py-2 text-sm resize-none outline-none"
+            style={{
+              background: 'var(--glass-panel)',
+              border: '1px solid var(--glass-border)',
+              color: 'var(--text)',
+              minHeight: 72,
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                if (canSend) submit()
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!canSend}
+            className="rounded-xl px-4 py-2 text-sm font-semibold"
+            style={{
+              background: canSend ? 'var(--cx-primary, #6d5efc)' : 'var(--glass-item-hover-bg)',
+              color: canSend ? '#fff' : 'var(--glass-item-disabled)',
+              border: '1px solid var(--glass-border)',
+            }}
+          >
+            Send
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
+

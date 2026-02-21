@@ -260,6 +260,26 @@ services:
       - zord-network
     restart: unless-stopped
 
+  zord-prompt-layer:
+    build:
+      context: ./backend/zord-prompt-layer
+      dockerfile: Dockerfile
+    container_name: zord-prompt-layer
+    ports:
+      - "8086:8086"
+    env_file:
+      - ./backend/zord-prompt-layer/.env
+    depends_on:
+      zord-edge-postgres:
+        condition: service_healthy
+      zord-intent-postgres:
+        condition: service_healthy
+      zord-relay-postgres:
+        condition: service_healthy
+    networks:
+      - zord-network
+    restart: unless-stopped
+
   zord-console:
     build:
       context: ./backend/zord-console
@@ -277,9 +297,12 @@ services:
       - ZORD_VAULT_URL=http://zord-edge:8080
       - ZORD_CONTRACTS_URL=http://zord-relay:8082
       - ZORD_PII_ENCLAVE_URL=http://zord-intent-engine:8083
+      - NEXT_PUBLIC_PROMPT_LAYER_URL=http://localhost:8086
+
     depends_on:
       - zord-edge
       - zord-intent-engine
+      - zord-prompt-layer
       - zord-relay
     networks:
       - zord-network

@@ -6,59 +6,17 @@ import Link from 'next/link'
 import { isAuthenticated, getCurrentUser } from '@/services/auth'
 import { RoleSwitcher } from '@/components/auth'
 import { canAccessDLQ } from '@/utils/permissions'
-import { format } from 'date-fns'
-
-type PayoutContract = {
-  contract_id: string
-  tenant_id: string
-  intent_id: string
-  envelope_id: string
-  contract_payload: string
-  contract_hash: string
-  status: string
-  created_at: string
-  trace_id?: string
-}
-
-function maskValue(value: string): string {
-  const v = value.trim()
-  if (v.length <= 6) return '***'
-  return `${v.slice(0, 3)}***${v.slice(-2)}`
-}
-
-function redactPII(input: unknown): unknown {
-  if (Array.isArray(input)) return input.map(redactPII)
-  if (!input || typeof input !== 'object') return input
-
-  const obj: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
-    const key = k.toLowerCase()
-    if (typeof v === 'string' && (key.includes('account') || key.includes('pan') || key.includes('vpa'))) {
-      obj[k] = maskValue(v)
-      continue
-    }
-    obj[k] = redactPII(v)
-  }
-  return obj
-}
-
-function tryDecodeBase64Payload(b64: string): string | null {
-  try {
-    // Browser-safe decoding; if backend sends non-base64, this will throw.
-    return atob(b64)
-  } catch {
-    return null
-  }
-}
+import { fetchContractById, decodeContractPayload } from '@/services/backend/contracts'
+import { ContractInstance, DecodedContractPayload } from '@/types/contract-instance'
 
 export default function ContractDetailPage() {
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
   const [loading, setLoading] = useState(true)
+  const [contract, setContract] = useState<ContractInstance | null>(null)
+  const [decodedPayload, setDecodedPayload] = useState<DecodedContractPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [contract, setContract] = useState<PayoutContract | null>(null)
-  const [payloadExpanded, setPayloadExpanded] = useState(false)
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -70,8 +28,26 @@ export default function ContractDetailPage() {
       router.push('/ops/login')
       return
     }
+
+    const loadContract = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const contractData = await fetchContractById(id)
+        setContract(contractData)
+        
+        // Decode payload
+        const decoded = decodeContractPayload(contractData.contract_payload)
+        setDecodedPayload(decoded)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load contract')
+      } finally {
+        setLoading(false)
+      }
+    }
+
     loadContract()
-  }, [router])
+  }, [router, id])
 
   const loadContract = async () => {
     setLoading(true)
@@ -143,6 +119,18 @@ export default function ContractDetailPage() {
         <h1 className="text-3xl font-bold text-gray-900">Contracts ▸ {id}</h1>
       </div>
 
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+          <p className="text-sm text-red-600">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden mb-6">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-sm font-semibold text-gray-900">Summary</h2>
@@ -150,31 +138,34 @@ export default function ContractDetailPage() {
         <div className="px-6 py-4 space-y-2 text-sm">
           <div className="flex items-center gap-2">
             <span className="text-gray-500">Contract ID:</span>
-            <span className="font-mono">{id}</span>
-            <button className="text-blue-600 hover:text-blue-800 text-xs">[Copy]</button>
+            <span className="font-mono">{contract?.contract_id || id}</span>
+            <button 
+              onClick={() => navigator.clipboard.writeText(contract?.contract_id || id)} 
+              className="text-blue-600 hover:text-blue-800 text-xs"
+            >
+              [Copy]
+            </button>
           </div>
           <div>
             <span className="text-gray-500">Intent ID:</span>{' '}
-            {contract?.intent_id ? (
-              <Link href={`/ops/intents/${contract.intent_id}`} className="text-blue-600 hover:text-blue-800">
-                {contract.intent_id}
-              </Link>
-            ) : (
-              '-'
-            )}
+            <Link href={`/ops/intents/${contract?.intent_id}`} className="text-blue-600 hover:text-blue-800">
+              {contract?.intent_id}
+            </Link>
           </div>
-          <div><span className="text-gray-500">Status:</span> {contract?.status || '-'}</div>
-          <div>
-            <span className="text-gray-500">Created At:</span>{' '}
-            {contract?.created_at ? format(new Date(contract.created_at), 'yyyy-MM-dd HH:mm:ss') : '-'}
-          </div>
+          <div><span className="text-gray-500">Status:</span> {contract?.status}</div>
+          <div><span className="text-gray-500">Created At:</span> {contract?.created_at}</div>
           <div className="flex items-center gap-2">
             <span className="text-gray-500">Contract Hash:</span>
-            <span className="font-mono">{contract?.contract_hash || '-'}</span>
-            <button className="text-blue-600 hover:text-blue-800 text-xs">[Copy]</button>
+            <span className="font-mono">{contract?.contract_hash?.substring(0, 8)}...</span>
+            <button 
+              onClick={() => navigator.clipboard.writeText(contract?.contract_hash || '')} 
+              className="text-blue-600 hover:text-blue-800 text-xs"
+            >
+              [Copy]
+            </button>
           </div>
-          <div><span className="text-gray-500">Tenant ID:</span> <span className="font-mono">{contract?.tenant_id || '-'}</span></div>
-          <div><span className="text-gray-500">Envelope ID:</span> <span className="font-mono">{contract?.envelope_id || '-'}</span></div>
+          <div><span className="text-gray-500">Tenant ID:</span> {contract?.tenant_id}</div>
+          <div><span className="text-gray-500">Envelope ID:</span> {contract?.envelope_id}</div>
         </div>
       </div>
 
@@ -191,14 +182,12 @@ export default function ContractDetailPage() {
           </div>
         </div>
         <div className="px-6 py-4">
-          {decoded ? (
-            <pre className={`text-sm font-mono bg-gray-50 p-4 rounded overflow-x-auto ${payloadExpanded ? '' : 'max-h-80 overflow-y-auto'}`}>
-              {prettyPayload || '(empty)'}
+          {decodedPayload ? (
+            <pre className="text-sm font-mono bg-gray-50 p-4 rounded overflow-x-auto">
+              {JSON.stringify(decodedPayload, null, 2)}
             </pre>
           ) : (
-            <div className="text-sm text-gray-600">
-              Payload not available or not base64-encoded.
-            </div>
+            <div className="text-sm text-gray-500">Failed to decode payload</div>
           )}
         </div>
       </div>
