@@ -4,8 +4,6 @@ pipeline {
   options {
     disableConcurrentBuilds()
     timestamps()
-    // Disable the implicit "Declarative: Checkout SCM" step so we can wipe the workspace first.
-    skipDefaultCheckout(true)
   }
 
   parameters {
@@ -27,9 +25,6 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
-        // Fix for ref conflicts like:
-        // "refs/remotes/origin/swaroop exists; cannot create .../swaroop/ui-backend-integration-main"
-        // by wiping the workspace (including .git) before fetching.
         deleteDir()
 
         // Don't run raw `git` in a shell for private repos; it will prompt for creds and fail.
