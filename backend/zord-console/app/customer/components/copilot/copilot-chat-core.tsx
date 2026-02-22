@@ -218,7 +218,9 @@ export function CopilotChatCore({
     const tenantMatch = text.match(/tenant(?:\s+id)?\s*(?:is|=|:)?\s*([0-9a-fA-F-]{36})/i)
     const tenantId = tenantMatch?.[1] ?? null
 
-    const baseUrl = process.env.NEXT_PUBLIC_PROMPT_LAYER_URL || 'http://localhost:8086'
+    // Default to same-origin proxy so this works on EC2 for all users (no localhost:8086 in the browser).
+    // If needed (local dev), NEXT_PUBLIC_PROMPT_LAYER_URL can override to a full URL.
+    const baseUrl = process.env.NEXT_PUBLIC_PROMPT_LAYER_URL || '/api/prompt-layer'
     const payload: Record<string, unknown> = { query: text }
     if (tenantId) payload.tenant_id = tenantId
     if (intentFromUrl) payload.intent_id = intentFromUrl
