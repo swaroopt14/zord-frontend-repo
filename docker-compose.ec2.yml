@@ -268,7 +268,8 @@ services:
     ports:
       - "8086:8086"
     env_file:
-      - ./backend/zord-prompt-layer/.env
+      # Repo has `.env.example` but not `.env`; using example avoids CI/EC2 failures.
+      - ./backend/zord-prompt-layer/.env.example
     depends_on:
       zord-edge-postgres:
         condition: service_healthy
