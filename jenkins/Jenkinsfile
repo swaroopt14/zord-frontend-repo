@@ -4,6 +4,8 @@ pipeline {
   options {
     disableConcurrentBuilds()
     timestamps()
+    // Disable the implicit "Declarative: Checkout SCM" step so we can wipe the workspace first.
+    skipDefaultCheckout(true)
   }
 
   parameters {
