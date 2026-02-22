@@ -271,6 +271,11 @@ services:
       # Use committed defaults so `docker compose -f docker-compose.ec2.yml up` works on a fresh clone.
       # Override by exporting env vars in your shell or by editing `.env.example` locally.
       - ./backend/zord-prompt-layer/.env.example
+    environment:
+      # Required for `/query`. Set in your shell or in a local (uncommitted) `./.env` file:
+      #   GEMINI_API_KEY=...
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_API_KEYS=${GEMINI_API_KEYS:-}
     depends_on:
       zord-edge-postgres:
         condition: service_healthy
