@@ -4,6 +4,8 @@ pipeline {
   options {
     disableConcurrentBuilds()
     timestamps()
+    // Disable the implicit "Declarative: Checkout SCM" so we can wipe the workspace first.
+    skipDefaultCheckout(true)
   }
 
   parameters {
@@ -15,6 +17,7 @@ pipeline {
     GIT_URL = 'https://github.com/Arealis-network/Arealis-Zord.git'
     COMPOSE_FILE = 'docker-compose.ec2.yml'
     APP_ENV_FILE = 'backend/zord-intent-engine/.env'
+    PROMPT_ENV_FILE = 'backend/zord-prompt-layer/.env'
     AWS_REGION = 'ap-south-1'
     CANONICAL_REGION = 'ap-southeast-2'
     EDGE_BUCKET = 'arealis-zord-vault'
@@ -56,7 +59,9 @@ pipeline {
       steps {
         withCredentials([
           string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
-          string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+          string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
+          // Create this in Jenkins as "Secret text" containing your Gemini API key.
+          string(credentialsId: 'gemini-api-key', variable: 'GEMINI_API_KEY')
         ]) {
           sh '''
             set -eu
@@ -68,6 +73,24 @@ S3_BUCKET=${EDGE_BUCKET}
 CANONICAL_AWS_REGION=${CANONICAL_REGION}
 CANONICAL_S3_BUCKET=${INTENT_BUCKET}
 AWS_EC2_METADATA_DISABLED=${AWS_EC2_METADATA_DISABLED}
+EOF
+
+            # Prompt-layer runtime env (used by docker-compose.ec2.yml env_file)
+            cat > "${PROMPT_ENV_FILE}" <<EOF
+SERVICE_NAME=zord-prompt-layer
+HTTP_PORT=8086
+
+GEMINI_API_KEY=${GEMINI_API_KEY}
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
+
+EDGE_READ_DSN=postgres://zord_user:zord_password@zord-edge-postgres:5432/zord_edge_db?sslmode=disable
+INTENT_READ_DSN=postgres://intent_user:intent_password@zord-intent-postgres:5432/zord_intent_engine_db?sslmode=disable
+RELAY_READ_DSN=postgres://relay_user:relay_password@zord-relay-postgres:5432/zord_relay_db?sslmode=disable
+
+CHROMA_URL=http://chroma:8000
+CHROMA_COLLECTION=zord_prompt_chunks
+DEFAULT_TOP_K=5
 EOF
           '''
         }
