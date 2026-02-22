@@ -267,12 +267,23 @@ services:
     container_name: zord-prompt-layer
     # Keep prompt-layer internal; zord-console proxies via /api/prompt-layer so users don't need a port.
     env_file:
+<<<<<<< swaroop/ui-backend-integration-main
+      # Use committed defaults so `docker compose -f docker-compose.ec2.yml up` works on a fresh clone.
+      # Override by exporting env vars in your shell or by editing `.env.example` locally.
+      - ./backend/zord-prompt-layer/.env.example
+    environment:
+      # Required for `/query`. Set in your shell or in a local (uncommitted) `./.env` file:
+      #   GEMINI_API_KEY=...
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_API_KEYS=${GEMINI_API_KEYS:-}
+=======
       
       - ./backend/zord-prompt-layer/.env
     environment:
       - ONNXRUNTIME_SHARED_LIBRARY_PATH=/opt/onnxruntime/lib/libonnxruntime.so
       - LD_LIBRARY_PATH=/opt/onnxruntime/lib
       - CHROMA_URL=http://chroma:8000
+>>>>>>> main
     depends_on:
       zord-edge-postgres:
         condition: service_healthy

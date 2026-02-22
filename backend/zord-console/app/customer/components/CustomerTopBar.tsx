@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { MOCK_INTENT_IDS } from '../mock'
 
 type Environment = 'sandbox' | 'production'
 
@@ -19,6 +20,7 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [mounted, setMounted] = useState(false)
+  const [toasts, setToasts] = useState<Array<{ id: string; title: string; desc?: string; type?: 'success' | 'warning' | 'error' | 'info' }>>([])
   const notifRef = useRef<HTMLDivElement>(null)
   const userRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
@@ -50,12 +52,79 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  useEffect(() => {
+    const onToast = (e: Event) => {
+      const ce = e as CustomEvent
+      const detail = (ce.detail || {}) as { title?: unknown; desc?: unknown; type?: unknown }
+      const title = typeof detail.title === 'string' ? detail.title : 'Notification'
+      const desc = typeof detail.desc === 'string' ? detail.desc : undefined
+      const type =
+        detail.type === 'success' || detail.type === 'warning' || detail.type === 'error' || detail.type === 'info'
+          ? detail.type
+          : 'info'
+      const id = `${Date.now()}_${Math.random().toString(16).slice(2)}`
+
+      setToasts((prev) => [{ id, title, desc, type }, ...prev].slice(0, 4))
+      window.setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id))
+      }, 2600)
+    }
+    window.addEventListener('cx:toast', onToast as EventListener)
+    return () => window.removeEventListener('cx:toast', onToast as EventListener)
+  }, [])
+
   const handleEnvChange = (env: Environment) => { setCurrentEnv(env); onEnvironmentChange?.(env) }
 
   if (!mounted) return <div className="h-14" style={{ background: 'var(--glass-surface)' }} />
 
   return (
     <>
+      {/* Top Toasts (customer-only UI notifications) */}
+      {toasts.length ? (
+        <div className="fixed right-4 top-4 z-[60] space-y-2">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              className="w-[360px] max-w-[92vw] rounded-[14px] px-3.5 py-3"
+              style={{
+                background: 'var(--glass-panel)',
+                border: '1px solid var(--glass-border)',
+                boxShadow: 'var(--glass-shadow)',
+                backdropFilter: `blur(var(--glass-panel-blur))`,
+                WebkitBackdropFilter: `blur(var(--glass-panel-blur))`,
+              }}
+            >
+              <div className="flex items-start gap-2.5">
+                <div
+                  className="mt-0.5 h-2.5 w-2.5 rounded-full flex-shrink-0"
+                  style={{
+                    background:
+                      t.type === 'success'
+                        ? 'var(--cx-success)'
+                        : t.type === 'warning'
+                          ? 'var(--cx-energy)'
+                          : t.type === 'error'
+                            ? 'var(--cx-danger)'
+                            : 'var(--cx-primary)',
+                    boxShadow: '0 0 0 6px rgba(255,255,255,0.02)',
+                  }}
+                />
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold truncate" style={{ color: 'var(--glass-item-active)' }}>
+                    {t.title}
+                  </div>
+                  {t.desc ? (
+                    <div className="text-xs mt-0.5" style={{ color: 'var(--glass-item-text)' }}>
+                      {t.desc}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <header
         className="h-14 flex items-center justify-between px-0 z-40 relative"
         style={{
@@ -175,7 +244,7 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
                   {[
                     { title: 'SLA Breach Alert', desc: 'P95 latency at 480ms (threshold: 450ms)', time: '2m ago', type: 'warning' },
                     { title: 'Webhook Failures', desc: '12 deliveries failed for endpoint /callback', time: '14m ago', type: 'error' },
-                    { title: 'Evidence Pack Ready', desc: 'Pack #EP-2847 generated for pi_20260210_91XK', time: '32m ago', type: 'success' },
+                    { title: 'Evidence Pack Ready', desc: `Pack #EP-2847 generated for ${MOCK_INTENT_IDS[0]}`, time: '32m ago', type: 'success' },
                   ].map((n, i) => (
                     <div key={i} className="px-4 py-3 cursor-pointer transition-colors duration-[120ms]"
                       style={{ borderBottom: '1px solid var(--glass-divider)' }}
