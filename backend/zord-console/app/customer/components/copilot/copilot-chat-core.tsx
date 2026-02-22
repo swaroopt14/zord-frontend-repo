@@ -30,6 +30,104 @@ function nowIso() {
   return new Date().toISOString()
 }
 
+function hasMissingGeminiKey(details: unknown): boolean {
+  const s = String(details || '')
+  return (
+    s.includes('missing GEMINI_API_KEY/GEMINI_API_KEYS') ||
+    s.includes('GEMINI_API_KEY') ||
+    s.includes('GEMINI_API_KEYS')
+  )
+}
+
+function djb2Hash(input: string): number {
+  let h = 5381
+  for (let i = 0; i < input.length; i++) h = ((h << 5) + h) + input.charCodeAt(i)
+  // Force uint32
+  return h >>> 0
+}
+
+function xorshift32(seed: number): () => number {
+  let x = seed >>> 0
+  return () => {
+    x ^= x << 13
+    x ^= x >>> 17
+    x ^= x << 5
+    return x >>> 0
+  }
+}
+
+function toHex(n: number, width: number): string {
+  return (n >>> 0).toString(16).padStart(width, '0').slice(-width)
+}
+
+function mockUuid(nextU32: () => number): string {
+  // RFC4122-ish formatting; deterministic but not cryptographically random.
+  const a = toHex(nextU32(), 8)
+  const b = toHex(nextU32(), 4)
+  const c = toHex(nextU32(), 4)
+  const d = toHex(nextU32(), 4)
+  const e = toHex(nextU32(), 12)
+  return `${a}-${b}-${c}-${d}-${e}`
+}
+
+function buildDemoMockAnswer(prompt: string): CopilotResponse {
+  const dayUtc = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+  const seed = djb2Hash(`${dayUtc}::${prompt}`)
+  const rnd = xorshift32(seed)
+
+  const intentA = mockUuid(rnd)
+  const intentB = mockUuid(rnd)
+  const intentC = mockUuid(rnd)
+  const traceA = mockUuid(rnd)
+
+  const normalized = prompt.trim().toLowerCase()
+  const isSummary =
+    normalized.includes("summarize") ||
+    normalized.includes("today") ||
+    normalized.includes("intents")
+
+  if (isSummary) {
+    return {
+      answer: [
+        `Demo (mock): Prompt Layer LLM key is not configured, so this is a deterministic fallback response for ${dayUtc} (UTC).`,
+        ``,
+        `Ingestion summary (UTC):`,
+        `- Intents processed: 12`,
+        `- Rejected / DLQ: 2`,
+        `- In-flight: 1`,
+        ``,
+        `Notable intents:`,
+        `- intent_id=${intentA} (status=READY) trace_id=${traceA}`,
+        `- intent_id=${intentB} (status=VALIDATED)`,
+        `- intent_id=${intentC} (status=DLQ: semantic_validation_failed)`,
+        ``,
+        `Next actions:`,
+        `1) Open /console/ingestion/dlq to review the 2 failed intents`,
+        `2) Re-submit with corrected fields (amount > 0, allowed currency, valid IFSC when applicable)`,
+      ].join('\n'),
+      confidence: 'demo',
+      entities_found: { intent_id: intentA, trace_id: traceA },
+      next_actions: [
+        'Review DLQ items in console',
+        'Fix validation errors and resubmit with a new idempotency key',
+      ],
+    }
+  }
+
+  return {
+    answer: [
+      `Demo (mock): Prompt Layer LLM key is not configured, so this is a deterministic fallback response.`,
+      ``,
+      `I can answer ingestion questions using tenant / intent / trace context once GEMINI_API_KEY is set.`,
+      ``,
+      `What I understood: "${prompt.trim()}"`,
+      ``,
+      `Try: "Summarize today's intents" or "Why did my last intent fail? intent=<intent_id>"`,
+    ].join('\n'),
+    confidence: 'demo',
+  }
+}
+
 export function CopilotChatCore({
   intentFromUrl,
   compact,
@@ -140,6 +238,18 @@ export function CopilotChatCore({
       body = { details: raw }
     }
     if (!res.ok) {
+      // Demo fallback: if Prompt Layer is running but missing Gemini keys, return a deterministic mock answer
+      // so product videos/screenshares don't get blocked on external LLM credentials.
+      if (hasMissingGeminiKey(body?.details)) {
+        const demo = buildDemoMockAnswer(text)
+        const formatted = formatResponseText(demo)
+        setItems((prev) => [
+          ...prev,
+          { id: `sys_${Date.now()}_demo`, type: 'system', created_at: nowIso(), text: formatted },
+        ])
+        return
+      }
+
       const details = body?.details ? `\nDetails: ${String(body.details)}` : ''
       throw new Error(`Prompt query failed.${details}`)
     }
@@ -151,6 +261,19 @@ export function CopilotChatCore({
     ])
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
+
+    // If Prompt Layer isn't reachable at all, also fall back to a deterministic demo answer.
+    if (hasMissingGeminiKey(msg) || String(msg).toLowerCase().includes('failed to fetch')) {
+      const demo = buildDemoMockAnswer(text)
+      const formatted = formatResponseText(demo)
+      setItems((prev) => [
+        ...prev,
+        { id: `sys_${Date.now()}_demo`, type: 'system', created_at: nowIso(), text: formatted },
+      ])
+      setIsSending(false)
+      return
+    }
+
     setItems((prev) => [
       ...prev,
       { id: `sys_${Date.now()}_error`, type: 'system', created_at: nowIso(), text: `Query failed.\n${msg}` },
@@ -389,4 +512,3 @@ export function CopilotChatCore({
     </div>
   )
 }
-
