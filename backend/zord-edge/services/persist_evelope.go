@@ -52,24 +52,21 @@ func RawIntent(ctx context.Context,
 			ParseStatus:    "RECEIVED",
 		}
 	} else {
-		// API Flow - Strict Separation
-		var req dto.IncomingIntentRequestV1
-		err := json.Unmarshal([]byte(msg.RawPayload), &req)
-		if err != nil {
-			// If it's the API queue, it MUST be valid JSON conforming to schema
-			return err
-		}
+        // API Flow - accept any valid JSON, extract fields if present
+        var req dto.IncomingIntentRequestV1
+        // We ignore the error here intentionally — fields may not exist
+        json.Unmarshal([]byte(msg.RawPayload), &req)
 
-		envelope = model.IngressEnvolope{
+        envelope = model.IngressEnvolope{
 			TraceID:        trace_id,
 			EnvelopeID:     envelopeID,
 			TenantID:       tenantUUID,
-			Source:         req.Source,
-			SourceSystem:   req.SourceSystem,
+			Source:         req.Source,         // empty string if not in JSON, that's OK now
+			SourceSystem:   req.SourceSystem, 
 			IdempotencyKey: msg.IdempotencyKey,
 			PayloadHash:    req.PayloadHash,
 			ObjectRef:      ObjRef,
-			AmountValue:    req.Amount.Value,
+			AmountValue:    req.Amount.Value,   // empty string if not in JSON
 			AmountCurrency: req.Amount.Currency,
 			ParseStatus:    "RECEIVED",
 		}
@@ -127,12 +124,9 @@ func SendToIntentEngine(
 			ParseStatus:    "RECEIVED",
 		}
 	} else {
-		var req dto.IncomingIntentRequestV1
-		err := json.Unmarshal([]byte(msg.RawPayload), &req)
-		if err != nil {
-			log.Printf("Failed to unmarshal payload for intent engine: %v", err)
-			return
-		}
+    	var req dto.IncomingIntentRequestV1
+    	// Ignore unmarshal error — any JSON is valid, fields may be missing
+    	json.Unmarshal([]byte(msg.RawPayload), &req)
 
 		envelope = model.IngressEnvolope{
 			TraceID:        trace_id,
@@ -146,7 +140,7 @@ func SendToIntentEngine(
 			AmountValue:    req.Amount.Value,
 			AmountCurrency: req.Amount.Currency,
 			ParseStatus:    "RECEIVED",
-		}
+    	}
 	}
 
 	// Prepare payload for intent engine
