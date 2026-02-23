@@ -154,19 +154,79 @@ const WORKFLOWS: WorkflowOption[] = [
 
 // Mock timeline events. Keep deterministic for replayable UI screenshots.
 const BASE_TS = new Date('2026-02-20T15:04:50Z').getTime()
-const EVENTS: EventNode[] = [
-  { id: 'wf_onboarding_17_n1', workflowId: 'wf_onboarding_17', laneId: 'ingestion', name: 'INIT', status: 'success', timestampMs: BASE_TS, durationMs: 500, details: { step: 'INIT' } },
-  { id: 'wf_onboarding_17_n2', workflowId: 'wf_onboarding_17', laneId: 'validation', name: 'VALIDATE', status: 'success', timestampMs: BASE_TS + 90_000, durationMs: 3200, details: { step: 'VALIDATE', validations: 12, passed: 12 } },
-  { id: 'wf_onboarding_17_n3', workflowId: 'wf_onboarding_17', laneId: 'canonical', name: 'CANONICALIZE', status: 'warning', timestampMs: BASE_TS + 155_000, durationMs: 8500, details: { step: 'CANONICALIZE', pii: 'tokenized', warnings: 1 }, dependsOn: ['wf_onboarding_17_n2'] },
-  { id: 'wf_onboarding_17_n4', workflowId: 'wf_onboarding_17', laneId: 'outbox', name: 'OUTBOX', status: 'delayed', timestampMs: BASE_TS + 360_000, durationMs: 25_000, details: { step: 'OUTBOX', expected_duration_s: 12, actual_duration_s: 25 }, dependsOn: ['wf_onboarding_17_n3'], error: { code: 'SLA_BREACH_RISK', message: 'Step exceeded expected duration by 108%', recovery: 'Awaiting completion' } },
-  { id: 'wf_onboarding_17_n5', workflowId: 'wf_onboarding_17', laneId: 'ops', name: 'VERIFY', status: 'in_progress', timestampMs: BASE_TS + 510_000, durationMs: 0, details: { step: 'VERIFY', checks_pending: 4 }, dependsOn: ['wf_onboarding_17_n4'] },
-  { id: 'wf_onboarding_17_n6', workflowId: 'wf_onboarding_17', laneId: 'ops', name: 'NOTIFY', status: 'pending', timestampMs: BASE_TS + 600_000, durationMs: 0, details: { step: 'NOTIFY' }, dependsOn: ['wf_onboarding_17_n5'] },
 
-  { id: 'wf_deployment_03_n1', workflowId: 'wf_deployment_03', laneId: 'ingestion', name: 'INIT', status: 'success', timestampMs: BASE_TS + 10_000, durationMs: 1200, details: { step: 'INIT' } },
-  { id: 'wf_deployment_03_n2', workflowId: 'wf_deployment_03', laneId: 'validation', name: 'POLICY', status: 'success', timestampMs: BASE_TS + 55_000, durationMs: 900, details: { policy: 'DEPLOY_APPROVAL', result: 'PASSED' } },
-  { id: 'wf_deployment_03_n3', workflowId: 'wf_deployment_03', laneId: 'outbox', name: 'DEPLOY', status: 'delayed', timestampMs: BASE_TS + 180_000, durationMs: 250_000, details: { step: 'DEPLOY' }, error: { code: 'SLA_BREACH_RISK', message: 'Deploy running longer than expected' }, dependsOn: ['wf_deployment_03_n2'] },
-  { id: 'wf_deployment_03_n4', workflowId: 'wf_deployment_03', laneId: 'ops', name: 'ROLLBACK', status: 'retry', timestampMs: BASE_TS + 520_000, durationMs: 45_000, details: { attempt: 2, max_attempts: 3 }, dependsOn: ['wf_deployment_03_n3'] },
-]
+function hash32(s: string): number {
+  // FNV-1a 32-bit (deterministic)
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) h = (h ^ s.charCodeAt(i)) * 16777619
+  return h >>> 0
+}
+
+function buildWorkflowEvents(wf: WorkflowOption): EventNode[] {
+  // Make every workflow have a full deterministic timeline graph.
+  const h = hash32(wf.id)
+  const offset = (h % 90_000) - 45_000 // +/- 45s
+  const ts0 = BASE_TS + offset
+
+  const base: Omit<EventNode, 'id' | 'status' | 'timestampMs'>[] = [
+    { workflowId: wf.id, laneId: 'ingestion', name: 'INGRESS', durationMs: 900, details: { step: 'INGRESS', source: wf.inputOrigin } },
+    { workflowId: wf.id, laneId: 'validation', name: 'VALIDATE', durationMs: 2400, details: { step: 'VALIDATE', schema: 'intent.request.v1' }, dependsOn: [`${wf.id}_n1`] },
+    { workflowId: wf.id, laneId: 'canonical', name: 'CANONICALIZE', durationMs: 5200, details: { step: 'CANONICALIZE', pii: 'tokenized' }, dependsOn: [`${wf.id}_n2`] },
+    { workflowId: wf.id, laneId: 'outbox', name: 'OUTBOX', durationMs: 12_000, details: { step: 'OUTBOX', topic: 'z.intent.ready.v1' }, dependsOn: [`${wf.id}_n3`] },
+    { workflowId: wf.id, laneId: 'ops', name: 'VERIFY', durationMs: 0, details: { step: 'VERIFY', checks_pending: 2 }, dependsOn: [`${wf.id}_n4`] },
+    { workflowId: wf.id, laneId: 'ops', name: 'NOTIFY', durationMs: 0, details: { step: 'NOTIFY' }, dependsOn: [`${wf.id}_n5`] },
+  ]
+
+  const statusProfile = (() => {
+    if (wf.status === 'delayed') {
+      return ['success', 'success', 'warning', 'delayed', 'in_progress', 'pending'] as EventNodeStatus[]
+    }
+    if (wf.status === 'degraded') {
+      return ['success', 'warning', 'warning', 'retry', 'in_progress', 'pending'] as EventNodeStatus[]
+    }
+    if (wf.status === 'running') {
+      return ['success', 'success', 'success', 'warning', 'in_progress', 'pending'] as EventNodeStatus[]
+    }
+    return ['success', 'success', 'success', 'success', 'success', 'success'] as EventNodeStatus[]
+  })()
+
+  const times = [0, 70_000, 150_000, 300_000, 450_000, 540_000]
+
+  return base.map((b, i) => {
+    const id = `${wf.id}_n${i + 1}`
+    const status = statusProfile[i] || 'success'
+    const node: EventNode = {
+      id,
+      workflowId: wf.id,
+      laneId: b.laneId,
+      name: b.name,
+      status,
+      timestampMs: ts0 + times[i],
+      durationMs: b.durationMs,
+      details: b.details,
+      dependsOn: b.dependsOn,
+    }
+
+    if (node.name === 'OUTBOX' && (status === 'delayed' || status === 'retry')) {
+      node.error = {
+        code: 'SLA_BREACH_RISK',
+        message: status === 'retry' ? 'Outbox publish retried after transient error' : 'Outbox publish slower than expected',
+        recovery: 'Will retry with backoff',
+      }
+      node.details = {
+        ...node.details,
+        expected_duration_s: 12,
+        actual_duration_s: status === 'retry' ? 18 : 25,
+      }
+    }
+
+    if (node.name === 'VERIFY' && status === 'in_progress') {
+      node.details = { ...node.details, checks_pending: 4 }
+    }
+
+    return node
+  })
+}
 
 function formatTimeLabel(ms: number): string {
   const d = new Date(ms)
@@ -629,6 +689,7 @@ export default function CustomerWorkflowTimelinePage() {
   const [selectedNode, setSelectedNode] = useState<EventNode | null>(null)
   const [showLaneDropdown, setShowLaneDropdown] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const [clock, setClock] = useState(() => Date.now())
 
   // Close lane dropdown on outside click.
   useEffect(() => {
@@ -637,6 +698,12 @@ export default function CustomerWorkflowTimelinePage() {
     }
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+
+  // Simulated live clock to keep mock graphs feeling real-time.
+  useEffect(() => {
+    const t = setInterval(() => setClock(Date.now()), 1000)
+    return () => clearInterval(t)
   }, [])
 
   const selectedWorkflow = useMemo(() => WORKFLOWS.find((w) => w.id === selectedWorkflowId) || null, [selectedWorkflowId])
@@ -650,15 +717,42 @@ export default function CustomerWorkflowTimelinePage() {
     })
   }, [query])
 
+  const workflowNodesBase = useMemo(() => {
+    if (!selectedWorkflow) return []
+    return buildWorkflowEvents(selectedWorkflow).sort((a, b) => a.timestampMs - b.timestampMs)
+  }, [selectedWorkflow])
+
+  const [baseStart, baseEnd] = useMemo(() => {
+    if (!workflowNodesBase.length) return [BASE_TS, BASE_TS + 1]
+    return [workflowNodesBase[0].timestampMs, workflowNodesBase[workflowNodesBase.length - 1].timestampMs]
+  }, [workflowNodesBase])
+
+  // Shift base events so the last node aligns with "now".
+  const shiftMs = useMemo(() => clock - baseEnd, [clock, baseEnd])
+
   const workflowNodesAll = useMemo(() => {
-    if (!selectedWorkflowId) return []
-    return EVENTS.filter((e) => e.workflowId === selectedWorkflowId).sort((a, b) => a.timestampMs - b.timestampMs)
-  }, [selectedWorkflowId])
+    if (!workflowNodesBase.length) return []
+    const phase = Math.floor(clock / 3000) % 4
+    return workflowNodesBase.map((n) => {
+      const ts = n.timestampMs + shiftMs
+      // Animate in-progress nodes a bit so the confidence line "moves".
+      if (n.status === 'in_progress') {
+        const nextStatus: EventNodeStatus = phase >= 2 ? 'success' : 'in_progress'
+        const durationMs = Math.max(0, clock - ts)
+        return { ...n, timestampMs: ts, status: nextStatus, durationMs }
+      }
+      if (n.status === 'pending') {
+        const nextStatus: EventNodeStatus = phase === 3 ? 'in_progress' : 'pending'
+        return { ...n, timestampMs: ts, status: nextStatus }
+      }
+      return { ...n, timestampMs: ts }
+    })
+  }, [workflowNodesBase, shiftMs, clock])
 
   const [startTime, endTime] = useMemo(() => {
     if (!workflowNodesAll.length) return [BASE_TS, BASE_TS + 1]
-    return [workflowNodesAll[0].timestampMs, workflowNodesAll[workflowNodesAll.length - 1].timestampMs]
-  }, [workflowNodesAll])
+    return [baseStart + shiftMs, baseEnd + shiftMs]
+  }, [workflowNodesAll.length, baseStart, baseEnd, shiftMs])
 
   const windowMs = useMemo(() => TIME_PRESETS.find((p) => p.value === timeRange)?.ms ?? TIME_PRESETS[1].ms, [timeRange])
   const rangeStart = Math.max(startTime, endTime - windowMs)
@@ -702,9 +796,21 @@ export default function CustomerWorkflowTimelinePage() {
 
         <div className="flex items-center gap-3">
           {selectedWorkflowId ? (
+            <button
+              onClick={() => {
+                setSelectedWorkflowId(null)
+                setSelectedNode(null)
+              }}
+              className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg bg-white border border-gray-200 text-cx-text hover:bg-gray-50 transition-colors"
+              title="Back to workflow list"
+            >
+              <span aria-hidden>←</span> Back
+            </button>
+          ) : null}
+          {selectedWorkflowId ? (
             <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Live from backend
+              Live (simulated)
             </span>
           ) : null}
           <select
@@ -765,18 +871,18 @@ export default function CustomerWorkflowTimelinePage() {
             <div className="min-w-[980px] px-6 py-5">
               <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-10 bg-white border-b border-gray-100">
-                    <tr className="text-[11px] uppercase tracking-wider text-cx-neutral">
-                      <th className="text-left font-semibold px-4 py-3">Workflow</th>
-                      <th className="text-left font-semibold px-4 py-3">Project</th>
-                      <th className="text-left font-semibold px-4 py-3">Env</th>
-                      <th className="text-left font-semibold px-4 py-3">Context</th>
-                      <th className="text-left font-semibold px-4 py-3">Input Origin</th>
-                      <th className="text-left font-semibold px-4 py-3">Issue Type</th>
-                      <th className="text-left font-semibold px-4 py-3">Status</th>
-                      <th className="text-right font-semibold px-4 py-3">Action</th>
-                    </tr>
-                  </thead>
+	                  <thead className="sticky top-0 z-10 bg-white border-b border-gray-100">
+	                    <tr className="text-[11px] uppercase tracking-wider text-cx-neutral">
+	                      <th className="text-left font-semibold px-4 py-3">Workflow</th>
+	                      <th className="text-left font-semibold px-4 py-3">Project</th>
+	                      <th className="text-left font-semibold px-4 py-3">Env</th>
+	                      <th className="text-left font-semibold px-4 py-3">Context</th>
+	                      <th className="text-left font-semibold px-4 py-3">Input Origin</th>
+	                      <th className="text-left font-semibold px-4 py-3">Issue Type</th>
+	                      <th className="text-left font-semibold px-4 py-3">Status</th>
+	                      <th className="text-right font-semibold px-4 py-3">Action</th>
+	                    </tr>
+	                  </thead>
                   <tbody>
                     {filteredWorkflows.map((wf) => (
                       <tr key={wf.id} className="border-b border-gray-100 last:border-0 hover:bg-slate-50/70">
@@ -802,12 +908,12 @@ export default function CustomerWorkflowTimelinePage() {
                         <td className="px-4 py-3">
                           <span className={`text-[11px] px-2 py-1 rounded-md border ${chipBg('origin')}`}>{wf.inputOrigin}</span>
                         </td>
-                        <td className="px-4 py-3">
-                          <span className={`text-[11px] px-2 py-1 rounded-md border ${chipBg('issue')}`}>{wf.issueType}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`text-[11px] px-2 py-1 rounded-md border ${chipBg('status')}`}>{wf.status}</span>
-                        </td>
+	                        <td className="px-4 py-3">
+	                          <span className={`text-[11px] px-2 py-1 rounded-md border ${chipBg('issue')}`}>{wf.issueType}</span>
+	                        </td>
+	                        <td className="px-4 py-3">
+	                          <span className={`text-[11px] px-2 py-1 rounded-md border ${chipBg('status')}`}>{wf.status}</span>
+	                        </td>
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => setSelectedWorkflowId(wf.id)}
@@ -818,13 +924,13 @@ export default function CustomerWorkflowTimelinePage() {
                         </td>
                       </tr>
                     ))}
-                    {filteredWorkflows.length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="px-4 py-10 text-center text-sm text-cx-neutral">
-                          No workflows match this search.
-                        </td>
-                      </tr>
-                    ) : null}
+	                    {filteredWorkflows.length === 0 ? (
+	                      <tr>
+	                        <td colSpan={8} className="px-4 py-10 text-center text-sm text-cx-neutral">
+	                          No workflows match this search.
+	                        </td>
+	                      </tr>
+	                    ) : null}
                   </tbody>
                 </table>
               </div>

@@ -265,10 +265,14 @@ services:
       context: ./backend/zord-prompt-layer
       dockerfile: Dockerfile
     container_name: zord-prompt-layer
-    ports:
-      - "8086:8086"
+    # Keep prompt-layer internal; zord-console proxies via /api/prompt-layer so users don't need a port.
     env_file:
+      
       - ./backend/zord-prompt-layer/.env
+    environment:
+      - ONNXRUNTIME_SHARED_LIBRARY_PATH=/opt/onnxruntime/lib/libonnxruntime.so
+      - LD_LIBRARY_PATH=/opt/onnxruntime/lib
+      - CHROMA_URL=http://chroma:8000
     depends_on:
       zord-edge-postgres:
         condition: service_healthy
@@ -276,6 +280,17 @@ services:
         condition: service_healthy
       zord-relay-postgres:
         condition: service_healthy
+      chroma:
+        condition: service_started
+    networks:
+      - zord-network
+    restart: unless-stopped
+
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: chroma
+    volumes:
+      - chroma_data:/chroma/chroma
     networks:
       - zord-network
     restart: unless-stopped
@@ -297,7 +312,8 @@ services:
       - ZORD_VAULT_URL=http://zord-edge:8080
       - ZORD_CONTRACTS_URL=http://zord-relay:8082
       - ZORD_PII_ENCLAVE_URL=http://zord-intent-engine:8083
-      - NEXT_PUBLIC_PROMPT_LAYER_URL=http://localhost:8086
+      # Next API route proxies to prompt-layer; browser uses same-origin /api/prompt-layer (no port).
+      - PROMPT_LAYER_URL=http://zord-prompt-layer:8086
 
     depends_on:
       - zord-edge

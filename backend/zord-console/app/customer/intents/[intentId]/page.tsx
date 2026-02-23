@@ -23,7 +23,6 @@ type IntentDetail = {
   beneficiary?: unknown
   pii_tokens?: unknown
   deadline_at?: string
-  confidence_score?: number
   created_at?: string
 }
 
@@ -104,7 +103,6 @@ export default function CustomerIntentDetailPage() {
           { label: 'Instrument', value: detail?.canonical?.instrument?.kind ?? '-', mono: false },
           { label: 'Envelope ID', value: detail?.evidence?.raw_envelope_id ?? '-', mono: true },
           { label: 'Deadline', value: detail?.deadline_at ?? '-', mono: false },
-          { label: 'Confidence', value: detail?.confidence_score ?? '-', mono: false },
           { label: 'Created', value: created ? format(created, 'yyyy-MM-dd HH:mm:ss') : '-', mono: false },
           { label: 'Status', value: detail?.status ?? '-', mono: false },
         ].map((item) => (
@@ -130,4 +128,3 @@ export default function CustomerIntentDetailPage() {
     </div>
   )
 }
-

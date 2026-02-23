@@ -5,7 +5,9 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-ENV CGO_ENABLED=1 GOOS=linux GOARCH=amd64
+# Build for the container's native architecture to keep local dev (Apple Silicon) working.
+# If you need amd64 images, set `--platform=linux/amd64` at build time.
+ENV CGO_ENABLED=1 GOOS=linux
 RUN go build -o /out/zord-prompt-layer ./cmd/main.go
 
 FROM debian:bookworm-slim
@@ -26,7 +28,9 @@ ENV LD_LIBRARY_PATH=/opt/onnxruntime/lib
 WORKDIR /app
 COPY --from=builder /out/zord-prompt-layer /app/zord-prompt-layer
 COPY assets /app/assets
-COPY .env /app/.env
+# Use committed defaults so the image can be built on a fresh clone.
+# Runtime env vars (e.g. via docker-compose `env_file`) can still override as needed.
+COPY .env.example /app/.env
 
 EXPOSE 8086
 CMD ["/app/zord-prompt-layer"]

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { MOCK_INTENT_IDS } from '../../mock'
 
 interface Discrepancy {
   id: string
@@ -16,13 +17,13 @@ interface Discrepancy {
 }
 
 const discrepancies: Discrepancy[] = [
-  { id: 'DIS-001', intentId: 'pi_20260210_F6QR', type: 'Status Mismatch', description: 'Provider says "success", bank settlement file missing', providerStatus: 'success', zordStatus: 'pending_settlement', amount: '₹45,000.00', detectedAt: '12:34:00', severity: 'high', status: 'open' },
-  { id: 'DIS-002', intentId: 'pi_20260210_G7ST', type: 'Amount Mismatch', description: 'Settlement amount differs: provider ₹10,000 vs bank ₹9,800', providerStatus: 'settled_10000', zordStatus: 'settled_9800', amount: '₹200.00', detectedAt: '11:22:00', severity: 'medium', status: 'investigating' },
-  { id: 'DIS-003', intentId: 'pi_20260209_H8UV', type: 'Status Mismatch', description: 'Provider returned failure but UTR found in bank file', providerStatus: 'failed', zordStatus: 'settled', amount: '₹7,500.00', detectedAt: 'Feb 9, 23:45', severity: 'high', status: 'open' },
-  { id: 'DIS-004', intentId: 'pi_20260209_I9WX', type: 'Missing UTR', description: 'Provider ack received but no UTR in T+1 bank file', providerStatus: 'success', zordStatus: 'pending_utr', amount: '₹22,000.00', detectedAt: 'Feb 9, 22:10', severity: 'medium', status: 'open' },
-  { id: 'DIS-005', intentId: 'pi_20260208_J0YZ', type: 'Duplicate', description: 'Duplicate UTR detected in two different intents', providerStatus: 'success', zordStatus: 'duplicate_utr', amount: '₹15,600.00', detectedAt: 'Feb 8, 18:30', severity: 'low', status: 'resolved' },
-  { id: 'DIS-006', intentId: 'pi_20260208_K1AB', type: 'Timing Mismatch', description: 'Settlement confirmed > 24h after provider ack', providerStatus: 'success', zordStatus: 'late_settlement', amount: '₹31,200.00', detectedAt: 'Feb 8, 14:00', severity: 'low', status: 'resolved' },
-  { id: 'DIS-007', intentId: 'pi_20260210_L2CD', type: 'Status Mismatch', description: 'Provider webhook says refund_completed, no debit entry in ledger', providerStatus: 'refund_completed', zordStatus: 'refund_pending', amount: '₹5,400.00', detectedAt: '10:15:00', severity: 'high', status: 'open' },
+  { id: 'DIS-001', intentId: MOCK_INTENT_IDS[0], type: 'Status Mismatch', description: 'Provider says "success", bank settlement file missing', providerStatus: 'success', zordStatus: 'pending_settlement', amount: '₹45,000.00', detectedAt: '12:34:00', severity: 'high', status: 'open' },
+  { id: 'DIS-002', intentId: MOCK_INTENT_IDS[1], type: 'Amount Mismatch', description: 'Settlement amount differs: provider ₹10,000 vs bank ₹9,800', providerStatus: 'settled_10000', zordStatus: 'settled_9800', amount: '₹200.00', detectedAt: '11:22:00', severity: 'medium', status: 'investigating' },
+  { id: 'DIS-003', intentId: MOCK_INTENT_IDS[2], type: 'Status Mismatch', description: 'Provider returned failure but UTR found in bank file', providerStatus: 'failed', zordStatus: 'settled', amount: '₹7,500.00', detectedAt: 'Feb 9, 23:45', severity: 'high', status: 'open' },
+  { id: 'DIS-004', intentId: MOCK_INTENT_IDS[3], type: 'Missing UTR', description: 'Provider ack received but no UTR in T+1 bank file', providerStatus: 'success', zordStatus: 'pending_utr', amount: '₹22,000.00', detectedAt: 'Feb 9, 22:10', severity: 'medium', status: 'open' },
+  { id: 'DIS-005', intentId: MOCK_INTENT_IDS[4], type: 'Duplicate', description: 'Duplicate UTR detected in two different intents', providerStatus: 'success', zordStatus: 'duplicate_utr', amount: '₹15,600.00', detectedAt: 'Feb 8, 18:30', severity: 'low', status: 'resolved' },
+  { id: 'DIS-006', intentId: MOCK_INTENT_IDS[1], type: 'Timing Mismatch', description: 'Settlement confirmed > 24h after provider ack', providerStatus: 'success', zordStatus: 'late_settlement', amount: '₹31,200.00', detectedAt: 'Feb 8, 14:00', severity: 'low', status: 'resolved' },
+  { id: 'DIS-007', intentId: MOCK_INTENT_IDS[0], type: 'Status Mismatch', description: 'Provider webhook says refund_completed, no debit entry in ledger', providerStatus: 'refund_completed', zordStatus: 'refund_pending', amount: '₹5,400.00', detectedAt: '10:15:00', severity: 'high', status: 'open' },
 ]
 
 const severityConfig = {

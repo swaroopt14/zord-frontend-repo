@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { MOCK_INTENT_IDS } from '../../mock'
 
 interface ReplayCandidate {
   id: string
@@ -13,30 +14,56 @@ interface ReplayCandidate {
   attempts: number
   canAutoRetry: boolean
   needsApproval: boolean
+  state?: 'ready' | 'replaying' | 'replayed'
 }
 
-const replayCandidates: ReplayCandidate[] = [
-  { id: 'RPL-001', intentId: 'pi_20260210_37RE', type: 'payment', amount: '₹25,000.00', failureReason: 'Provider timeout after 30s', failedAt: '14:15:44', attempts: 1, canAutoRetry: true, needsApproval: false },
-  { id: 'RPL-002', intentId: 'pi_20260210_C3ZM', type: 'payment', amount: '₹8,900.00', failureReason: 'Stuck in pending_ack > 35min', failedAt: '13:48:12', attempts: 0, canAutoRetry: true, needsApproval: false },
-  { id: 'RPL-003', intentId: 'pi_20260210_D4WN', type: 'payment', amount: '₹2,100.00', failureReason: 'Provider returned transient 503', failedAt: '13:42:30', attempts: 2, canAutoRetry: true, needsApproval: false },
-  { id: 'RPL-004', intentId: 'pi_20260210_E5VP', type: 'payout', amount: '₹56,000.00', failureReason: 'Bank connectivity issue — NEFT window', failedAt: '13:38:55', attempts: 1, canAutoRetry: false, needsApproval: true },
-  { id: 'RPL-005', intentId: 'pi_20260210_B2YL', type: 'refund', amount: '₹4,200.00', failureReason: 'Refund provider timeout', failedAt: '13:32:10', attempts: 1, canAutoRetry: true, needsApproval: false },
+const initialCandidates: ReplayCandidate[] = [
+  { id: 'RPL-001', intentId: MOCK_INTENT_IDS[0], type: 'payment', amount: '₹25,000.00', failureReason: 'Provider timeout after 30s', failedAt: '14:15:44', attempts: 1, canAutoRetry: true, needsApproval: false },
+  { id: 'RPL-002', intentId: MOCK_INTENT_IDS[1], type: 'payment', amount: '₹8,900.00', failureReason: 'Stuck in pending_ack > 35min', failedAt: '13:48:12', attempts: 0, canAutoRetry: true, needsApproval: false },
+  { id: 'RPL-003', intentId: MOCK_INTENT_IDS[2], type: 'payment', amount: '₹2,100.00', failureReason: 'Provider returned transient 503', failedAt: '13:42:30', attempts: 2, canAutoRetry: true, needsApproval: false },
+  { id: 'RPL-004', intentId: MOCK_INTENT_IDS[3], type: 'payout', amount: '₹56,000.00', failureReason: 'Bank connectivity issue — NEFT window', failedAt: '13:38:55', attempts: 1, canAutoRetry: false, needsApproval: true },
+  { id: 'RPL-005', intentId: MOCK_INTENT_IDS[4], type: 'refund', amount: '₹4,200.00', failureReason: 'Refund provider timeout', failedAt: '13:32:10', attempts: 1, canAutoRetry: true, needsApproval: false },
 ]
 
 export default function ReplayCenter() {
+  const [items, setItems] = useState<ReplayCandidate[]>(() => initialCandidates.map((c) => ({ ...c, state: 'ready' })))
   const [selected, setSelected] = useState<string[]>([])
   const [showConfirm, setShowConfirm] = useState(false)
+  const pushToast = (title: string, desc?: string, type: 'success' | 'warning' | 'error' | 'info' = 'info') => {
+    window.dispatchEvent(new CustomEvent('cx:toast', { detail: { title, desc, type } }))
+  }
 
   const toggleSelect = (id: string) => {
     setSelected(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
   }
 
   const selectAll = () => {
-    if (selected.length === replayCandidates.length) {
+    if (selected.length === items.length) {
       setSelected([])
     } else {
-      setSelected(replayCandidates.map(c => c.id))
+      setSelected(items.map(c => c.id))
     }
+  }
+
+  useEffect(() => void 0, [])
+
+  const selectedReplayable = useMemo(() => {
+    const map = new Map(items.map((i) => [i.id, i]))
+    return selected.map((id) => map.get(id)).filter(Boolean) as ReplayCandidate[]
+  }, [selected, items])
+
+  const simulateReplay = async (ids: string[]) => {
+    if (!ids.length) return
+    setItems((prev) => prev.map((it) => (ids.includes(it.id) ? { ...it, state: 'replaying' } : it)))
+    pushToast('Replay started', `Replaying ${ids.length} intent(s)…`, 'info')
+    await new Promise((r) => setTimeout(r, 1100))
+    setItems((prev) =>
+      prev.map((it) => {
+        if (!ids.includes(it.id)) return it
+        return { ...it, state: 'replayed', attempts: it.attempts + 1 }
+      })
+    )
+    pushToast('Replay queued', 'Watch DLQ / Intent Journal for updates.', 'success')
   }
 
   return (
@@ -56,7 +83,7 @@ export default function ReplayCenter() {
         </div>
         <div className="flex items-center gap-2">
           <span className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-cx-purple-50 text-cx-purple-700 border border-cx-purple-200">
-            {replayCandidates.length} candidates
+            {items.length} candidates
           </span>
           {selected.length > 0 && (
             <button
@@ -89,7 +116,7 @@ export default function ReplayCenter() {
               <th className="px-5 py-3 text-left">
                 <input
                   type="checkbox"
-                  checked={selected.length === replayCandidates.length}
+                  checked={items.length > 0 && selected.length === items.length}
                   onChange={selectAll}
                   className="w-4 h-4 rounded border-gray-300 text-cx-purple-600 focus:ring-cx-purple-500"
                 />
@@ -104,13 +131,14 @@ export default function ReplayCenter() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {replayCandidates.map((item) => (
+            {items.map((item) => (
               <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                 <td className="px-5 py-3">
                   <input
                     type="checkbox"
                     checked={selected.includes(item.id)}
                     onChange={() => toggleSelect(item.id)}
+                    disabled={item.state !== 'ready'}
                     className="w-4 h-4 rounded border-gray-300 text-cx-purple-600 focus:ring-cx-purple-500"
                   />
                 </td>
@@ -133,9 +161,19 @@ export default function ReplayCenter() {
                   )}
                 </td>
                 <td className="px-5 py-3">
-                  <button className="px-3 py-1.5 text-xs font-semibold text-cx-purple-600 bg-cx-purple-50 border border-cx-purple-200 rounded-lg hover:bg-cx-purple-100 transition-colors">
-                    Replay
-                  </button>
+                  {item.state === 'replayed' ? (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cx-teal-50 text-cx-teal-700 border border-cx-teal-200">
+                      Queued
+                    </span>
+                  ) : (
+                    <button
+                      disabled={item.state !== 'ready'}
+                      onClick={() => void simulateReplay([item.id])}
+                      className="px-3 py-1.5 text-xs font-semibold text-white bg-cx-purple-600 rounded-lg hover:bg-cx-purple-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {item.state === 'replaying' ? 'Replaying…' : 'Replay'}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -161,7 +199,14 @@ export default function ReplayCenter() {
                 Cancel
               </button>
               <button
-                onClick={() => { setShowConfirm(false); setSelected([]) }}
+                onClick={async () => {
+                  const ids = selectedReplayable
+                    .filter((x) => x.state === 'ready')
+                    .map((x) => x.id)
+                  setShowConfirm(false)
+                  setSelected([])
+                  await simulateReplay(ids)
+                }}
                 className="flex-1 py-2 text-sm font-semibold text-white bg-cx-purple-600 rounded-lg hover:bg-cx-purple-700 transition-colors"
               >
                 Confirm Replay
@@ -170,6 +215,8 @@ export default function ReplayCenter() {
           </div>
         </div>
       )}
+
+      {/* Toasts are rendered in the top bar */}
     </div>
   )
 }

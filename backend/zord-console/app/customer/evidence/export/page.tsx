@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { MOCK_INTENT_IDS } from '../../mock'
 
 const exportHistory = [
-  { id: 'EXP-041', type: 'PDF Report', scope: 'Intent pi_20260210_91XK', size: '1.2 MB', createdAt: '14:25:00', status: 'ready' },
+  { id: 'EXP-041', type: 'PDF Report', scope: `Intent ${MOCK_INTENT_IDS[0]}`, size: '1.2 MB', createdAt: '14:25:00', status: 'ready' },
   { id: 'EXP-040', type: 'JSON Bundle', scope: 'EP-2847 Full Pack', size: '24 KB', createdAt: '14:24:30', status: 'ready' },
   { id: 'EXP-039', type: 'PDF Report', scope: 'Daily Recon Summary', size: '3.4 MB', createdAt: '12:00:00', status: 'ready' },
   { id: 'EXP-038', type: 'CSV Export', scope: 'Failed Intents (24h)', size: '156 KB', createdAt: '09:00:00', status: 'ready' },
@@ -73,7 +74,7 @@ export default function ExportCenterPage() {
                 <label className="block text-xs font-semibold text-cx-neutral uppercase tracking-wider mb-1.5">Intent ID</label>
                 <input
                   type="text"
-                  placeholder="pi_20260210_91XK"
+                  placeholder={MOCK_INTENT_IDS[0]}
                   className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-cx-text placeholder-gray-400 focus:ring-1 focus:ring-cx-purple-500 focus:border-cx-purple-500 outline-none font-mono"
                 />
               </div>
