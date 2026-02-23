@@ -55,6 +55,8 @@ CREATE TABLE IF NOT EXISTS outbox (
 
     event_type TEXT NOT NULL,   -- intent.created.v1, intent.updated.v1
     payload JSONB NOT NULL,     -- downstream message body (no raw PII)
+    amount NUMERIC(18,2),
+    currency CHAR(3),
 
     status TEXT NOT NULL DEFAULT 'PENDING',
     attempts INT NOT NULL DEFAULT 0,
