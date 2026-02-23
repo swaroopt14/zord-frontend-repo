@@ -8,15 +8,19 @@ import (
 )
 
 type OutboxEvent struct {
-	EnvelopeID    string          `db:"envelope_id"`
-	TraceID       string          `db:"trace_id"`
-	TenantID      string          `db:"tenant_id"`
-	AggregateType string          `db:"aggregate_type"`
-	AggregateID   uuid.UUID       `db:"aggregate_id"`
-	EventType     string          `db:"event_type"`
-	RetryCount    int             `db:"retry_count"`
-	NextRetryAt   time.Time       `db:"next_attempt_at"`
-	Payload       json.RawMessage `db:"payload"`
-	Status        string          `db:"status"`
-	CreatedAt     time.Time       `db:"created_at"`
+	EventID       string          `json:"event_id" db:"event_id"`
+	EnvelopeID    string          `json:"envelope_id" db:"envelope_id"`
+	TraceID       string          `json:"trace_id" db:"trace_id"`
+	TenantID      string          `json:"tenant_id" db:"tenant_id"`
+	AggregateType string          `json:"aggregate_type" db:"aggregate_type"`
+	AggregateID   uuid.UUID       `json:"aggregate_id" db:"aggregate_id"`
+	EventType     string          `json:"event_type" db:"event_type"`
+	RetryCount    int             `json:"retry_count" db:"retry_count"`
+	NextRetryAt   *time.Time      `json:"next_attempt_at,omitempty" db:"next_attempt_at"`
+	Payload       json.RawMessage `json:"payload" db:"payload"`
+	Status        string          `json:"status" db:"status"`
+	CreatedAt     time.Time       `json:"created_at" db:"created_at"`
+	LeaseID       string          `json:"lease_id,omitempty" db:"lease_id"`
+	LeasedBy      string          `json:"leased_by,omitempty" db:"leased_by"`
+	LeaseUntil    *time.Time      `json:"lease_until,omitempty" db:"lease_until"`
 }

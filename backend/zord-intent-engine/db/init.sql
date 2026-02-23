@@ -62,6 +62,9 @@ CREATE TABLE IF NOT EXISTS outbox (
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     sent_at TIMESTAMPTZ,
+    lease_id UUID,
+    leased_by TEXT,
+    lease_until TIMESTAMPTZ,
 
     -- tracing / observability
     trace_id VARCHAR(255),
@@ -80,6 +83,8 @@ CREATE TABLE IF NOT EXISTS outbox (
 );
 
 -- Create indexes for outbox processing
+CREATE INDEX IF NOT EXISTS idx_outbox_pending_lease ON outbox(status, lease_until, created_at);
+CREATE INDEX IF NOT EXISTS idx_outbox_lease_id ON outbox(lease_id);
 CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox(status);
 CREATE INDEX IF NOT EXISTS idx_outbox_tenant_id ON outbox(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_outbox_created_at ON outbox(created_at);

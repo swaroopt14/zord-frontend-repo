@@ -62,6 +62,7 @@ func CreateTables() error {
 	trace_id UUID NOT NULL,  
     envelope_id UUID NOT NULL, 
     tenant_id UUID NOT NULL,
+	lease_id UUID, leased_by TEXT, lease_until TIMESTAMPTZ,
 
     -- intent-specific outbox
     aggregate_type TEXT NOT NULL DEFAULT 'intent',
@@ -94,6 +95,31 @@ func CreateTables() error {
 	if _, err := DB.Exec(outbox); err != nil {
 		return err
 	}
+	// Ensure lease columns exist for internal outbox pull API
+	if _, err := DB.Exec(`
+		ALTER TABLE outbox
+		ADD COLUMN IF NOT EXISTS lease_id UUID,
+		ADD COLUMN IF NOT EXISTS leased_by TEXT,
+		ADD COLUMN IF NOT EXISTS lease_until TIMESTAMPTZ;
+	`); err != nil {
+		return err
+	}
+
+	// Indexes for lease scanning and ack/nack operations
+	if _, err := DB.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_outbox_pending_lease
+		ON outbox (status, lease_until, created_at);
+	`); err != nil {
+		return err
+	}
+
+	if _, err := DB.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_outbox_lease_id
+		ON outbox (lease_id);
+	`); err != nil {
+		return err
+	}
+
 	// DLQ ITEMS (OWNED)
 	dlqItems := `
 	CREATE TABLE IF NOT EXISTS dlq_items (
