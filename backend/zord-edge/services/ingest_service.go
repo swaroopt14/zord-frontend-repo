@@ -30,11 +30,15 @@ func SaveRawIntent(
 	}()
 
 	query := `
-		INSERT INTO ingress_envelopes
-		(trace_id,envelope_id, tenant_id, source, source_system,idempotency_key,payload_hash,object_ref,parse_status,amount_value,amount_currency)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,$10,$11)
+    	INSERT INTO ingress_envelopes
+    	(trace_id, envelope_id, tenant_id, source, source_system, idempotency_key, payload_hash, object_ref, parse_status, amount_value, amount_currency)
+		VALUES ($1, $2, $3, 
+			NULLIF($4, ''), 
+			NULLIF($5, ''), 
+			$6, $7, $8, $9, 
+			NULLIF($10::text, '')::NUMERIC, 
+			NULLIF($11, ''))
 		ON CONFLICT (tenant_id, idempotency_key) DO NOTHING
-
 	`
 	res, err := tx.ExecContext(ctx, query, envelope.TraceID, envelope.EnvelopeID, envelope.TenantID, envelope.Source, envelope.SourceSystem, envelope.IdempotencyKey, envelope.PayloadHash, envelope.ObjectRef, envelope.ParseStatus, envelope.AmountValue, envelope.AmountCurrency)
 	if err != nil {
