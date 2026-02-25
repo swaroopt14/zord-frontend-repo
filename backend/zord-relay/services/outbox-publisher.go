@@ -2,21 +2,17 @@ package services
 
 import (
 	"context"
-	"database/sql"
-	"math/rand"
 	"time"
 	"zord-relay/kafka"
-	"zord-relay/model"
 	"zord-relay/utils"
 
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
 type Publisher struct {
-	db       *sql.DB
-	producer *kafka.Producer
-	cfg      *Config
+	intentClient *IntentClient
+	producer     *kafka.Producer
+	cfg          *Config
 }
 
 type Config struct {
@@ -24,13 +20,11 @@ type Config struct {
 	DLQTopic     string
 	WorkerCount  int
 	BatchSize    int
-	MaxRetries   int
-	RetryBackoff time.Duration
 	PollInterval time.Duration
 }
 
-func NewPublisher(db *sql.DB, producer *kafka.Producer, cfg *Config) *Publisher {
-	return &Publisher{db: db, producer: producer, cfg: cfg}
+func NewPublisher(intentClient *IntentClient, producer *kafka.Producer, cfg *Config) *Publisher {
+	return &Publisher{intentClient: intentClient, producer: producer, cfg: cfg}
 }
 
 func (p *Publisher) Start(ctx context.Context) {
@@ -47,39 +41,22 @@ func (p *Publisher) worker(ctx context.Context, id int) {
 		default:
 		}
 
-		tx, err := p.db.BeginTx(ctx, nil)
+		lease, err := p.intentClient.Lease(ctx, p.cfg.BatchSize)
 		if err != nil {
-			utils.Logger.Error("begin tx failed", zap.Error(err))
+			utils.Logger.Error("lease failed", zap.Error(err))
 			time.Sleep(p.cfg.PollInterval)
 			continue
 		}
 
-		rows, err := tx.QueryContext(ctx, `
-			SELECT event_id, aggregate_id, event_type, payload, retry_count, tenant_id, trace_id, envelope_id
-			FROM outbox
-			WHERE status='PENDING' AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
-			FOR UPDATE SKIP LOCKED
-			LIMIT $1
-		`, p.cfg.BatchSize)
-		if err != nil {
-			utils.Logger.Error("fetch pending failed", zap.Error(err))
-			tx.Rollback()
+		if len(lease.Events) == 0 {
 			time.Sleep(p.cfg.PollInterval)
 			continue
 		}
 
-		events := []model.OutboxEvent{}
-		for rows.Next() {
-			var e model.OutboxEvent
-			if err := rows.Scan(&e.ID, &e.AggregateID, &e.EventType, &e.Payload, &e.RetryCount, &e.TenantID, &e.TraceID, &e.EnvelopeID); err != nil {
-				utils.Logger.Error("row scan failed", zap.Error(err))
-				continue
-			}
-			events = append(events, e)
-		}
-		rows.Close()
+		var ackIDs []string
+		var nackIDs []string
 
-		for _, e := range events {
+		for _, e := range lease.Events {
 			headers := map[string]string{
 				"trace_id":    e.TraceID,
 				"tenant_id":   e.TenantID,
@@ -89,36 +66,23 @@ func (p *Publisher) worker(ctx context.Context, id int) {
 
 			err := p.producer.Publish(p.cfg.ReadyTopic, e.AggregateID, e.Payload, headers)
 			if err != nil {
-				retries := e.RetryCount + 1
-				if retries >= p.cfg.MaxRetries {
-					dlq := map[string]interface{}{
-						"reason_code":         "PUBLISH_FAILED",
-						"error_message":       err.Error(),
-						"original_event_type": e.EventType,
-						"tenant_id":           e.TenantID,
-						"trace_id":            e.TraceID,
-						"envelope_id":         e.EnvelopeID,
-						"schema_subject":      "z.intent.ready",
-						"schema_version":      "v1",
-					}
-					_ = p.producer.Publish(p.cfg.DLQTopic, e.AggregateID, dlq, headers)
-					_, _ = tx.ExecContext(ctx, `INSERT INTO dlq_items (dlq_id, tenant_id, envelope_id, stage, reason_code, error_detail, replayable, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())`,
-						uuid.New().String(), e.TenantID, e.EnvelopeID, "OUTBOX_PUBLISH", "PUBLISH_FAILED", err.Error(), true)
-					_, _ = tx.ExecContext(ctx, `UPDATE outbox SET status='FAILED' WHERE event_id=$1`, e.ID)
-				} else {
-					backoff := p.cfg.RetryBackoff * time.Duration(1<<retries)
-					backoff += time.Duration(rand.Intn(100)) * time.Millisecond
-					ms := int(backoff / time.Millisecond)
-					_, _ = tx.ExecContext(ctx, `UPDATE outbox SET attempts=$1, next_attempt_at=NOW() + ($2::int * interval '1 millisecond') WHERE event_id=$3`, retries, ms, e.ID)
-				}
+				utils.Logger.Error("publish failed", zap.String("event_id", e.ID), zap.Error(err))
+				nackIDs = append(nackIDs, e.ID)
 			} else {
-				_, _ = tx.ExecContext(ctx, `UPDATE outbox SET status='SENT', sent_at=NOW() WHERE event_id=$1`, e.ID)
+				ackIDs = append(ackIDs, e.ID)
 			}
 		}
 
-		tx.Commit()
-		if len(events) == 0 {
-			time.Sleep(p.cfg.PollInterval)
+		if len(ackIDs) > 0 {
+			if err := p.intentClient.Ack(ctx, lease.LeaseID, ackIDs); err != nil {
+				utils.Logger.Error("ack failed", zap.String("lease_id", lease.LeaseID), zap.Error(err))
+			}
+		}
+
+		if len(nackIDs) > 0 {
+			if err := p.intentClient.Nack(ctx, lease.LeaseID, nackIDs); err != nil {
+				utils.Logger.Error("nack failed", zap.String("lease_id", lease.LeaseID), zap.Error(err))
+			}
 		}
 	}
 }
