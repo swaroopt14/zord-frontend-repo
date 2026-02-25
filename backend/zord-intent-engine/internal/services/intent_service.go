@@ -281,7 +281,7 @@ func (s *IntentService) ProcessIncomingIntent(
 	// if err != nil {
 	// 	return nil, nil, err
 	// }
-	// -------- STEP 8: TOKENIZATION (PII ENCLAVE) --------
+	// -------- STEP 8: TOKENIZATION (PII ENCLAVE SERVICE) --------
 	tokenReq := enclaveTokenizeRequest{
 		TenantID: in.TenantID.String(),
 		TraceID:  in.TraceID.String(),
