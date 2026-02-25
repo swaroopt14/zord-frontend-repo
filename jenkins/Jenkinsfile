@@ -4,6 +4,8 @@ pipeline {
   options {
     disableConcurrentBuilds()
     timestamps()
+    // Disable the implicit "Declarative: Checkout SCM" so we can wipe the workspace first.
+    skipDefaultCheckout(true)
   }
 
   parameters {
@@ -15,6 +17,7 @@ pipeline {
     GIT_URL = 'https://github.com/Arealis-network/Arealis-Zord.git'
     COMPOSE_FILE = 'docker-compose.ec2.yml'
     APP_ENV_FILE = 'backend/zord-intent-engine/.env'
+    PROMPT_ENV_FILE = 'backend/zord-prompt-layer/.env'
     AWS_REGION = 'ap-south-1'
     CANONICAL_REGION = 'ap-southeast-2'
     EDGE_BUCKET = 'arealis-zord-vault'
@@ -25,6 +28,8 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
+        deleteDir()
+
         // Don't run raw `git` in a shell for private repos; it will prompt for creds and fail.
         // Use Jenkins-managed credentials for a non-interactive checkout of the requested branch.
         checkout([
@@ -33,7 +38,7 @@ pipeline {
           userRemoteConfigs: [[url: env.GIT_URL, credentialsId: params.GIT_CREDENTIALS_ID]],
           extensions: [
             [$class: 'PruneStaleBranch'],
-            [$class: 'CleanBeforeCheckout']
+            [$class: 'WipeWorkspace']
           ]
         ])
       }
@@ -54,7 +59,7 @@ pipeline {
       steps {
         withCredentials([
           string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
-          string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+          string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
         ]) {
           sh '''
             set -eu

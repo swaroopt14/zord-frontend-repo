@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { MOCK_CONTRACT_IDS, MOCK_ENVELOPE_IDS, MOCK_INTENT_IDS } from '../../mock'
 
 type ContractDetail = {
   contract_id: string
@@ -118,8 +119,40 @@ function EvidenceExplorerContent() {
       ) : null}
 
       {!contractId && !envelopeId ? (
-        <div className="bg-white rounded-xl border border-gray-100 p-5 text-sm text-cx-neutral">
-          Open this page from Evidence Packs list to inspect linked `contract_id` and `envelope_id`.
+        <div className="bg-white rounded-xl border border-gray-100 p-5 space-y-4">
+          <div className="text-sm text-cx-neutral">
+            Open this page from Evidence Packs list to inspect linked <span className="font-mono">contract_id</span> and <span className="font-mono">envelope_id</span>.
+          </div>
+          <div>
+            <div className="text-[10px] font-semibold text-cx-neutral uppercase tracking-wider mb-2">Recent (mock)</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {[
+                { label: 'Recent Contract + Envelope', contract_id: MOCK_CONTRACT_IDS[0], envelope_id: MOCK_ENVELOPE_IDS[0], intent_id: MOCK_INTENT_IDS[0] },
+                { label: 'Contract only', contract_id: MOCK_CONTRACT_IDS[1], envelope_id: '', intent_id: MOCK_INTENT_IDS[1] },
+                { label: 'Envelope only', contract_id: '', envelope_id: MOCK_ENVELOPE_IDS[1], intent_id: MOCK_INTENT_IDS[2] },
+                { label: 'Raw (newest)', contract_id: '', envelope_id: MOCK_ENVELOPE_IDS[2], intent_id: MOCK_INTENT_IDS[3] },
+              ].map((x) => {
+                const qs = new URLSearchParams()
+                if (x.contract_id) qs.set('contract_id', x.contract_id)
+                if (x.envelope_id) qs.set('envelope_id', x.envelope_id)
+                const href = `/customer/evidence/explorer?${qs.toString()}`
+                return (
+                  <Link
+                    key={x.label}
+                    href={href}
+                    className="rounded-xl border border-gray-100 p-4 hover:border-cx-purple-200 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="text-sm font-semibold text-cx-text">{x.label}</div>
+                    <div className="mt-2 space-y-1 text-xs text-cx-neutral">
+                      <div>intent_id: <span className="font-mono text-cx-purple-600 break-all">{x.intent_id}</span></div>
+                      <div>contract_id: <span className="font-mono break-all">{x.contract_id || '-'}</span></div>
+                      <div>envelope_id: <span className="font-mono break-all">{x.envelope_id || '-'}</span></div>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
         </div>
       ) : null}
 

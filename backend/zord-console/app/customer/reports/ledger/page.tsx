@@ -1,10 +1,12 @@
 'use client'
 
+import { MOCK_INTENT_IDS } from '../../mock'
+
 const ledgerEntries = [
-  { id: 'LE-001', timestamp: '14:23:48', intentId: 'pi_20260210_91XK', type: 'CREDIT', account: 'Merchant Settlement', amount: '₹12,500.00', balance: '₹1,24,56,000.00', ref: 'UTR20260210HDFC991827' },
-  { id: 'LE-002', timestamp: '14:18:15', intentId: 'pi_20260210_55TG', type: 'CREDIT', account: 'Merchant Settlement', amount: '₹8,900.00', balance: '₹1,24,43,500.00', ref: 'UTR20260210HDFC991826' },
-  { id: 'LE-003', timestamp: '14:14:25', intentId: 'pi_20260210_28QD', type: 'DEBIT', account: 'Refund Pool', amount: '₹750.00', balance: '₹1,24,34,600.00', ref: 'REF20260210HDFC001' },
-  { id: 'LE-004', timestamp: '14:12:13', intentId: 'pi_20260210_19PC', type: 'CREDIT', account: 'Merchant Settlement', amount: '₹6,400.00', balance: '₹1,24,35,350.00', ref: 'UTR20260210ICICI887722' },
+  { id: 'LE-001', timestamp: '14:23:48', intentId: MOCK_INTENT_IDS[0], type: 'CREDIT', account: 'Merchant Settlement', amount: '₹12,500.00', balance: '₹1,24,56,000.00', ref: 'UTR20260210HDFC991827' },
+  { id: 'LE-002', timestamp: '14:18:15', intentId: MOCK_INTENT_IDS[1], type: 'CREDIT', account: 'Merchant Settlement', amount: '₹8,900.00', balance: '₹1,24,43,500.00', ref: 'UTR20260210HDFC991826' },
+  { id: 'LE-003', timestamp: '14:14:25', intentId: MOCK_INTENT_IDS[2], type: 'DEBIT', account: 'Refund Pool', amount: '₹750.00', balance: '₹1,24,34,600.00', ref: 'REF20260210HDFC001' },
+  { id: 'LE-004', timestamp: '14:12:13', intentId: MOCK_INTENT_IDS[3], type: 'CREDIT', account: 'Merchant Settlement', amount: '₹6,400.00', balance: '₹1,24,35,350.00', ref: 'UTR20260210ICICI887722' },
   { id: 'LE-005', timestamp: '12:00:00', intentId: '-', type: 'CREDIT', account: 'Settlement Batch', amount: '₹56,78,000.00', balance: '₹1,24,28,950.00', ref: 'STL-2026-0210-002' },
   { id: 'LE-006', timestamp: '09:00:00', intentId: '-', type: 'DEBIT', account: 'MDR Fee', amount: '₹12,340.00', balance: '₹67,50,950.00', ref: 'MDR-2026-0210-001' },
 ]
