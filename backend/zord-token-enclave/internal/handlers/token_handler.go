@@ -18,9 +18,9 @@ func NewTokenHandler(s *services.TokenService) *TokenHandler {
 
 func (h *TokenHandler) Tokenize(c *gin.Context) {
 	var req struct {
-		TenantID string `json:"tenant_id"`
-		Kind     string `json:"kind"`
-		Value    string `json:"value"`
+		TenantID string            `json:"tenant_id"`
+		TraceID  string            `json:"trace_id"`
+		PII      map[string]string `json:"pii"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -28,13 +28,25 @@ func (h *TokenHandler) Tokenize(c *gin.Context) {
 		return
 	}
 
-	token, err := h.svc.Tokenize(c, req.TenantID, req.Kind, []byte(req.Value))
+	if req.TenantID == "" || len(req.PII) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id and pii required"})
+		return
+	}
+
+	tokens, err := h.svc.TokenizePII(
+		c.Request.Context(),
+		req.TenantID,
+		req.TraceID,
+		req.PII,
+	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "tokenization failed"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	c.JSON(http.StatusOK, gin.H{
+		"tokens": tokens,
+	})
 }
 
 func (h *TokenHandler) Detokenize(c *gin.Context) {
