@@ -147,11 +147,14 @@ func callEnclaveTokenize(ctx context.Context, req enclaveTokenizeRequest) (map[s
 		return nil, fmt.Errorf("enclave tokenize failed: status=%d body=%s", resp.StatusCode, string(raw))
 	}
 
-	var out map[string]string
+	var out struct {
+		Tokens map[string]string `json:"tokens"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return nil, err
 	}
-	return out, nil
+	return out.Tokens, nil
+
 }
 
 /* ---------------- Pipeline ---------------- */
@@ -317,10 +320,10 @@ func (s *IntentService) ProcessIncomingIntent(
 	beneficiaryTokenized := map[string]any{
 		"instrument": map[string]any{
 			"kind":       canonicalInput.Beneficiary.Instrument.Kind,
-			"ifsc_token": tokenMap["ifsc_token"],
-			"vpa_token":  tokenMap["vpa_token"],
+			"ifsc_token": tokenMap["ifsc"],
+			"vpa_token":  tokenMap["vpa"],
 		},
-		"name_token": tokenMap["name_token"],
+		"name_token": tokenMap["name"],
 		"country":    canonicalInput.Beneficiary.Country,
 	}
 	beneficiaryJSON, err := json.Marshal(beneficiaryTokenized)
