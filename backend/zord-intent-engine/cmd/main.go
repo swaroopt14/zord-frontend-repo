@@ -19,7 +19,7 @@ import (
 
 	"zord-intent-engine/internal/persistence"
 
-	"zord-intent-engine/internal/pii"
+	//"zord-intent-engine/internal/pii"
 
 	"zord-intent-engine/storage"
 )
@@ -45,10 +45,10 @@ func main() {
 	intentValidator := validator.NewValidator(dlqRepo)
 
 	// -------- PII Tokenizer --------
-	tokenizer, err := pii.NewTokenizer(os.Getenv("PII_TOKEN_SECRET"))
-	if err != nil {
-		log.Fatal("failed to init PII tokenizer:", err)
-	}
+	//tokenizer, err := pii.NewTokenizer(os.Getenv("PII_TOKEN_SECRET"))
+	// if err != nil {
+	// 	log.Fatal("failed to init PII tokenizer:", err)
+	// }
 
 	// -------- Intent Service --------
 	//------Initializing s3
@@ -59,7 +59,6 @@ func main() {
 
 	intentService := services.NewIntentService(
 		intentValidator,
-		tokenizer,
 		intentRepo,
 		s3store,
 	)

@@ -15,6 +15,7 @@ func CanonicalizeIntent(input models.ParsedIncomingIntent) models.ParsedIncoming
 
 	// account_number
 	out.AccountNumber = strings.TrimSpace(out.AccountNumber)
+	out.Beneficiary.Name = strings.TrimSpace(out.Beneficiary.Name)
 
 	// amount
 	out.Amount.Value = normalizeAmountValue(out.Amount.Value)
@@ -29,6 +30,8 @@ func CanonicalizeIntent(input models.ParsedIncomingIntent) models.ParsedIncoming
 		out.Beneficiary.Country =
 			strings.ToUpper(strings.TrimSpace(out.Beneficiary.Country))
 	}
+	out.Remitter.Phone = strings.TrimSpace(out.Remitter.Phone)
+	out.Remitter.Email = strings.ToLower(strings.TrimSpace(out.Remitter.Email))
 
 	//  purpose_code
 	out.PurposeCode = strings.ToUpper(strings.TrimSpace(out.PurposeCode))

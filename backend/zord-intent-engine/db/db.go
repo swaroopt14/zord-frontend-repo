@@ -69,6 +69,7 @@ func CreateTables() error {
     aggregate_id UUID NOT NULL, -- payment_intents.intent_id
 
     event_type TEXT NOT NULL,   -- intent.created.v1, intent.updated.v1
+	schema_version TEXT,
 	amount NUMERIC(18,2),
 	currency CHAR(3),
 

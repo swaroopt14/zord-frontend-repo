@@ -45,7 +45,7 @@ CREATE INDEX IF NOT EXISTS idx_payment_intents_created_at ON payment_intents(cre
 -- Stores events to be published to downstream systems
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS outbox (
-    outbox_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     tenant_id UUID NOT NULL,
 
@@ -54,12 +54,14 @@ CREATE TABLE IF NOT EXISTS outbox (
     aggregate_id UUID NOT NULL, -- payment_intents.intent_id
 
     event_type TEXT NOT NULL,   -- intent.created.v1, intent.updated.v1
+    schema_version TEXT,
+
     payload JSONB NOT NULL,     -- downstream message body (no raw PII)
     amount NUMERIC(18,2),
     currency CHAR(3),
 
     status TEXT NOT NULL DEFAULT 'PENDING',
-    attempts INT NOT NULL DEFAULT 0,
+    retry_count INT NOT NULL DEFAULT 0,
     next_attempt_at TIMESTAMPTZ,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -69,8 +71,8 @@ CREATE TABLE IF NOT EXISTS outbox (
     lease_until TIMESTAMPTZ,
 
     -- tracing / observability
-    trace_id VARCHAR(255),
-    envelope_id VARCHAR(255),
+    trace_id UUID NOT NULL,  
+    envelope_id UUID NOT NULL,
 
     CONSTRAINT fk_outbox_intent
         FOREIGN KEY (aggregate_id)
