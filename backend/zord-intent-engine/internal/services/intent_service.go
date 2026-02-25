@@ -81,12 +81,16 @@ func parseAmount(value string) (float64, error) {
 }
 
 type enclaveTokenizeRequest struct {
-	AccountNumber string `json:"account_number"`
-	IFSC          string `json:"ifsc"`
-	VPA           string `json:"vpa"`
-	Name          string `json:"name"`
-	Phone         string `json:"phone"`
-	Email         string `json:"email"`
+	TenantID string `json:"tenant_id"`
+	TraceID  string `json:"trace_id"`
+	PII      struct {
+		AccountNumber string `json:"account_number"`
+		IFSC          string `json:"ifsc"`
+		VPA           string `json:"vpa"`
+		Name          string `json:"name"`
+		Phone         string `json:"phone"`
+		Email         string `json:"email"`
+	} `json:"pii"`
 }
 
 // func firstNonEmpty(vals ...string) string {
@@ -277,14 +281,25 @@ func (s *IntentService) ProcessIncomingIntent(
 	// if err != nil {
 	// 	return nil, nil, err
 	// }
-	// -------- STEP 8: TOKENIZATION (PII ENCLAVE) --------
+	// -------- STEP 8: TOKENIZATION (PII ENCLAVE SERVICE) --------
 	tokenReq := enclaveTokenizeRequest{
-		AccountNumber: canonicalInput.AccountNumber,
-		IFSC:          canonicalInput.Beneficiary.Instrument.IFSC,
-		VPA:           canonicalInput.Beneficiary.Instrument.VPA,
-		Name:          canonicalInput.Beneficiary.Name,
-		Phone:         canonicalInput.Remitter.Phone,
-		Email:         canonicalInput.Remitter.Email,
+		TenantID: in.TenantID.String(),
+		TraceID:  in.TraceID.String(),
+		PII: struct {
+			AccountNumber string `json:"account_number"`
+			IFSC          string `json:"ifsc"`
+			VPA           string `json:"vpa"`
+			Name          string `json:"name"`
+			Phone         string `json:"phone"`
+			Email         string `json:"email"`
+		}{
+			AccountNumber: canonicalInput.AccountNumber,
+			IFSC:          canonicalInput.Beneficiary.Instrument.IFSC,
+			VPA:           canonicalInput.Beneficiary.Instrument.VPA,
+			Name:          canonicalInput.Beneficiary.Name,
+			Phone:         canonicalInput.Remitter.Phone,
+			Email:         canonicalInput.Remitter.Email,
+		},
 	}
 
 	tokenMap, err := callEnclaveTokenize(ctx, tokenReq)
