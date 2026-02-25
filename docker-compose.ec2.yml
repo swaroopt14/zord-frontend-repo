@@ -311,9 +311,8 @@ services:
       - ZORD_INTENT_ENGINE_URL=http://zord-intent-engine:8083
       - ZORD_VAULT_URL=http://zord-edge:8080
       - ZORD_CONTRACTS_URL=http://zord-relay:8082
-      - ZORD_PII_ENCLAVE_URL=http://zord-intent-engine:8083
-      # Next API route proxies to prompt-layer; browser uses same-origin /api/prompt-layer (no port).
-      - PROMPT_LAYER_URL=http://zord-prompt-layer:8086
+      - ZORD_PII_ENCLAVE_URL=http://zord-intent-engine:8087
+      - NEXT_PUBLIC_PROMPT_LAYER_URL=http://localhost:8086
 
     depends_on:
       - zord-edge

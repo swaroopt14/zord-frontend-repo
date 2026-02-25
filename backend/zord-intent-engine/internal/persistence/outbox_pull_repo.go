@@ -21,6 +21,8 @@ type OutboxPullRepo struct {
 	db *sql.DB
 }
 
+const maxOutboxRetries = 7
+
 func NewOutboxPullRepo(db *sql.DB) *OutboxPullRepo {
 	return &OutboxPullRepo{db: db}
 }
@@ -171,7 +173,14 @@ func (r *OutboxPullRepo) NackOutboxBatch(ctx context.Context, leaseID string, ev
 	query := `
 UPDATE outbox
 SET retry_count = retry_count + 1,
-    next_attempt_at = NOW(),
+    status = CASE
+        WHEN retry_count + 1 > $3 THEN 'FAILED'
+        ELSE 'PENDING'
+    END,
+    next_attempt_at = CASE
+        WHEN retry_count + 1 > $3 THEN NULL
+        ELSE NOW()
+    END,
     lease_id = NULL,
     leased_by = NULL,
     lease_until = NULL
@@ -179,7 +188,8 @@ WHERE lease_id = $1::uuid
   AND event_id = ANY($2::uuid[])
   AND status = 'PENDING';
 `
-	res, err := r.db.ExecContext(ctx, query, leaseID, pq.Array(eventIDs))
+	res, err := r.db.ExecContext(ctx, query, leaseID, pq.Array(eventIDs), maxOutboxRetries)
+
 	if err != nil {
 		return 0, err
 	}
