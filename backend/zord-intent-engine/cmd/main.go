@@ -39,6 +39,7 @@ func main() {
 	dlqRepo := persistence.NewDLQRepo(db.DB)
 	intentRepo := persistence.NewPaymentIntentRepo(db.DB)
 	intentQueryRepo := persistence.NewIntentQueryRepo(db.DB)
+	outboxPullRepo := persistence.NewOutboxPullRepo(db.DB)
 
 	// -------- Validator --------
 	intentValidator := validator.NewValidator(dlqRepo)
@@ -66,6 +67,7 @@ func main() {
 	// -------- DLQ HTTP (READ-ONLY) --------
 	dlqHandler := handlers.NewDLQHandler(dlqRepo)
 	intentHandler := handlers.NewIntentHandler(intentQueryRepo)
+	outboxHandler := handlers.NewOutboxHandler(outboxPullRepo)
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -98,6 +100,9 @@ func main() {
 		}
 	})
 	http.HandleFunc("/v1/intents", intentHandler.List)
+	http.HandleFunc("/internal/outbox/lease", outboxHandler.Lease)
+	http.HandleFunc("/internal/outbox/ack", outboxHandler.Ack)
+	http.HandleFunc("/internal/outbox/nack", outboxHandler.Nack)
 
 	// -------- REDIS CONSUMER (PRIMARY ENTRYPOINT) --------
 
