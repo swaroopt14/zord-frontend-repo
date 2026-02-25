@@ -203,6 +203,7 @@ services:
     env_file:
       - ./backend/zord-intent-engine/.env
     environment:
+      - ZORD_PII_ENCLAVE_URL=http://host.docker.internal:8087
       - DB_HOST=zord-intent-postgres
       - DB_PORT=5432
       - DB_USER=intent_user
@@ -348,4 +349,5 @@ volumes:
   kafka2_metadata:
   kafka3_data:
   kafka3_metadata:
+  chroma_data:
 
