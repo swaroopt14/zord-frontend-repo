@@ -11,12 +11,12 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *S3Store) StoreRawPayload(RawPayload []byte, TenatId string) (string, time.Time, string, error) {
+func (s *S3Store) StoreRawPayload(Payload []byte, TenantId string) (string, time.Time, string, error) {
 	EnvelopeID := uuid.New().String()
 	receivedTime := time.Now().UTC()
 	year, month, day := receivedTime.Date()
 
-	ObjectKey := fmt.Sprintf("raw/%s/%04d/%02d/%02d/%s", TenatId,
+	ObjectKey := fmt.Sprintf("raw/%s/%04d/%02d/%02d/%s", TenantId,
 		year,
 		int(month),
 		day,
@@ -30,7 +30,7 @@ func (s *S3Store) StoreRawPayload(RawPayload []byte, TenatId string) (string, ti
 	_, err := s.Client.PutObject(s3Ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(s.BucketName),
 		Key:         aws.String(ObjectKey),
-		Body:        bytes.NewReader(RawPayload),
+		Body:        bytes.NewReader(Payload),
 		ContentType: aws.String("application/json"),
 	})
 	if err != nil {

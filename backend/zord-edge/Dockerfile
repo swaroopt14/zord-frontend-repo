@@ -32,6 +32,9 @@ COPY --from=builder /app/main .
 # Copy schemas directory
 COPY --from=builder /app/schemas ./schemas
 
+#Copy backend/zord-edge/ed25519_private.pem
+COPY ed25519_private.pem /root/ed25519_private.pem
+
 # Expose port
 EXPOSE 8080
 

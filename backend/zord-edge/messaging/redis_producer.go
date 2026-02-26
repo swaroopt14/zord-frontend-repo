@@ -20,7 +20,7 @@ func ProduceWebhookMessage(ctx context.Context, msg model.RawIntentMessage, rdb 
 	}
 	return nil
 }
-func SendRawIntentMessage(ctx context.Context, msg model.IngressEnvolope, rdb *redis.Client) error {
+func SendRawIntentMessage(ctx context.Context, msg model.IngressEnvelope, rdb *redis.Client) error {
 	data, err := json.Marshal(msg)
 	if err != nil {
 		return err

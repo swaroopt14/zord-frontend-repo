@@ -13,7 +13,7 @@ func ProcessRawIntent(
 ) (*model.AckMessage, error) {
 
 	envelopeID, receivedAt, objRef, err := s3store.StoreRawPayload(
-		[]byte(msg.RawPayload),
+		[]byte(msg.Payload),
 		msg.TenantID,
 	)
 	if err != nil {

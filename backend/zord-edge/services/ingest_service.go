@@ -3,19 +3,17 @@ package services
 import (
 	"context"
 	"database/sql"
-	"errors"
+	"fmt"
 	"log"
 
 	"main.go/model"
 )
 
-var ErrDuplicateIdempotencyKey = errors.New("duplicate idempotency key")
-
 // intent *model.Payment_Intent,
 func SaveRawIntent(
 	ctx context.Context,
 	db *sql.DB,
-	envelope *model.IngressEnvolope,
+	envelope *model.IngressEnvelope,
 
 ) error {
 	//log.Printf("%+v\n", envelope)
@@ -30,28 +28,46 @@ func SaveRawIntent(
 	}()
 
 	query := `
-    	INSERT INTO ingress_envelopes
-    	(trace_id, envelope_id, tenant_id, source, source_system, idempotency_key, payload_hash, object_ref, parse_status, amount_value, amount_currency)
-		VALUES ($1, $2, $3, 
-			NULLIF($4, ''), 
-			NULLIF($5, ''), 
-			$6, $7, $8, $9, 
-			NULLIF($10::text, '')::NUMERIC, 
-			NULLIF($11, ''))
-		ON CONFLICT (tenant_id, idempotency_key) DO NOTHING
+		INSERT INTO ingress_envelopes
+		(trace_id,envelope_id, tenant_id, source, source_system,content_type,idempotency_key,payload_size,payload_hash,envelope_hash,envelope_signature,vault_object_ref,status,received_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	`
-	res, err := tx.ExecContext(ctx, query, envelope.TraceID, envelope.EnvelopeID, envelope.TenantID, envelope.Source, envelope.SourceSystem, envelope.IdempotencyKey, envelope.PayloadHash, envelope.ObjectRef, envelope.ParseStatus, envelope.AmountValue, envelope.AmountCurrency)
+	_, err = tx.ExecContext(ctx, query,
+		envelope.TraceID,
+		envelope.EnvelopeID,
+		envelope.TenantID,
+		envelope.Source,
+		envelope.SourceSystem,
+		envelope.ContentType,
+		envelope.IdempotencyKey,
+		envelope.PayloadSize,
+		envelope.PayloadHash,
+		envelope.EnvelopeHash,
+		envelope.EnvelopeSignature,
+		envelope.ObjectRef,
+		envelope.Status,
+		envelope.ReceivedAt)
 	if err != nil {
 
+		return err
+	}
+
+	query = `UPDATE idempotency_keys SET status=$1,first_envelope_id=$2 
+		WHERE tenant_id=$3 AND idempotency_key=$4`
+
+	res, err := tx.ExecContext(ctx, query, "Completed", envelope.EnvelopeID, envelope.TenantID, envelope.IdempotencyKey)
+	if err != nil {
+		log.Printf("Error updating idempotency key: %v", err)
 		return err
 	}
 	rows, err := res.RowsAffected()
 	if err != nil {
 		return err
 	}
-	if rows == 0 {
-		return ErrDuplicateIdempotencyKey
+	if rows != 1 {
+		return fmt.Errorf("idempotency update affected %d rows", rows)
 	}
+
 	return tx.Commit()
 
 }
