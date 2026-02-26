@@ -3,6 +3,8 @@ package models
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 type CanonicalIntent struct {
@@ -19,9 +21,9 @@ type CanonicalIntent struct {
 	CanonicalVersion string `json:"canonical_version"`
 	SchemaVersion    string `json:"schema_version"`
 
-	Amount     float64    `json:"amount"`
-	Currency   string     `json:"currency"`
-	DeadlineAt *time.Time `json:"deadline_at,omitempty"`
+	Amount     decimal.Decimal `json:"amount"`
+	Currency   string          `json:"currency"`
+	DeadlineAt *time.Time      `json:"deadline_at,omitempty"`
 
 	Constraints json.RawMessage `json:"constraints,omitempty"`
 

@@ -15,31 +15,24 @@ func CreateTables() error {
 		trace_id UUID NOT NULL,
 		envelope_id UUID NOT NULL,
 		tenant_id UUID NOT NULL,
-
     idempotency_key TEXT,
     salient_hash TEXT NOT NULL,
-
     intent_type TEXT NOT NULL,
     canonical_version TEXT NOT NULL,
     schema_version TEXT,
-
-    amount NUMERIC(18,2) NOT NULL,
+    amount NUMERIC NOT NULL,
     currency CHAR(3) NOT NULL,
     deadline_at TIMESTAMPTZ,
-
     constraints JSONB,
     beneficiary_type TEXT,
     pii_tokens JSONB,
     beneficiary JSONB,
-
     status TEXT NOT NULL,
     confidence_score NUMERIC(5,2),
-
     -- 🆕 WORM / Tamper-evidence fields
     canonical_hash TEXT NOT NULL,
     prev_hash TEXT,
     canonical_ref TEXT NOT NULL,
-
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );`
 
@@ -63,34 +56,25 @@ func CreateTables() error {
     envelope_id UUID NOT NULL, 
     tenant_id UUID NOT NULL,
 	lease_id UUID, leased_by TEXT, lease_until TIMESTAMPTZ,
-
     -- intent-specific outbox
     aggregate_type TEXT NOT NULL DEFAULT 'intent',
     aggregate_id UUID NOT NULL, -- payment_intents.intent_id
-
     event_type TEXT NOT NULL,   -- intent.created.v1, intent.updated.v1
 	schema_version TEXT,
-	amount NUMERIC(18,2),
+	amount NUMERIC,
 	currency CHAR(3),
-
     payload JSONB NOT NULL,     -- downstream message body (no raw PII)
-
     status TEXT NOT NULL DEFAULT 'PENDING',
     retry_count INT NOT NULL DEFAULT 0,
     next_attempt_at TIMESTAMPTZ,
-
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     sent_at TIMESTAMPTZ,
-
-
     CONSTRAINT fk_outbox_intent
         FOREIGN KEY (aggregate_id)
         REFERENCES payment_intents(intent_id)
         ON DELETE RESTRICT,
-
     CONSTRAINT chk_outbox_status
         CHECK (status IN ('PENDING', 'SENT', 'FAILED')),
-
     CONSTRAINT chk_outbox_aggregate_type
         CHECK (aggregate_type = 'intent')
 );
@@ -130,12 +114,10 @@ func CreateTables() error {
 		dlq_id UUID PRIMARY KEY,
 		tenant_id UUID NOT NULL,
 		envelope_id UUID NOT NULL,
-
 		stage TEXT NOT NULL,
 		reason_code TEXT NOT NULL,
 		error_detail TEXT,
 		replayable BOOLEAN NOT NULL,
-
 		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 	);`
 
