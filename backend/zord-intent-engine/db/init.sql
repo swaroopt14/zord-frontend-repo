@@ -12,14 +12,17 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS payment_intents (
     intent_id UUID PRIMARY KEY,
+    trace_id UUID NOT NULL,
     envelope_id UUID NOT NULL,
     tenant_id UUID NOT NULL,
+    idempotency_key TEXT,
+    salient_hash TEXT NOT NULL,
 
     intent_type TEXT NOT NULL,
     canonical_version TEXT NOT NULL,
     schema_version TEXT,
 
-    amount NUMERIC(18,2) NOT NULL,
+    amount NUMERIC NOT NULL,
     currency CHAR(3) NOT NULL,
     deadline_at TIMESTAMPTZ,
 
@@ -30,6 +33,9 @@ CREATE TABLE IF NOT EXISTS payment_intents (
 
     status TEXT NOT NULL,
     confidence_score NUMERIC(5,2),
+    canonical_hash TEXT NOT NULL,
+    prev_hash TEXT,
+    canonical_ref TEXT NOT NULL,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -57,7 +63,7 @@ CREATE TABLE IF NOT EXISTS outbox (
     schema_version TEXT,
 
     payload JSONB NOT NULL,     -- downstream message body (no raw PII)
-    amount NUMERIC(18,2),
+    amount NUMERIC,
     currency CHAR(3),
 
     status TEXT NOT NULL DEFAULT 'PENDING',

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/big"
 	"net/http"
 	"os"
 	"strings"
@@ -22,6 +21,8 @@ import (
 	//"zord-intent-engine/internal/pii"
 	"zord-intent-engine/internal/validator"
 	"zord-intent-engine/storage"
+
+	"github.com/shopspring/decimal"
 )
 
 type IntentService struct {
@@ -70,14 +71,12 @@ func NewIntentService(
 
 /* ---------------- Helpers ---------------- */
 
-func parseAmount(value string) (float64, error) {
-	rat, ok := new(big.Rat).SetString(value)
-	if !ok {
-		return 0, errors.New("invalid amount format")
+func parseAmount(value string) (decimal.Decimal, error) {
+	v := strings.TrimSpace(value)
+	if v == "" {
+		return decimal.Zero, errors.New("amount is required")
 	}
-
-	f, _ := rat.Float64()
-	return f, nil
+	return decimal.NewFromString(v) // exact decimal, no rounding
 }
 
 type enclaveTokenizeRequest struct {
@@ -460,7 +459,7 @@ func (s *IntentService) processWebhook(
 		SalientHash:    in.PayloadHash, // Might be empty
 		IntentType:     "WEBHOOK",
 		SchemaVersion:  "v1",
-		Amount:         0,
+		Amount:         decimal.Zero,
 		Currency:       "XXX",
 		Status:         "CREATED",
 		CreatedAt:      time.Now().UTC(),
