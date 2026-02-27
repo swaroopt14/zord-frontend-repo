@@ -9,8 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	_ "github.com/lib/pq"
 	"go.uber.org/zap"
 
 	"zord-relay/config"
@@ -61,11 +59,14 @@ func main() {
 
 	// Publisher Service (Relay logic)
 	pubCfg := &services.Config{
-		ReadyTopic:   cfg.ReadyTopic,
-		DLQTopic:     cfg.DLQTopic,
-		WorkerCount:  cfg.WorkerCount,
-		BatchSize:    cfg.BatchSize,
-		PollInterval: cfg.PollInterval,
+		ReadyTopic:             cfg.ReadyTopic,
+		PublishFailureDLQTopic: cfg.PublishFailureDLQTopic,
+		PoisonEventDLQTopic:    cfg.PoisonEventDLQTopic,
+		WorkerCount:            cfg.WorkerCount,
+		BatchSize:              cfg.BatchSize,
+		PollInterval:           cfg.PollInterval,
+		MaxAttempts:            cfg.MaxAttempts,
+		MaxAge:                 cfg.MaxAge,
 	}
 
 	publisher := services.NewPublisher(intentClient, producer, pubCfg)
@@ -74,10 +75,6 @@ func main() {
 	defer cancel()
 
 	publisher.Start(ctx)
-
-	// API Router (if needed for relay observability)
-	router := gin.New()
-	router.Use(gin.Logger(), gin.Recovery())
 
 	// Graceful shutdown
 	stop := make(chan os.Signal, 1)
