@@ -162,8 +162,21 @@ func callEnclaveTokenize(ctx context.Context, req enclaveTokenizeRequest) (map[s
 // It consumes ingress output from Service-1 (via Redis).
 func (s *IntentService) ProcessIncomingIntent(
 	ctx context.Context,
-	in *models.IncomingIntent,
+	event *models.Event,
 ) (*models.CanonicalIntent, *models.DLQEntry, error) {
+
+	//Unmarshal Payload into IncomingIntent struct
+	var in *models.IncomingIntent
+
+	in = &models.IncomingIntent{
+		TenantID:       event.TenantID,
+		EnvelopeID:     event.EnvelopeID,
+		TraceID:        event.TraceID,
+		Source:         event.Source,
+		Payload:        event.Raw_payload,
+		ObjectRef:      event.ObjectRef,
+		IdempotencyKey: event.IdempotencyKey,
+	}
 
 	// -------- STEP 0: Transport guards --------
 
@@ -190,23 +203,23 @@ func (s *IntentService) ProcessIncomingIntent(
 		return nil, &models.DLQEntry{ReasonCode: "MISSING_TENANT_ID"}, nil
 	}
 
-	switch in.ParseStatus {
-	case "PARSED":
-		// OK — normal path
+	// switch in.ParseStatus {
+	// case "PARSED":
+	// 	// OK — normal path
 
-	case "RECEIVED":
-		// Compatibility mode (temporary)
-		// Service-1 hasn’t upgraded yet
-		log.Printf(
-			"⚠️ COMPAT: parse_status=RECEIVED treated as PARSED [envelope=%s]",
-			in.EnvelopeID,
-		)
+	// case "RECEIVED":
+	// 	// Compatibility mode (temporary)
+	// 	// Service-1 hasn’t upgraded yet
+	// 	log.Printf(
+	// 		"⚠️ COMPAT: parse_status=RECEIVED treated as PARSED [envelope=%s]",
+	// 		in.EnvelopeID,
+	// 	)
 
-	default:
-		return nil, &models.DLQEntry{
-			ReasonCode: "NOT_PARSED",
-		}, nil
-	}
+	// default:
+	// 	return nil, &models.DLQEntry{
+	// 		ReasonCode: "NOT_PARSED",
+	// 	}, nil
+	// }
 
 	// if in.SignatureStatus == nil || *in.SignatureStatus != "VERIFIED" {
 	// 	return nil, &models.DLQEntry{ReasonCode: "SIGNATURE_NOT_VERIFIED"}, nil
@@ -230,7 +243,7 @@ func (s *IntentService) ProcessIncomingIntent(
 	// -------- STEP 5: Parse raw payload into domain model --------
 
 	var parsed models.ParsedIncomingIntent
-	if err := json.Unmarshal(in.Payload, &parsed); err != nil {
+	if err := json.Unmarshal(event.Raw_payload, &parsed); err != nil {
 		return nil, &models.DLQEntry{
 			ReasonCode: "INVALID_JSON_PAYLOAD",
 		}, nil
@@ -303,7 +316,7 @@ func (s *IntentService) ProcessIncomingIntent(
 			Email:         canonicalInput.Remitter.Email,
 		},
 	}
-
+	log.Println("Data sent for tokenization", tokenReq)
 	tokenMap, err := callEnclaveTokenize(ctx, tokenReq)
 	if err != nil {
 		return nil, nil, err
