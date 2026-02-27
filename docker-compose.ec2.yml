@@ -184,6 +184,7 @@ services:
       - AWS_REGION=ap-south-1
       - AWS_EC2_METADATA_DISABLED=${AWS_EC2_METADATA_DISABLED:-false}
       - S3_BUCKET=arealis-zord-vault
+      - ZORD_VAULT_KEY=00Ofxp50eVCizf58ZoX4Zy2T83O38sMSrc3s9Cpb/ac=
     depends_on:
       zord-edge-postgres:
         condition: service_healthy

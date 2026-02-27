@@ -31,7 +31,34 @@ func Authenticate() gin.HandlerFunc {
 				})
 				return
 			}
+			ContentType := context.GetHeader("Content-Type")
+			if ContentType != "application/json" {
+				context.JSON(http.StatusBadRequest, gin.H{"Error": "Content-Type must be application/json"})
+				context.Abort()
+				return
+			}
+			SourceType := context.GetHeader("X-Zord-Source-Type")
+			if SourceType == "" {
+				context.JSON(http.StatusBadRequest, gin.H{"Error": "X-Zord-Source-Type header is required"})
+				context.Abort()
+				return
+			}
+			validSources := map[string]bool{
+				"REST":        true,
+				"CSV":         true,
+				"PROMPT":      true,
+				"WEBHOOK":     true,
+				"FILE_UPLOAD": true,
+			}
+			if !validSources[SourceType] {
+				context.JSON(http.StatusBadRequest, gin.H{"Error": "Invalid X-Zord-Source-Type header value"})
+				context.Abort()
+				return
+			}
+
 			context.Set("tenant_id", response.TenantId)
+			context.Set("Content-Type", ContentType)
+			context.Set("source_type", SourceType)
 			context.Next()
 
 		}

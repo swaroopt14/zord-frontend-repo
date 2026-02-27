@@ -9,7 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func ConsumeIngressMessage(ctx context.Context, rdb *redis.Client) (*models.IncomingIntent, error) {
+func ConsumeIngressMessage(ctx context.Context, rdb *redis.Client) (*models.Event, error) {
 
 	result, err := rdb.BRPop(ctx,
 		0,
@@ -18,7 +18,7 @@ func ConsumeIngressMessage(ctx context.Context, rdb *redis.Client) (*models.Inco
 	if err != nil {
 		return nil, err
 	}
-	var msg models.IncomingIntent
+	var msg models.Event
 	err = json.Unmarshal([]byte(result[1]), &msg)
 	if err != nil {
 		return nil, err

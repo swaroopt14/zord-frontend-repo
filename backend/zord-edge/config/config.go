@@ -14,6 +14,10 @@ import (
 	"main.go/db"
 )
 
+type Config struct {
+	VaultKey string
+}
+
 func InitDB() {
 	var err error
 	_ = godotenv.Load()
@@ -72,4 +76,10 @@ func InitRedisClient() *redis.Client {
 	}
 
 	return rdb
+}
+
+func LoadConfig() *Config {
+	return &Config{
+		VaultKey: os.Getenv("ZORD_VAULT_KEY"),
+	}
 }

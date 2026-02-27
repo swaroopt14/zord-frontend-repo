@@ -15,6 +15,7 @@ import (
 	"main.go/handler"
 	"main.go/routes"
 	"main.go/storage"
+	"main.go/vault"
 )
 
 var (
@@ -86,6 +87,16 @@ func main() {
 	h := &handler.Handler{
 		Redis:   Rdb,
 		S3store: s3store,
+	}
+	cfg := config.LoadConfig()
+
+	err = vault.InitVaultKey(cfg.VaultKey)
+	if err != nil {
+		log.Fatal("failed to initialize vault key:", err)
+	}
+	err = vault.InitSigningKey("ed25519_private.pem")
+	if err != nil {
+		log.Fatal("failed to load signing key:", err)
 	}
 
 	routes.Routes(server, h)

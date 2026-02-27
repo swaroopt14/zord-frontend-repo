@@ -22,7 +22,7 @@ func Routes(router *gin.Engine, h *handler.Handler) {
 	webhooks := router.Group("/v1/raw/envelopes")
 	webhooks.Use(middleware.VerifyWebhookSignature())
 	{
-		//webhooks.POST("/webhooks/:provider", h.WebhookHandler)
+		webhooks.POST("/webhooks/:provider", h.WebhookHandler)
 	}
 
 	if err := validator.InitSchemaValidator(); err != nil {

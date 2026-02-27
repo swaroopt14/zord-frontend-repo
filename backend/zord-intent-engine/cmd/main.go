@@ -106,10 +106,10 @@ func main() {
 	// -------- REDIS CONSUMER (PRIMARY ENTRYPOINT) --------
 
 	workerPoolSize := config.GetWorkerPoolSize()
-	jobChan := make(chan *models.IncomingIntent, 100)
+	jobChan := make(chan *models.Event, 100)
 
 	// Worker function
-	worker := func(id int, jobs <-chan *models.IncomingIntent) {
+	worker := func(id int, jobs <-chan *models.Event) {
 		for job := range jobs {
 			canonical, dlq, err := intentService.ProcessIncomingIntent(ctx, job)
 
