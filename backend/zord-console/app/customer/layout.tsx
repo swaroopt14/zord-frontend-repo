@@ -22,6 +22,13 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
     if (env === 'sandbox' || env === 'production') setEnvironment(env)
   }, [])
 
+  useEffect(() => {
+    if (!pathname?.startsWith('/customer')) return
+    const nextEnv: 'sandbox' | 'production' = pathname.startsWith('/customer/sandbox') ? 'sandbox' : 'production'
+    setEnvironment(nextEnv)
+    localStorage.setItem('cx_env', nextEnv)
+  }, [pathname])
+
   const handleEnvChange = (env: 'sandbox' | 'production') => {
     setEnvironment(env)
     localStorage.setItem('cx_env', env)

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { MOCK_INTENT_IDS } from '../mock'
 
 type Environment = 'sandbox' | 'production'
@@ -11,6 +11,45 @@ interface CustomerTopBarProps {
   tenant?: string
   environment?: Environment
   onEnvironmentChange?: (env: Environment) => void
+}
+
+const SANDBOX_SUPPORTED_ROUTES = new Set<string>([
+  '/customer/overview',
+  '/customer/exceptions',
+  '/customer/work-queue',
+  '/customer/intents',
+  '/customer/intents/create',
+  '/customer/intents/replay',
+  '/customer/workflow-timeline',
+  '/customer/evidence',
+  '/customer/evidence/explorer',
+  '/customer/evidence/export',
+  '/customer/integrations/webhooks',
+  '/customer/integrations/api-logs',
+  '/customer/integrations/adapters',
+  '/customer/reports/ledger',
+  '/customer/reports/settlement',
+  '/customer/reports/discrepancy',
+])
+
+const isIntentDetailPath = (path: string) => /^\/customer\/intents\/[^/]+$/.test(path)
+
+const toSandboxPath = (path: string) => {
+  const normalized = path === '/customer' ? '/customer/overview' : path
+  if (normalized.startsWith('/customer/sandbox')) return normalized
+  if (normalized === '/customer/intents/create') return '/customer/sandbox/intents/create'
+  if (SANDBOX_SUPPORTED_ROUTES.has(normalized) || isIntentDetailPath(normalized)) {
+    return normalized.replace('/customer', '/customer/sandbox')
+  }
+  return '/customer/sandbox/overview'
+}
+
+const toProductionPath = (path: string) => {
+  if (path.startsWith('/customer/sandbox')) {
+    const converted = path.replace('/customer/sandbox', '/customer')
+    return converted === '/customer' ? '/customer/overview' : converted
+  }
+  return path === '/customer' ? '/customer/overview' : path
 }
 
 export function CustomerTopBar({ tenant, environment = 'production', onEnvironmentChange }: CustomerTopBarProps) {
@@ -23,6 +62,7 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
   const [toasts, setToasts] = useState<Array<{ id: string; title: string; desc?: string; type?: 'success' | 'warning' | 'error' | 'info' }>>([])
   const notifRef = useRef<HTMLDivElement>(null)
   const userRef = useRef<HTMLDivElement>(null)
+  const pathname = usePathname()
   const router = useRouter()
 
   useEffect(() => {
@@ -73,7 +113,21 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
     return () => window.removeEventListener('cx:toast', onToast as EventListener)
   }, [])
 
-  const handleEnvChange = (env: Environment) => { setCurrentEnv(env); onEnvironmentChange?.(env) }
+  useEffect(() => {
+    setCurrentEnv(environment)
+  }, [environment])
+
+  const handleEnvChange = (env: Environment) => {
+    const currentPath = pathname || '/customer/overview'
+    const nextPath = env === 'sandbox' ? toSandboxPath(currentPath) : toProductionPath(currentPath)
+    setCurrentEnv(env)
+    onEnvironmentChange?.(env)
+    if (nextPath !== currentPath) {
+      router.push(nextPath)
+    }
+  }
+
+  const homeHref = currentEnv === 'sandbox' ? '/customer/sandbox/overview' : '/customer/overview'
 
   if (!mounted) return <div className="h-14" style={{ background: 'var(--glass-surface)' }} />
 
@@ -138,7 +192,7 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
         {/* Left Section */}
         <div className="flex items-center h-full">
           {/* Logo */}
-          <Link href="/customer/overview" className="px-4 h-full flex items-center gap-2.5 transition-colors duration-[120ms]"
+          <Link href={homeHref} className="px-4 h-full flex items-center gap-2.5 transition-colors duration-[120ms]"
             style={{ color: 'var(--glass-item-active)' }}
           >
             <div className="w-8 h-8 rounded-[10px] flex items-center justify-center" style={{ background: 'var(--cx-primary)', boxShadow: '0 2px 6px rgba(124,58,237,0.25)' }}>
@@ -149,7 +203,34 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
             </span>
           </Link>
 
-          {/* Tenant + Environment moved into the notifications panel (bell icon). */}
+          <div
+            className="mx-2 flex items-center rounded-[12px] p-0.5"
+            style={{ background: 'var(--glass-item-hover-bg)', border: '1px solid var(--glass-border)' }}
+            aria-label="Environment toggle"
+          >
+            <button
+              onClick={() => handleEnvChange('production')}
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-[10px] transition-all duration-[120ms]"
+              style={
+                currentEnv === 'production'
+                  ? { background: 'var(--cx-success)', color: '#fff', boxShadow: '0 1px 4px rgba(20,184,166,0.25)' }
+                  : { color: 'var(--glass-item-text)' }
+              }
+            >
+              LIVE
+            </button>
+            <button
+              onClick={() => handleEnvChange('sandbox')}
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-[10px] transition-all duration-[120ms]"
+              style={
+                currentEnv === 'sandbox'
+                  ? { background: 'var(--cx-energy)', color: '#fff', boxShadow: '0 1px 4px rgba(249,115,22,0.25)' }
+                  : { color: 'var(--glass-item-text)' }
+              }
+            >
+              SANDBOX
+            </button>
+          </div>
         </div>
 
         {/* Center — Global Search */}
@@ -211,33 +292,15 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
                       </div>
                     </div>
 
-                    <div
-                      className="flex items-center rounded-[12px] p-0.5 flex-shrink-0"
-                      style={{ background: 'var(--glass-item-hover-bg)', border: '1px solid var(--glass-border)' }}
+                    <span
+                      className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide rounded-full flex-shrink-0"
+                      style={{
+                        background: currentEnv === 'sandbox' ? 'rgba(249,115,22,0.12)' : 'rgba(20,184,166,0.12)',
+                        color: currentEnv === 'sandbox' ? 'var(--cx-energy)' : 'var(--cx-success)',
+                      }}
                     >
-                      <button
-                        onClick={() => handleEnvChange('production')}
-                        className="px-2.5 py-1 text-[11px] font-semibold rounded-[10px] transition-all duration-[120ms]"
-                        style={
-                          currentEnv === 'production'
-                            ? { background: 'var(--cx-success)', color: '#fff', boxShadow: '0 1px 4px rgba(20,184,166,0.25)' }
-                            : { color: 'var(--glass-item-text)' }
-                        }
-                      >
-                        PROD
-                      </button>
-                      <button
-                        onClick={() => handleEnvChange('sandbox')}
-                        className="px-2.5 py-1 text-[11px] font-semibold rounded-[10px] transition-all duration-[120ms]"
-                        style={
-                          currentEnv === 'sandbox'
-                            ? { background: 'var(--cx-energy)', color: '#fff', boxShadow: '0 1px 4px rgba(249,115,22,0.25)' }
-                            : { color: 'var(--glass-item-text)' }
-                        }
-                      >
-                        SANDBOX
-                      </button>
-                    </div>
+                      {currentEnv === 'sandbox' ? 'Sandbox Mode' : 'Live Mode'}
+                    </span>
                   </div>
                 </div>
                 <div className="max-h-72 overflow-y-auto cx-glass-scroll">

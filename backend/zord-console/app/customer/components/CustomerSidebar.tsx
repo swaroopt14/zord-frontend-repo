@@ -50,6 +50,7 @@ function Icon({ d, size = 20 }: { d: React.ReactNode; size?: number }) {
    ================================================================ */
 interface NavItem { label: string; href: string; icon: React.ReactNode; badge?: number }
 interface NavSection { id: string; title: string; items: NavItem[] }
+type Environment = 'sandbox' | 'production'
 
 const sections: NavSection[] = [
   {
@@ -109,6 +110,25 @@ const sections: NavSection[] = [
   },
 ]
 
+const SANDBOX_ROUTE_MAP: Record<string, string> = {
+  '/customer/overview': '/customer/sandbox/overview',
+  '/customer/exceptions': '/customer/sandbox/exceptions',
+  '/customer/work-queue': '/customer/sandbox/work-queue',
+  '/customer/intents': '/customer/sandbox/intents',
+  '/customer/intents/create': '/customer/sandbox/intents/create',
+  '/customer/intents/replay': '/customer/sandbox/intents/replay',
+  '/customer/workflow-timeline': '/customer/sandbox/workflow-timeline',
+  '/customer/evidence': '/customer/sandbox/evidence',
+  '/customer/evidence/explorer': '/customer/sandbox/evidence/explorer',
+  '/customer/evidence/export': '/customer/sandbox/evidence/export',
+  '/customer/integrations/api-logs': '/customer/sandbox/integrations/api-logs',
+  '/customer/integrations/webhooks': '/customer/sandbox/integrations/webhooks',
+  '/customer/integrations/adapters': '/customer/sandbox/integrations/adapters',
+  '/customer/reports/settlement': '/customer/sandbox/reports/settlement',
+  '/customer/reports/ledger': '/customer/sandbox/reports/ledger',
+  '/customer/reports/discrepancy': '/customer/sandbox/reports/discrepancy',
+}
+
 /* ================================================================
    Sidebar Component
    ================================================================ */
@@ -117,10 +137,25 @@ export function CustomerSidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const [isDark, setIsDark] = useState(false)
   const [query, setQuery] = useState('')
+  const [environment, setEnvironment] = useState<Environment>('production')
 
   useEffect(() => {
     setIsDark(document.documentElement.getAttribute('data-theme') === 'dark')
+    const savedEnv = localStorage.getItem('cx_env')
+    if (savedEnv === 'sandbox' || savedEnv === 'production') {
+      setEnvironment(savedEnv)
+    }
   }, [])
+
+  useEffect(() => {
+    if (pathname?.startsWith('/customer/sandbox')) {
+      setEnvironment('sandbox')
+      return
+    }
+    if (pathname?.startsWith('/customer')) {
+      setEnvironment('production')
+    }
+  }, [pathname])
 
   const toggleTheme = () => {
     const next = !isDark
@@ -134,10 +169,15 @@ export function CustomerSidebar() {
     }
   }
 
+  const toSandboxHref = (href: string) => SANDBOX_ROUTE_MAP[href] ?? href
+  const scopedHref = (href: string) => (environment === 'sandbox' ? toSandboxHref(href) : href)
+
   const isActive = (href: string) => {
-    if (href === '/customer/overview') return pathname === '/customer/overview' || pathname === '/customer'
-    if (href === '/customer/intents') return pathname === '/customer/intents'
-    if (href === '/customer/evidence') return pathname === '/customer/evidence'
+    if (href === '/customer/overview' || href === '/customer/sandbox/overview') {
+      return pathname === href || pathname === href.replace('/overview', '')
+    }
+    if (href === '/customer/intents' || href === '/customer/sandbox/intents') return pathname === href
+    if (href === '/customer/evidence' || href === '/customer/sandbox/evidence') return pathname === href
     if (href === '/customer/alerts') return pathname === '/customer/alerts'
     return pathname === href || pathname?.startsWith(href + '/')
   }
@@ -259,11 +299,12 @@ export function CustomerSidebar() {
 
             {/* Items */}
             {section.items.map((item) => {
-              const active = isActive(item.href)
+              const href = scopedHref(item.href)
+              const active = isActive(href)
               return (
                 <Link
-                  key={item.href}
-                  href={item.href}
+                  key={`${section.id}_${item.href}`}
+                  href={href}
                   title={collapsed ? item.label : undefined}
                   className="flex items-center gap-3 rounded-[10px] transition-all duration-150 relative group"
                   style={{
