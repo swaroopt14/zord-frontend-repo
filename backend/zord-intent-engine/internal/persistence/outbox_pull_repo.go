@@ -21,7 +21,10 @@ type OutboxPullRepo struct {
 	db *sql.DB
 }
 
-const maxOutboxRetries = 7
+const (
+	maxOutboxAttempts = 7
+	maxOutboxAgeHours = 8
+)
 
 func NewOutboxPullRepo(db *sql.DB) *OutboxPullRepo {
 	return &OutboxPullRepo{db: db}
@@ -40,7 +43,9 @@ WITH picked AS (
 	SELECT event_id
 	FROM outbox
 	WHERE status = 'PENDING'
+	  AND retry_count < $5
 	  AND (lease_until IS NULL OR lease_until < NOW())
+	  AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
 	ORDER BY created_at ASC
 	LIMIT $1
 	FOR UPDATE SKIP LOCKED
@@ -49,7 +54,8 @@ leased AS (
 	UPDATE outbox o
 	SET lease_id = $2::uuid,
 	    leased_by = $3,
-	    lease_until = NOW() + ($4::int * INTERVAL '1 second')
+	    lease_until = NOW() + ($4::int * INTERVAL '1 second'),
+	    retry_count = o.retry_count + 1
 	FROM picked p
 	WHERE o.event_id = p.event_id
 	RETURNING
@@ -89,7 +95,7 @@ FROM leased
 ORDER BY created_at ASC;
 `
 
-	rows, err := r.db.QueryContext(ctx, query, limit, leaseID, leasedBy, leaseTTLSeconds)
+	rows, err := r.db.QueryContext(ctx, query, limit, leaseID, leasedBy, leaseTTLSeconds, maxOutboxAttempts)
 	if err != nil {
 		return "", nil, nil, err
 	}
@@ -159,8 +165,7 @@ SET status = 'SENT',
     leased_by = NULL,
     lease_until = NULL
 WHERE lease_id = $1::uuid
-  AND event_id = ANY($2::uuid[])
-  AND status = 'PENDING';
+  AND event_id = ANY($2::uuid[]);
 `
 	res, err := r.db.ExecContext(ctx, query, leaseID, pq.Array(eventIDs))
 	if err != nil {
@@ -172,14 +177,15 @@ WHERE lease_id = $1::uuid
 func (r *OutboxPullRepo) NackOutboxBatch(ctx context.Context, leaseID string, eventIDs []string) (int64, error) {
 	query := `
 UPDATE outbox
-SET retry_count = retry_count + 1,
-    status = CASE
-        WHEN retry_count + 1 > $3 THEN 'FAILED'
+SET status = CASE
+        WHEN retry_count >= $3 OR created_at < NOW() - ($4::int * INTERVAL '1 hour') THEN 'FAILED'
         ELSE 'PENDING'
     END,
     next_attempt_at = CASE
-        WHEN retry_count + 1 > $3 THEN NULL
-        ELSE NOW()
+        WHEN retry_count >= $3 OR created_at < NOW() - ($4::int * INTERVAL '1 hour') THEN NULL
+        ELSE NOW() + (
+			LEAST(3600, GREATEST(1, POWER(2, retry_count - 1))) * (0.8 + random() * 0.4)
+		) * INTERVAL '1 second'
     END,
     lease_id = NULL,
     leased_by = NULL,
@@ -188,8 +194,7 @@ WHERE lease_id = $1::uuid
   AND event_id = ANY($2::uuid[])
   AND status = 'PENDING';
 `
-	res, err := r.db.ExecContext(ctx, query, leaseID, pq.Array(eventIDs), maxOutboxRetries)
-
+	res, err := r.db.ExecContext(ctx, query, leaseID, pq.Array(eventIDs), maxOutboxAttempts, maxOutboxAgeHours)
 	if err != nil {
 		return 0, err
 	}

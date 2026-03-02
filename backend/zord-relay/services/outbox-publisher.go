@@ -2,35 +2,57 @@ package services
 
 import (
 	"context"
-	"database/sql"
-	"math/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"strings"
 	"time"
 	"zord-relay/kafka"
-	"zord-relay/model"
 	"zord-relay/utils"
 
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
 type Publisher struct {
-	db       *sql.DB
-	producer *kafka.Producer
-	cfg      *Config
+	intentClient *IntentClient
+	producer     *kafka.Producer
+	cfg          *Config
 }
 
 type Config struct {
-	ReadyTopic   string
-	DLQTopic     string
-	WorkerCount  int
-	BatchSize    int
-	MaxRetries   int
-	RetryBackoff time.Duration
-	PollInterval time.Duration
+	ReadyTopic             string
+	PublishFailureDLQTopic string
+	PoisonEventDLQTopic    string
+	WorkerCount            int
+	BatchSize              int
+	PollInterval           time.Duration
+	MaxAttempts            int
+	MaxAge                 time.Duration
 }
 
-func NewPublisher(db *sql.DB, producer *kafka.Producer, cfg *Config) *Publisher {
-	return &Publisher{db: db, producer: producer, cfg: cfg}
+type relayEvent struct {
+	EventID       string          `json:"event_id"`
+	EventType     string          `json:"event_type"`
+	TenantID      string          `json:"tenant_id"`
+	IntentID      string          `json:"intent_id"`
+	EnvelopeID    string          `json:"envelope_id"`
+	TraceID       string          `json:"trace_id"`
+	SchemaVersion string          `json:"schema_version,omitempty"`
+	PayloadInline json.RawMessage `json:"payload_inline"`
+	PayloadHash   string          `json:"payload_hash"`
+}
+
+type dlqEnvelope struct {
+	Event         relayEvent `json:"event"`
+	Error         string     `json:"error"`
+	ReasonCode    string     `json:"reason_code"`
+	LastAttemptAt time.Time  `json:"last_attempt_at"`
+	AttemptsCount int        `json:"attempts_count"`
+}
+
+func NewPublisher(intentClient *IntentClient, producer *kafka.Producer, cfg *Config) *Publisher {
+	return &Publisher{intentClient: intentClient, producer: producer, cfg: cfg}
 }
 
 func (p *Publisher) Start(ctx context.Context) {
@@ -47,78 +69,175 @@ func (p *Publisher) worker(ctx context.Context, id int) {
 		default:
 		}
 
-		tx, err := p.db.BeginTx(ctx, nil)
+		lease, err := p.intentClient.Lease(ctx, p.cfg.BatchSize)
 		if err != nil {
-			utils.Logger.Error("begin tx failed", zap.Error(err))
+			utils.Logger.Error("lease failed", zap.Int("worker_id", id), zap.Error(err))
 			time.Sleep(p.cfg.PollInterval)
 			continue
 		}
 
-		rows, err := tx.QueryContext(ctx, `
-			SELECT event_id, aggregate_id, event_type, payload, retry_count, tenant_id, trace_id, envelope_id
-			FROM outbox
-			WHERE status='PENDING' AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
-			FOR UPDATE SKIP LOCKED
-			LIMIT $1
-		`, p.cfg.BatchSize)
-		if err != nil {
-			utils.Logger.Error("fetch pending failed", zap.Error(err))
-			tx.Rollback()
+		if lease == nil || len(lease.Events) == 0 || lease.LeaseID == "" {
 			time.Sleep(p.cfg.PollInterval)
 			continue
 		}
 
-		events := []model.OutboxEvent{}
-		for rows.Next() {
-			var e model.OutboxEvent
-			if err := rows.Scan(&e.ID, &e.AggregateID, &e.EventType, &e.Payload, &e.RetryCount, &e.TenantID, &e.TraceID, &e.EnvelopeID); err != nil {
-				utils.Logger.Error("row scan failed", zap.Error(err))
+		var ackIDs []string
+		var nackIDs []string
+
+		for _, e := range lease.Events {
+			key := e.ID
+			if key == "" {
+				key = e.AggregateID
+			}
+
+			hash := sha256.Sum256(e.Payload)
+			msg := relayEvent{
+				EventID:       e.ID,
+				EventType:     e.EventType,
+				TenantID:      e.TenantID,
+				IntentID:      e.AggregateID,
+				EnvelopeID:    e.EnvelopeID,
+				TraceID:       e.TraceID,
+				SchemaVersion: e.SchemaVersion,
+				PayloadInline: e.Payload,
+				PayloadHash:   "sha256:" + hex.EncodeToString(hash[:]),
+			}
+
+			if p.cfg.MaxAge > 0 && time.Since(e.CreatedAt) >= p.cfg.MaxAge {
+				dlqMsg := dlqEnvelope{
+					Event:         msg,
+					Error:         "retry window exceeded",
+					ReasonCode:    "RETRY_WINDOW_EXCEEDED",
+					LastAttemptAt: time.Now().UTC(),
+					AttemptsCount: e.RetryCount,
+				}
+				dlqHeaders := map[string]string{
+					"trace_id":     e.TraceID,
+					"tenant_id":    e.TenantID,
+					"event_id":     e.ID,
+					"reason_code":  dlqMsg.ReasonCode,
+					"dlq_category": "publish_failure",
+				}
+				if dlqErr := p.producer.Publish(p.cfg.PublishFailureDLQTopic, key, dlqMsg, dlqHeaders); dlqErr != nil {
+					utils.Logger.Error("publish failure dlq publish failed", zap.Int("worker_id", id), zap.String("event_id", e.ID), zap.Error(dlqErr))
+				}
+				nackIDs = append(nackIDs, e.ID)
 				continue
 			}
-			events = append(events, e)
-		}
-		rows.Close()
 
-		for _, e := range events {
 			headers := map[string]string{
-				"trace_id":    e.TraceID,
-				"tenant_id":   e.TenantID,
-				"envelope_id": e.EnvelopeID,
-				"event_type":  e.EventType,
+				"trace_id":  e.TraceID,
+				"tenant_id": e.TenantID,
+				"event_id":  e.ID,
 			}
 
-			err := p.producer.Publish(p.cfg.ReadyTopic, e.AggregateID, e.Payload, headers)
+			err := p.producer.Publish(p.cfg.ReadyTopic, key, msg, headers)
 			if err != nil {
-				retries := e.RetryCount + 1
-				if retries >= p.cfg.MaxRetries {
-					dlq := map[string]interface{}{
-						"reason_code":         "PUBLISH_FAILED",
-						"error_message":       err.Error(),
-						"original_event_type": e.EventType,
-						"tenant_id":           e.TenantID,
-						"trace_id":            e.TraceID,
-						"envelope_id":         e.EnvelopeID,
-						"schema_subject":      "z.intent.ready",
-						"schema_version":      "v1",
+				reasonCode := classifyPublishError(err)
+				shouldDLQ := isPoisonPublishError(err)
+
+				if shouldDLQ {
+					dlqTopic := p.cfg.PoisonEventDLQTopic
+					dlqMsg := dlqEnvelope{
+						Event:         msg,
+						Error:         err.Error(),
+						ReasonCode:    reasonCode,
+						LastAttemptAt: time.Now().UTC(),
+						AttemptsCount: e.RetryCount,
 					}
-					_ = p.producer.Publish(p.cfg.DLQTopic, e.AggregateID, dlq, headers)
-					_, _ = tx.ExecContext(ctx, `INSERT INTO dlq_items (dlq_id, tenant_id, envelope_id, stage, reason_code, error_detail, replayable, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())`,
-						uuid.New().String(), e.TenantID, e.EnvelopeID, "OUTBOX_PUBLISH", "PUBLISH_FAILED", err.Error(), true)
-					_, _ = tx.ExecContext(ctx, `UPDATE outbox SET status='FAILED' WHERE event_id=$1`, e.ID)
+
+					if isMessageTooLargeError(err) {
+						dlqMsg.Event.PayloadInline = nil
+					}
+
+					dlqHeaders := map[string]string{
+						"trace_id":     e.TraceID,
+						"tenant_id":    e.TenantID,
+						"event_id":     e.ID,
+						"reason_code":  dlqMsg.ReasonCode,
+						"dlq_category": "poison_event",
+					}
+
+					if dlqErr := p.producer.Publish(dlqTopic, key, dlqMsg, dlqHeaders); dlqErr != nil {
+						utils.Logger.Error("poison dlq publish failed", zap.Int("worker_id", id), zap.String("event_id", e.ID), zap.Error(dlqErr))
+						nackIDs = append(nackIDs, e.ID)
+					} else {
+						ackIDs = append(ackIDs, e.ID)
+					}
 				} else {
-					backoff := p.cfg.RetryBackoff * time.Duration(1<<retries)
-					backoff += time.Duration(rand.Intn(100)) * time.Millisecond
-					ms := int(backoff / time.Millisecond)
-					_, _ = tx.ExecContext(ctx, `UPDATE outbox SET attempts=$1, next_attempt_at=NOW() + ($2::int * interval '1 millisecond') WHERE event_id=$3`, retries, ms, e.ID)
+					if p.cfg.MaxAttempts > 0 && e.RetryCount >= p.cfg.MaxAttempts {
+						dlqMsg := dlqEnvelope{
+							Event:         msg,
+							Error:         err.Error(),
+							ReasonCode:    "PUBLISH_FAILED_MAX_ATTEMPTS",
+							LastAttemptAt: time.Now().UTC(),
+							AttemptsCount: e.RetryCount,
+						}
+						dlqHeaders := map[string]string{
+							"trace_id":     e.TraceID,
+							"tenant_id":    e.TenantID,
+							"event_id":     e.ID,
+							"reason_code":  dlqMsg.ReasonCode,
+							"dlq_category": "publish_failure",
+						}
+						if dlqErr := p.producer.Publish(p.cfg.PublishFailureDLQTopic, key, dlqMsg, dlqHeaders); dlqErr != nil {
+							utils.Logger.Error("publish failure dlq publish failed", zap.Int("worker_id", id), zap.String("event_id", e.ID), zap.Error(dlqErr))
+						}
+					}
+					utils.Logger.Error("publish failed", zap.Int("worker_id", id), zap.String("event_id", e.ID), zap.String("reason_code", reasonCode), zap.Error(err))
+					nackIDs = append(nackIDs, e.ID)
 				}
 			} else {
-				_, _ = tx.ExecContext(ctx, `UPDATE outbox SET status='SENT', sent_at=NOW() WHERE event_id=$1`, e.ID)
+				ackIDs = append(ackIDs, e.ID)
 			}
 		}
 
-		tx.Commit()
-		if len(events) == 0 {
-			time.Sleep(p.cfg.PollInterval)
+		if len(ackIDs) > 0 {
+			if err := p.intentClient.Ack(ctx, lease.LeaseID, ackIDs); err != nil {
+				utils.Logger.Error("ack failed", zap.Int("worker_id", id), zap.String("lease_id", lease.LeaseID), zap.Error(err))
+			}
+		}
+
+		if len(nackIDs) > 0 {
+			if err := p.intentClient.Nack(ctx, lease.LeaseID, nackIDs); err != nil {
+				utils.Logger.Error("nack failed", zap.Int("worker_id", id), zap.String("lease_id", lease.LeaseID), zap.Error(err))
+			}
 		}
 	}
+}
+
+func classifyPublishError(err error) string {
+	if isPoisonPublishError(err) {
+		if isMessageTooLargeError(err) {
+			return "POISON_EVENT_TOO_LARGE"
+		}
+		if isJSONMarshalError(err) {
+			return "POISON_EVENT_INVALID_JSON"
+		}
+		return "POISON_EVENT"
+	}
+	return "KAFKA_PUBLISH_FAILED"
+}
+
+func isPoisonPublishError(err error) bool {
+	return isJSONMarshalError(err) || isMessageTooLargeError(err)
+}
+
+func isJSONMarshalError(err error) bool {
+	var syntaxErr *json.SyntaxError
+	var typeErr *json.UnsupportedTypeError
+	var valueErr *json.UnsupportedValueError
+
+	if errors.As(err, &syntaxErr) || errors.As(err, &typeErr) || errors.As(err, &valueErr) {
+		return true
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "invalid character")
+}
+
+func isMessageTooLargeError(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "message size") ||
+		strings.Contains(msg, "too large") ||
+		strings.Contains(msg, "record is too large") ||
+		strings.Contains(msg, "packet encoding")
 }

@@ -11,19 +11,21 @@ services:
       - KAFKA_CONSUMER_GROUP=zord-relay-group
       - KAFKA_READY_TOPIC=z.intent.ready.v1
       - KAFKA_DLQ_TOPIC=z.intent.dlq.v1
+      - KAFKA_PUBLISH_FAILURE_DLQ_TOPIC=z.intent.publish_failure.dlq.v1
+      - KAFKA_POISON_EVENT_DLQ_TOPIC=z.intent.poison_event.dlq.v1
       - HTTP_PORT=8082
-      - SINK_DATABASE_URL=postgres://relay_user:relay_password@postgres:5432/zord_relay_db?sslmode=disable
-      - SOURCE_DATABASE_URL=postgres://intent_user:intent_password@zord-intent-postgres:5432/zord_intent_engine_db?sslmode=disable
+      - INTENT_ENGINE_BASE_URL=http://zord-intent-engine:8083
       - ENVIRONMENT=production
       - SERVICE_NAME=zord-relay
       - OUTBOX_POLL_INTERVAL=5s
       - OUTBOX_BATCH_SIZE=10
       - OUTBOX_WORKER_COUNT=24
+      - OUTBOX_MAX_ATTEMPTS=7
+      - OUTBOX_MAX_AGE=8h
     depends_on:
       - broker1
       - broker2
       - broker3
-      - postgres
     networks:
       - zord-network
     restart: unless-stopped
