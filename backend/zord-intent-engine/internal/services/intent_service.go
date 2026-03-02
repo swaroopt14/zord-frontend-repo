@@ -20,6 +20,7 @@ import (
 
 	//"zord-intent-engine/internal/pii"
 	"zord-intent-engine/internal/validator"
+	"zord-intent-engine/internal/vault"
 	"zord-intent-engine/storage"
 
 	"github.com/shopspring/decimal"
@@ -169,15 +170,15 @@ func (s *IntentService) ProcessIncomingIntent(
 	var in *models.IncomingIntent
 
 	in = &models.IncomingIntent{
-		TenantID:       event.TenantID,
-		EnvelopeID:     event.EnvelopeID,
-		TraceID:        event.TraceID,
-		Source:         event.Source,
-		Payload:        event.Raw_payload,
-		ObjectRef:      event.ObjectRef,
-		IdempotencyKey: event.IdempotencyKey,
+		TenantID:         event.TenantID,
+		EnvelopeID:       event.EnvelopeID,
+		TraceID:          event.TraceID,
+		Source:           event.Source,
+		ObjectRef:        event.ObjectRef,
+		IdempotencyKey:   event.IdempotencyKey,
+		EncryptedPayload: event.EncryptedPayload,
 	}
-
+	//log.Printf("Encrypted Payload= %s, Length=%d", string(event.EncryptedPayload), len(event.EncryptedPayload))
 	// -------- STEP 0: Transport guards --------
 
 	log.Printf("ProcessIncomingIntent: Source=%s EnvelopeID=%s", in.Source, in.EnvelopeID)
@@ -187,7 +188,7 @@ func (s *IntentService) ProcessIncomingIntent(
 		return s.processWebhook(ctx, in)
 	}
 
-	if len(in.Payload) == 0 {
+	if len(in.EncryptedPayload) == 0 {
 		return nil, &models.DLQEntry{ReasonCode: "EMPTY_PAYLOAD"}, nil
 	}
 
@@ -241,9 +242,15 @@ func (s *IntentService) ProcessIncomingIntent(
 	// }
 
 	// -------- STEP 5: Parse raw payload into domain model --------
-
+	//log.Printf("Attempting to decrypt payload: %s", string(in.EncryptedPayload))
+	decryptedPayload, err := vault.DecryptPayload(in.EncryptedPayload) // best effort, log + continue if fails
+	if err != nil {
+		log.Printf("⚠️ Payload decryption failed for EnvelopeID=%s: %v", in.EnvelopeID, err)
+		return nil, &models.DLQEntry{ReasonCode: "PAYLOAD_DECRYPTION_FAILED"}, nil
+	}
+	//log.Println("Payload decrypted successfully", string(decryptedPayload))
 	var parsed models.ParsedIncomingIntent
-	if err := json.Unmarshal(event.Raw_payload, &parsed); err != nil {
+	if err := json.Unmarshal(decryptedPayload, &parsed); err != nil {
 		return nil, &models.DLQEntry{
 			ReasonCode: "INVALID_JSON_PAYLOAD",
 		}, nil
@@ -316,7 +323,7 @@ func (s *IntentService) ProcessIncomingIntent(
 			Email:         canonicalInput.Remitter.Email,
 		},
 	}
-	log.Println("Data sent for tokenization", tokenReq)
+	//log.Println("Data sent for tokenization", tokenReq)
 	tokenMap, err := callEnclaveTokenize(ctx, tokenReq)
 	if err != nil {
 		return nil, nil, err

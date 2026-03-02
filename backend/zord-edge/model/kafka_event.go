@@ -7,12 +7,12 @@ import (
 )
 
 type Event struct {
-	TraceID        uuid.UUID
-	EnvelopeID     uuid.UUID
-	TenantID       uuid.UUID
-	ObjectRef      string
-	Raw_payload    []byte
-	ReceivedAt     time.Time
-	Source         string
-	IdempotencyKey string
+	TraceID          uuid.UUID
+	EnvelopeID       uuid.UUID
+	TenantID         uuid.UUID
+	ObjectRef        string
+	ReceivedAt       time.Time
+	Source           string
+	IdempotencyKey   string
+	EncryptedPayload []byte
 }

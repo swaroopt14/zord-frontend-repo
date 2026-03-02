@@ -17,6 +17,10 @@ import (
 
 var RedisClient *redis.Client
 
+type Config struct {
+	VaultKey string
+}
+
 func InitDB() {
 	var err error
 	_ = godotenv.Load()
@@ -69,4 +73,9 @@ func GetWorkerPoolSize() int {
 		fmt.Sscanf(val, "%d", &size)
 	}
 	return size
+}
+func LoadConfig() *Config {
+	return &Config{
+		VaultKey: os.Getenv("ZORD_VAULT_KEY"),
+	}
 }

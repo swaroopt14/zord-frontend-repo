@@ -11,6 +11,7 @@ import (
 	"zord-intent-engine/internal/models"
 	"zord-intent-engine/internal/services"
 	"zord-intent-engine/internal/validator"
+	"zord-intent-engine/internal/vault"
 	"zord-intent-engine/messaging"
 
 	"zord-intent-engine/config"
@@ -32,6 +33,12 @@ func main() {
 	}
 
 	Rdb := config.InitRedis()
+	cfg := config.LoadConfig()
+
+	err := vault.InitVaultKey(cfg.VaultKey)
+	if err != nil {
+		log.Fatal("failed to initialize vault key:", err)
+	}
 
 	ctx := context.Background()
 
