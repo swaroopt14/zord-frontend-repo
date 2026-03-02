@@ -27,10 +27,6 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 	ContentType := context.GetString("Content-Type")
 	SourceType := context.GetString("source_type")
 
-	//Hash Payload Using SHA256
-	Hash := sha256.Sum256(rawPayload)
-	PayloadHash := Hash[:]
-
 	encryptedPayload, err := vault.Encrypt(rawPayload)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"error": "failed to encrypt payload"})
@@ -41,14 +37,11 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 	msg := model.RawIntentMessage{
 		TenantID:       tenantId.String(),
 		TraceID:        traceId,
-		PayloadHash:    PayloadHash,
 		IdempotencyKey: IdempotencyKey,
 		PayloadSize:    PayloadSize,
 		Payload:        encryptedPayload,
 		ContentType:    ContentType,
 		SourceType:     SourceType,
-		RawPayload:     rawPayload, //Need to remove this field once kafka added
-
 	}
 
 	id, err := services.PersistIdempotency(context.Request.Context(), msg)
@@ -93,6 +86,12 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 		return
 	}
 
+	//Hash Payload Using SHA256
+	Hash := sha256.Sum256(rawPayload)
+	PayloadHash := Hash[:]
+
+	msg.PayloadHash = PayloadHash
+
 	if err := services.RawIntent(context.Request.Context(), msg, data, h.Redis, false); err != nil {
 		log.Printf("Error persisting raw intent: %v", err)
 		context.JSON(http.StatusInternalServerError, gin.H{
@@ -103,16 +102,7 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 		})
 		return
 	}
-	// err = services.UpdateIdempotency(context.Request.Context(), msg, data)
-	// if err != nil {
-	// 	log.Printf("Error updating idempotency key: %v", err)
-	// 	context.JSON(http.StatusInternalServerError, gin.H{
-	// 		"ErrorCode":  "INTERNAL_SERVER_ERROR",
-	// 		"ErrorMsg":   "Failed to update idempotency key.",
-	// 		"HttpStatus": http.StatusInternalServerError,
-	// 	})
-	// 	return
-	// }
+
 	context.JSON(http.StatusAccepted, gin.H{
 		"EnvelopeID":  data.EnvelopeId,
 		"Trace_id":    msg.TraceID,

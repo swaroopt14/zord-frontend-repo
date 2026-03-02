@@ -54,13 +54,6 @@ func RawIntent(ctx context.Context,
 			ReceivedAt:     ack.ReceivedAt,
 		}
 	} else {
-		// API Flow - Strict Separation
-		//	var req dto.IncomingIntentRequestV1
-		//	err := json.Unmarshal([]byte(msg.RawPayload), &req)
-		//	if err != nil {
-		// If it's the API queue, it MUST be valid JSON conforming to schema
-		//		return err
-		//	}
 
 		envelope = model.IngressEnvelope{
 			TraceID:           trace_id,
@@ -91,8 +84,6 @@ func RawIntent(ctx context.Context,
 	return nil
 }
 
-// SendToIntentEngine sends the envelope to the intent engine via Redis
-// This function should be called asynchronously in a goroutine AFTER sending 202 response
 func SendToIntentEngine(
 	msg model.RawIntentMessage, ack *model.AckMessage, rdb *redis.Client, isWebhook bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -153,15 +144,14 @@ func SendToIntentEngine(
 	// 	ReceivedAt:     ack.ReceivedAt,
 	//}
 	NewEnvelope = model.Event{
-		TraceID:        trace_id,
-		EnvelopeID:     envelopeID,
-		TenantID:       tenantUUID,
-		ObjectRef:      ObjRef,
-		Raw_payload:    msg.RawPayload,
-		ReceivedAt:     ack.ReceivedAt,
-		Source:         msg.SourceType,
-		IdempotencyKey: msg.IdempotencyKey,
-	}
+		TraceID:          trace_id,
+		EnvelopeID:       envelopeID,
+		TenantID:         tenantUUID,
+		ObjectRef:        ObjRef,
+		ReceivedAt:       ack.ReceivedAt,
+		Source:           msg.SourceType,
+		IdempotencyKey:   msg.IdempotencyKey,
+		EncryptedPayload: msg.Payload}
 
 	// Prepare payload for intent engine
 	// if isWebhook {

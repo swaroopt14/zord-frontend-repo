@@ -9,5 +9,4 @@ type RawIntentMessage struct {
 	Payload        []byte `json:"raw_payload"`
 	ContentType    string `json:"content_type"`
 	SourceType     string `json:"source_type"`
-	RawPayload     []byte //Need to remove this field once kafka added
 }
