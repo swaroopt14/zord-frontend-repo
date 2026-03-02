@@ -30,7 +30,7 @@ type ParsedIncomingIntent struct {
 	AccountNumber  string         `json:"account_number"`
 	Amount         Amount         `json:"amount"`
 	Beneficiary    Beneficiary    `json:"beneficiary"`
-	Remitter       map[string]any `json:"remitter,omitempty"`
+	Remitter       Remitter       `json:"remitter,omitempty"`
 	Constraints    map[string]any `json:"constraints,omitempty"`
 	PurposeCode    string         `json:"purpose_code"`
 	IdempotencyKey string         `json:"idempotency_key"`
@@ -57,7 +57,12 @@ type Amount struct {
 
 type Beneficiary struct {
 	Instrument Instrument `json:"instrument"`
+	Name       string     `json:"name,omitempty"`
 	Country    string     `json:"country,omitempty"`
+}
+type Remitter struct {
+	Phone string `json:"phone,omitempty"`
+	Email string `json:"email,omitempty"`
 }
 
 type Instrument struct {

@@ -47,7 +47,7 @@ func (h *Handler) WebhookHandler(context *gin.Context) {
 	msg := model.RawIntentMessage{
 		TenantID:       tenantIdStr,
 		TraceID:        traceId,
-		RawPayload:     string(rawPayload),
+		PayloadHash:    rawPayload,
 		IdempotencyKey: idempotencyKey,
 	}
 

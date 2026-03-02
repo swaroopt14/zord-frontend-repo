@@ -1,27 +1,35 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"log"
-	"math/big"
+	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
 	"zord-intent-engine/internal/canonicalizer"
 	"zord-intent-engine/internal/models"
-	"zord-intent-engine/internal/pii"
+
+	//"zord-intent-engine/internal/pii"
 	"zord-intent-engine/internal/validator"
 	"zord-intent-engine/storage"
+
+	"github.com/shopspring/decimal"
 )
 
 type IntentService struct {
 	validator *validator.Validator
-	tokenizer *pii.Tokenizer
-	repo      CanonicalIntentRepository
-	s3        *storage.S3Store
+	//tokenizer *pii.Tokenizer
+	repo CanonicalIntentRepository
+	s3   *storage.S3Store
 }
 
 // Repository abstraction
@@ -49,28 +57,103 @@ type CanonicalIntentRepository interface {
 
 func NewIntentService(
 	v *validator.Validator,
-	t *pii.Tokenizer,
+	//t *pii.Tokenizer,
 	r CanonicalIntentRepository,
 	s3 *storage.S3Store, // ✅ ADD
 ) *IntentService {
 	return &IntentService{
 		validator: v,
-		tokenizer: t,
-		repo:      r,
-		s3:        s3,
+		//tokenizer: t,
+		repo: r,
+		s3:   s3,
 	}
 }
 
 /* ---------------- Helpers ---------------- */
 
-func parseAmount(value string) (float64, error) {
-	rat, ok := new(big.Rat).SetString(value)
-	if !ok {
-		return 0, errors.New("invalid amount format")
+func parseAmount(value string) (decimal.Decimal, error) {
+	v := strings.TrimSpace(value)
+	if v == "" {
+		return decimal.Zero, errors.New("amount is required")
+	}
+	return decimal.NewFromString(v) // exact decimal, no rounding
+}
+
+type enclaveTokenizeRequest struct {
+	TenantID string `json:"tenant_id"`
+	TraceID  string `json:"trace_id"`
+	PII      struct {
+		AccountNumber string `json:"account_number"`
+		IFSC          string `json:"ifsc"`
+		VPA           string `json:"vpa"`
+		Name          string `json:"name"`
+		Phone         string `json:"phone"`
+		Email         string `json:"email"`
+	} `json:"pii"`
+}
+
+// func firstNonEmpty(vals ...string) string {
+// 	for _, v := range vals {
+// 		v = strings.TrimSpace(v)
+// 		if v != "" {
+// 			return v
+// 		}
+// 	}
+// 	return ""
+// }
+
+// func nestedString(m map[string]any, keys ...string) string {
+// 	var cur any = m
+// 	for _, k := range keys {
+// 		obj, ok := cur.(map[string]any)
+// 		if !ok {
+// 			return ""
+// 		}
+// 		cur, ok = obj[k]
+// 		if !ok {
+// 			return ""
+// 		}
+// 	}
+// 	s, _ := cur.(string)
+// 	return strings.TrimSpace(s)
+// }
+
+func callEnclaveTokenize(ctx context.Context, req enclaveTokenizeRequest) (map[string]string, error) {
+	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("ZORD_PII_ENCLAVE_URL")), "/")
+	if baseURL == "" {
+		return nil, fmt.Errorf("ZORD_PII_ENCLAVE_URL is not set")
 	}
 
-	f, _ := rat.Float64()
-	return f, nil
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/v1/tokenize", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		raw, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("enclave tokenize failed: status=%d body=%s", resp.StatusCode, string(raw))
+	}
+
+	var out struct {
+		Tokens map[string]string `json:"tokens"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	return out.Tokens, nil
+
 }
 
 /* ---------------- Pipeline ---------------- */
@@ -79,8 +162,21 @@ func parseAmount(value string) (float64, error) {
 // It consumes ingress output from Service-1 (via Redis).
 func (s *IntentService) ProcessIncomingIntent(
 	ctx context.Context,
-	in *models.IncomingIntent,
+	event *models.Event,
 ) (*models.CanonicalIntent, *models.DLQEntry, error) {
+
+	//Unmarshal Payload into IncomingIntent struct
+	var in *models.IncomingIntent
+
+	in = &models.IncomingIntent{
+		TenantID:       event.TenantID,
+		EnvelopeID:     event.EnvelopeID,
+		TraceID:        event.TraceID,
+		Source:         event.Source,
+		Payload:        event.Raw_payload,
+		ObjectRef:      event.ObjectRef,
+		IdempotencyKey: event.IdempotencyKey,
+	}
 
 	// -------- STEP 0: Transport guards --------
 
@@ -107,23 +203,23 @@ func (s *IntentService) ProcessIncomingIntent(
 		return nil, &models.DLQEntry{ReasonCode: "MISSING_TENANT_ID"}, nil
 	}
 
-	switch in.ParseStatus {
-	case "PARSED":
-		// OK — normal path
+	// switch in.ParseStatus {
+	// case "PARSED":
+	// 	// OK — normal path
 
-	case "RECEIVED":
-		// Compatibility mode (temporary)
-		// Service-1 hasn’t upgraded yet
-		log.Printf(
-			"⚠️ COMPAT: parse_status=RECEIVED treated as PARSED [envelope=%s]",
-			in.EnvelopeID,
-		)
+	// case "RECEIVED":
+	// 	// Compatibility mode (temporary)
+	// 	// Service-1 hasn’t upgraded yet
+	// 	log.Printf(
+	// 		"⚠️ COMPAT: parse_status=RECEIVED treated as PARSED [envelope=%s]",
+	// 		in.EnvelopeID,
+	// 	)
 
-	default:
-		return nil, &models.DLQEntry{
-			ReasonCode: "NOT_PARSED",
-		}, nil
-	}
+	// default:
+	// 	return nil, &models.DLQEntry{
+	// 		ReasonCode: "NOT_PARSED",
+	// 	}, nil
+	// }
 
 	// if in.SignatureStatus == nil || *in.SignatureStatus != "VERIFIED" {
 	// 	return nil, &models.DLQEntry{ReasonCode: "SIGNATURE_NOT_VERIFIED"}, nil
@@ -147,7 +243,7 @@ func (s *IntentService) ProcessIncomingIntent(
 	// -------- STEP 5: Parse raw payload into domain model --------
 
 	var parsed models.ParsedIncomingIntent
-	if err := json.Unmarshal(in.Payload, &parsed); err != nil {
+	if err := json.Unmarshal(event.Raw_payload, &parsed); err != nil {
 		return nil, &models.DLQEntry{
 			ReasonCode: "INVALID_JSON_PAYLOAD",
 		}, nil
@@ -194,26 +290,72 @@ func (s *IntentService) ProcessIncomingIntent(
 
 	// -------- STEP 8: TOKENIZATION --------
 
-	accountTokenRef, err := s.tokenizer.TokenizeAccountNumber(
-		canonicalInput.AccountNumber,
-	)
+	// accountTokenRef, err := s.tokenizer.TokenizeAccountNumber(
+	// 	canonicalInput.AccountNumber,
+	// )
+	// if err != nil {
+	// 	return nil, nil, err
+	// }
+	// -------- STEP 8: TOKENIZATION (PII ENCLAVE SERVICE) --------
+	tokenReq := enclaveTokenizeRequest{
+		TenantID: in.TenantID.String(),
+		TraceID:  in.TraceID.String(),
+		PII: struct {
+			AccountNumber string `json:"account_number"`
+			IFSC          string `json:"ifsc"`
+			VPA           string `json:"vpa"`
+			Name          string `json:"name"`
+			Phone         string `json:"phone"`
+			Email         string `json:"email"`
+		}{
+			AccountNumber: canonicalInput.AccountNumber,
+			IFSC:          canonicalInput.Beneficiary.Instrument.IFSC,
+			VPA:           canonicalInput.Beneficiary.Instrument.VPA,
+			Name:          canonicalInput.Beneficiary.Name,
+			Phone:         canonicalInput.Remitter.Phone,
+			Email:         canonicalInput.Remitter.Email,
+		},
+	}
+	log.Println("Data sent for tokenization", tokenReq)
+	tokenMap, err := callEnclaveTokenize(ctx, tokenReq)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Persist full token map in pii_tokens JSONB
+	piiJSON, err := json.Marshal(tokenMap)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Replace raw beneficiary PII with token references before persist
+	beneficiaryTokenized := map[string]any{
+		"instrument": map[string]any{
+			"kind":       canonicalInput.Beneficiary.Instrument.Kind,
+			"ifsc_token": tokenMap["ifsc"],
+			"vpa_token":  tokenMap["vpa"],
+		},
+		"name_token": tokenMap["name"],
+		"country":    canonicalInput.Beneficiary.Country,
+	}
+	beneficiaryJSON, err := json.Marshal(beneficiaryTokenized)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// -------- JSONB PREP --------
 
-	beneficiaryJSON, err := json.Marshal(canonicalInput.Beneficiary)
-	if err != nil {
-		return nil, nil, err
-	}
+	// beneficiaryJSON, err := json.Marshal(canonicalInput.Beneficiary)
+	// if err != nil {
+	// 	return nil, nil, err
+	// }
 
-	piiJSON, err := json.Marshal(map[string]string{
-		"account_number": accountTokenRef,
-	})
-	if err != nil {
-		return nil, nil, err
-	}
+	// piiJSON, err := json.Marshal(map[string]string{
+	// 	"account_number": accountTokenRef,
+	// })
+	// if err != nil {
+	// 	return nil, nil, err
+	// }
 
 	constraintsJSON, err := json.Marshal(canonicalInput.Constraints)
 	if err != nil {
@@ -255,7 +397,12 @@ func (s *IntentService) ProcessIncomingIntent(
 
 	// -------- STEP 10: OUTBOX + PERSISTENCE (ATOMIC DB) --------
 
-	outbox, err := CanonicalIntentToOutboxEvent(canonical, in.Payload)
+	canonicalPayload, err := json.Marshal(canonical)
+	if err != nil {
+		return nil, nil, err
+	}
+	outbox, err := CanonicalIntentToOutboxEvent(canonical, canonicalPayload)
+
 	if err != nil {
 		return nil, nil, err
 	}
@@ -325,7 +472,7 @@ func (s *IntentService) processWebhook(
 		SalientHash:    in.PayloadHash, // Might be empty
 		IntentType:     "WEBHOOK",
 		SchemaVersion:  "v1",
-		Amount:         0,
+		Amount:         decimal.Zero,
 		Currency:       "XXX",
 		Status:         "CREATED",
 		CreatedAt:      time.Now().UTC(),

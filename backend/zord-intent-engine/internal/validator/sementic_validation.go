@@ -12,13 +12,25 @@ import (
 /* ---------- Semantic helpers ---------- */
 
 func validateAmount(value string) error {
-	amt, ok := new(big.Rat).SetString(strings.TrimSpace(value))
+	value = strings.TrimSpace(value)
+
+	amt, ok := new(big.Rat).SetString(value)
 	if !ok {
 		return semanticError("amount must be a valid decimal")
 	}
+
 	if amt.Sign() <= 0 {
 		return semanticError("amount must be greater than zero")
 	}
+
+	// 🔐 Check decimal scale (max 2 digits after decimal)
+	parts := strings.Split(value, ".")
+	if len(parts) == 2 {
+		if len(parts[1]) > 2 {
+			return semanticError("amount must not have more than two decimal places")
+		}
+	}
+
 	return nil
 }
 
