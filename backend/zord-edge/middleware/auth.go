@@ -32,8 +32,12 @@ func Authenticate() gin.HandlerFunc {
 				return
 			}
 			ContentType := context.GetHeader("Content-Type")
-			if ContentType != "application/json" {
-				context.JSON(http.StatusBadRequest, gin.H{"Error": "Content-Type must be application/json"})
+			if !strings.HasPrefix(ContentType, "application/json") &&
+				!strings.HasPrefix(ContentType, "multipart/form-data") {
+
+				context.JSON(http.StatusBadRequest, gin.H{
+					"Error": "Unsupported Content-Type",
+				})
 				context.Abort()
 				return
 			}
