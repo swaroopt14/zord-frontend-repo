@@ -1,9 +1,8 @@
 package handler
 
 import (
-	"context"
 	"crypto/sha256"
-	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -13,117 +12,104 @@ import (
 	"main.go/vault"
 )
 
-func (h *Handler) IntentHandler(c *gin.Context) {
+func (h *Handler) IntentHandler(context *gin.Context) {
 
-	rawPayloadAny, ok := c.Get("raw_payload")
+	rawPayloadAny, ok := context.Get("raw_payload")
 	if !ok {
-		c.JSON(400, gin.H{"error": "raw_payload missing"})
+		context.JSON(400, gin.H{"error": "raw_payload missing"})
 		return
 	}
-
 	rawPayload := rawPayloadAny.([]byte)
-	traceId := c.GetString("trace_id")
-	tenantId := c.MustGet("tenant_id").(uuid.UUID)
-	idempotencyKey := c.GetString("idempotency_key")
-	payloadSize := c.GetInt("payload_size")
-	contentType := c.GetString("Content-Type")
-	sourceType := c.GetString("source_type")
+	traceId := context.GetString("trace_id")
+	tenantId := context.MustGet("tenant_id").(uuid.UUID)
+	IdempotencyKey := context.GetString("idempotency_key")
+	PayloadSize := context.GetInt("payload_size")
+	ContentType := context.GetString("Content-Type")
+	SourceType := context.GetString("source_type")
 
-	data, duplicateID, err := h.processIntentCore(
-		c.Request.Context(),
-		rawPayload,
-		tenantId,
-		traceId,
-		idempotencyKey,
-		payloadSize,
-		contentType,
-		sourceType,
-	)
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"ErrorCode": "INTERNAL_SERVER_ERROR",
-			"ErrorMsg":  err.Error(),
-		})
-		return
-	}
-
-	// Duplicate case
-	if duplicateID != uuid.Nil {
-		c.JSON(http.StatusConflict, gin.H{
-			"ErrorCode":  "DUPLICATE_IDEMPOTENCY_KEY",
-			"ErrorMsg":   "An envelope with the same idempotency key already exists.",
-			"EnvelopeID": duplicateID.String(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusAccepted, gin.H{
-		"EnvelopeID":  data.EnvelopeId,
-		"Trace_id":    traceId,
-		"Status":      "Accepted",
-		"Received_At": data.ReceivedAt,
-	})
-}
-
-func (h *Handler) processIntentCore(
-	ctx context.Context,
-	rawPayload []byte,
-	tenantId uuid.UUID,
-	traceId string,
-	idempotencyKey string,
-	payloadSize int,
-	contentType string,
-	sourceType string,
-) (*model.AckMessage, uuid.UUID, error) {
-
-	// 🔐 Encrypt payload
 	encryptedPayload, err := vault.Encrypt(rawPayload)
 	if err != nil {
-		return nil, uuid.Nil, err
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "failed to encrypt payload"})
+		return
 	}
 
 	msg := model.RawIntentMessage{
 		TenantID:       tenantId.String(),
 		TraceID:        traceId,
-		IdempotencyKey: idempotencyKey,
-		PayloadSize:    payloadSize,
+		IdempotencyKey: IdempotencyKey,
+		PayloadSize:    PayloadSize,
 		Payload:        encryptedPayload,
-		ContentType:    contentType,
-		SourceType:     sourceType,
+		ContentType:    ContentType,
+		SourceType:     SourceType,
 	}
 
-	// 🧾 Persist idempotency
-	id, err := services.PersistIdempotency(ctx, msg)
+	id, err := services.PersistIdempotency(context.Request.Context(), msg)
 	if err != nil {
-		return nil, uuid.Nil, err
+		log.Printf("Error persisting idempotency key: %v", err)
+		context.JSON(http.StatusInternalServerError, gin.H{
+			"ErrorCode":  "INTERNAL_SERVER_ERROR",
+			"ErrorMsg":   "Failed to persist idempotency key.",
+			"HttpStatus": http.StatusInternalServerError,
+		})
+		return
 	}
-
-	// Duplicate case
 	if id != uuid.Nil {
-		return nil, id, nil
+		log.Printf("Duplicate idempotency key detected for tenant_id=%s, idempotency_key=%s, Envelope_Id=%s", msg.TenantID, msg.IdempotencyKey, id)
+		context.JSON(http.StatusConflict, gin.H{
+			"ErrorCode":  "DUPLICATE_IDEMPOTENCY_KEY",
+			"ErrorMsg":   "An envelope with the same idempotency key already exists.",
+			"EnvelopeID": id.String(),
+		})
+		return
 	}
+	//Need to replace Hashed payload with Encrypted Payload before sending to S3
 
-	// 📦 Store encrypted payload in S3
 	data, err := services.ProcessRawIntent(msg, h.S3store)
 	if err != nil {
-		return nil, uuid.Nil, err
+		log.Printf("Error processing intent: %v", err)
+		context.JSON(http.StatusInternalServerError, gin.H{
+			"TraceID":   msg.TraceID,
+			"ErrorCode": "INTERNAL_ERROR",
+			"ErrorMsg":  err.Error(),
+		})
+		return
 	}
+
 	if data == nil {
-		return nil, uuid.Nil, fmt.Errorf("S3 data is nil")
+		log.Printf("S3 Data is nil for trace_id=%s", msg.TraceID)
+		context.JSON(http.StatusInternalServerError, gin.H{
+			"TraceID":   msg.TraceID,
+			"ErrorCode": "INTERNAL_ERROR",
+			"ErrorMsg":  "S3 data is nil",
+		})
+		return
 	}
 
-	// 🔑 Hash original payload
-	hash := sha256.Sum256(rawPayload)
-	msg.PayloadHash = hash[:]
+	//Hash Payload Using SHA256
+	Hash := sha256.Sum256(rawPayload)
+	PayloadHash := Hash[:]
 
-	// 🗄 Persist raw intent
-	if err := services.RawIntent(ctx, msg, data, h.Redis, false); err != nil {
-		return nil, uuid.Nil, err
+	msg.PayloadHash = PayloadHash
+
+	if err := services.RawIntent(context.Request.Context(), msg, data, false); err != nil {
+		log.Printf("Error persisting raw intent: %v", err)
+		context.JSON(http.StatusInternalServerError, gin.H{
+			"TraceID":    msg.TraceID,
+			"ErrorCode":  "INTERNAL_SERVER_ERROR",
+			"ErrorMsg":   "Failed to persist raw intent.",
+			"HttpStatus": http.StatusInternalServerError,
+		})
+		return
 	}
 
-	// 🚀 Async dispatch
-	go services.SendToIntentEngine(msg, data, h.Redis, false)
+	context.JSON(http.StatusAccepted, gin.H{
+		"EnvelopeID":  data.EnvelopeId,
+		"Trace_id":    msg.TraceID,
+		"Status":      "Accepted",
+		"Received_At": data.ReceivedAt,
+	})
 
-	return data, uuid.Nil, nil
+	// Emit Kafka Event Logic
+	services.SendToIntentEngine(msg, data, h.Kafka, false)
+
 }

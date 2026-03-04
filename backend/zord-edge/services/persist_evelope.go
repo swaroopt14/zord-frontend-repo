@@ -6,15 +6,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 	"main.go/db"
-	"main.go/messaging"
+	"main.go/kafka"
 	"main.go/model"
 	"main.go/vault"
 )
 
 func RawIntent(ctx context.Context,
-	msg model.RawIntentMessage, ack *model.AckMessage, rdb *redis.Client, isWebhook bool) error {
+	msg model.RawIntentMessage, ack *model.AckMessage, isWebhook bool) error {
 
 	envelopeID, err := uuid.Parse(ack.EnvelopeId)
 	if err != nil {
@@ -85,7 +84,7 @@ func RawIntent(ctx context.Context,
 }
 
 func SendToIntentEngine(
-	msg model.RawIntentMessage, ack *model.AckMessage, rdb *redis.Client, isWebhook bool) {
+	msg model.RawIntentMessage, ack *model.AckMessage, pro *kafka.Producer, isWebhook bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -170,7 +169,7 @@ func SendToIntentEngine(
 
 	//Send to Intent Engine via Redis
 
-	err = messaging.SendRawIntentMessage(ctx, NewEnvelope, rdb)
+	err = kafka.SendRawIntentMessage(ctx, NewEnvelope, pro)
 	if err != nil {
 		log.Printf("Failed to send raw intent message: %v", err)
 	}

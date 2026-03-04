@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -12,10 +11,7 @@ import (
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
-	"github.com/redis/go-redis/v9"
 )
-
-var RedisClient *redis.Client
 
 type Config struct {
 	VaultKey string
@@ -46,27 +42,6 @@ func InitDB() {
 
 }
 
-func InitRedis() *redis.Client {
-	// Construct the Redis address from environment variables
-	addr := os.Getenv("REDIS_ADDR")
-	if addr == "" {
-		addr = "localhost:6379"
-	}
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         addr, // or from env
-		Password:     "",
-		DB:           0,
-		PoolSize:     100,
-		MinIdleConns: 20,
-	})
-
-	// optional health check
-	if err := rdb.Ping(context.Background()).Err(); err != nil {
-		log.Fatal("failed to connect to redis:", err)
-	}
-
-	return rdb
-}
 func GetWorkerPoolSize() int {
 	size := 50
 	if val := os.Getenv("WORKER_POOL_SIZE"); val != "" {
