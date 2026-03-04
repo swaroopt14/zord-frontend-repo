@@ -92,7 +92,7 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 
 	msg.PayloadHash = PayloadHash
 
-	if err := services.RawIntent(context.Request.Context(), msg, data, h.Redis, false); err != nil {
+	if err := services.RawIntent(context.Request.Context(), msg, data, false); err != nil {
 		log.Printf("Error persisting raw intent: %v", err)
 		context.JSON(http.StatusInternalServerError, gin.H{
 			"TraceID":    msg.TraceID,
@@ -111,6 +111,6 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 	})
 
 	// Emit Kafka Event Logic
-	go services.SendToIntentEngine(msg, data, h.Redis, false)
+	services.SendToIntentEngine(msg, data, h.Kafka, false)
 
 }

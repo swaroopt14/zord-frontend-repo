@@ -12,6 +12,8 @@ services:
     env_file:
       - ./.env
     environment:
+      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_TOPIC=vault.envelope.accepted.v1
       - ZORD_PII_ENCLAVE_URL=http://host.docker.internal:8087
       - DB_HOST=zord-intent-postgres
       - DB_PORT=5432
@@ -19,7 +21,6 @@ services:
       - DB_PASSWORD=intent_password
       - DB_NAME=zord_intent_engine_db
       - DB_SSLMODE=disable
-      - REDIS_ADDR=zord-edge-redis:6379
       - VAULT_JOURNAL_URL=http://host.docker.internal:8081
       - PII_TOKEN_SECRET=your-secret-key-for-pii-tokenization-change-in-production
       - ENVIRONMENT=production
