@@ -9,12 +9,19 @@ import (
 	"syscall"
 	"time"
 
-	"go.uber.org/zap"
-
 	"zord-relay/config"
+	"zord-relay/db"
+	"zord-relay/handler"
 	"zord-relay/kafka"
 	"zord-relay/services"
 	"zord-relay/utils"
+
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+)
+
+const (
+	WebPort = ":8081"
 )
 
 func main() {
@@ -22,6 +29,30 @@ func main() {
 	defer utils.SyncLogger()
 
 	cfg := config.Load()
+
+	// Database
+	dbConn := db.Connect(cfg.DatabaseURL)
+	defer dbConn.Close()
+
+	// Repositories
+	payoutContractsRepo := services.NewPayoutContractsRepo(dbConn)
+
+	// HTTP Server
+	router := gin.Default()
+	contractsHandler := handler.NewContractsHandler(payoutContractsRepo)
+	router.GET("/contracts", contractsHandler.ListContracts)
+
+	server := &http.Server{
+		Addr:    WebPort,
+		Handler: router,
+	}
+
+	go func() {
+		utils.Logger.Info("Starting HTTP server on " + WebPort)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			utils.Logger.Fatal("HTTP server failed", zap.Error(err))
+		}
+	}()
 
 	// Health check server
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -49,6 +80,12 @@ func main() {
 			utils.Logger.Error("Health check server failed", zap.Error(err))
 		}
 	}()
+
+	// Kafka Consumer for intents
+	intentConsumer := kafka.NewConsumer(cfg.KafkaBrokers, "zord-relay-payout-contracts-consumer")
+	intentHandler := services.NewIntentHandler(payoutContractsRepo)
+	intentConsumer.Consume(context.Background(), []string{"z.intent.ready.v1"}, intentHandler)
+	defer intentConsumer.Close()
 
 	// Intent Engine API Client
 	intentClient := services.NewIntentClient(cfg.IntentEngineBaseURL)

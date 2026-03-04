@@ -24,6 +24,7 @@ type Config struct {
 	MaxAttempts            int
 	MaxAge                 time.Duration
 	ServiceName            string
+	DatabaseURL            string
 }
 
 func Load() *Config {
@@ -84,6 +85,7 @@ func Load() *Config {
 		MaxAttempts:            maxAttempts,
 		MaxAge:                 maxAge,
 		ServiceName:            getEnv("SERVICE_NAME", "outbox-relay"),
+		DatabaseURL:            getEnv("DATABASE_URL", "postgres://relay_user:relay_password@zord-relay-postgres:5432/zord_relay_db?sslmode=disable"),
 	}
 }
 

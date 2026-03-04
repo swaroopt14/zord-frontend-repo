@@ -76,7 +76,7 @@ func (p *Publisher) worker(ctx context.Context, id int) {
 			continue
 		}
 
-		if lease == nil || len(lease.Events) == 0 || lease.LeaseID == "" {
+		if lease == nil || len(lease.Events) == 0 {
 			time.Sleep(p.cfg.PollInterval)
 			continue
 		}
@@ -189,6 +189,7 @@ func (p *Publisher) worker(ctx context.Context, id int) {
 				}
 			} else {
 				ackIDs = append(ackIDs, e.ID)
+				utils.Logger.Info("published event", zap.Int("worker_id", id), zap.String("event_id", e.ID), zap.String("topic", p.cfg.ReadyTopic))
 			}
 		}
 
