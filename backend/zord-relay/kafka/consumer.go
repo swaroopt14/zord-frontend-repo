@@ -33,7 +33,7 @@ type ConsumerHandler struct {
 func NewConsumer(brokers []string, groupID string) *Consumer {
 	config := sarama.NewConfig()
 	config.Consumer.Group.Rebalance.Strategy = sarama.NewBalanceStrategyRoundRobin()
-	config.Consumer.Offsets.Initial = sarama.OffsetNewest
+	config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	config.Version = sarama.V2_8_0_0
 
 	consumerGroup, err := sarama.NewConsumerGroup(brokers, groupID, config)
