@@ -160,7 +160,6 @@ func callEnclaveTokenize(ctx context.Context, req enclaveTokenizeRequest) (map[s
 /* ---------------- Pipeline ---------------- */
 
 // ProcessIncomingIntent is the ONLY entrypoint.
-// It consumes ingress output from Service-1 (via Redis).
 func (s *IntentService) ProcessIncomingIntent(
 	ctx context.Context,
 	event *models.Event,
@@ -178,7 +177,6 @@ func (s *IntentService) ProcessIncomingIntent(
 		IdempotencyKey:   event.IdempotencyKey,
 		EncryptedPayload: event.EncryptedPayload,
 	}
-	//log.Printf("Encrypted Payload= %s, Length=%d", string(event.EncryptedPayload), len(event.EncryptedPayload))
 	// -------- STEP 0: Transport guards --------
 
 	log.Printf("ProcessIncomingIntent: Source=%s EnvelopeID=%s", in.Source, in.EnvelopeID)
@@ -204,45 +202,11 @@ func (s *IntentService) ProcessIncomingIntent(
 		return nil, &models.DLQEntry{ReasonCode: "MISSING_TENANT_ID"}, nil
 	}
 
-	// switch in.ParseStatus {
-	// case "PARSED":
-	// 	// OK — normal path
-
-	// case "RECEIVED":
-	// 	// Compatibility mode (temporary)
-	// 	// Service-1 hasn’t upgraded yet
-	// 	log.Printf(
-	// 		"⚠️ COMPAT: parse_status=RECEIVED treated as PARSED [envelope=%s]",
-	// 		in.EnvelopeID,
-	// 	)
-
-	// default:
-	// 	return nil, &models.DLQEntry{
-	// 		ReasonCode: "NOT_PARSED",
-	// 	}, nil
-	// }
-
-	// if in.SignatureStatus == nil || *in.SignatureStatus != "VERIFIED" {
-	// 	return nil, &models.DLQEntry{ReasonCode: "SIGNATURE_NOT_VERIFIED"}, nil
-	// }
-
-	// if in.PayloadHash == "" {
-	// 	return nil, &models.DLQEntry{ReasonCode: "MISSING_PAYLOAD_HASH"}, nil
-	// }
-
 	if in.ObjectRef == "" {
 		return nil, &models.DLQEntry{ReasonCode: "MISSING_OBJECT_REF"}, nil
 	}
 
-	// -------- STEP 4: Payload integrity verification --------
-
-	// computedHash := sha256.Sum256(in.Payload)
-	// if hex.EncodeToString(computedHash[:]) != in.PayloadHash {
-	// 	return nil, &models.DLQEntry{ReasonCode: "PAYLOAD_HASH_MISMATCH"}, nil
-	// }
-
 	// -------- STEP 5: Parse raw payload into domain model --------
-	//log.Printf("Attempting to decrypt payload: %s", string(in.EncryptedPayload))
 	decryptedPayload, err := vault.DecryptPayload(in.EncryptedPayload) // best effort, log + continue if fails
 	if err != nil {
 		log.Printf("⚠️ Payload decryption failed for EnvelopeID=%s: %v", in.EnvelopeID, err)

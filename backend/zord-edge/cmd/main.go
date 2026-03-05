@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +14,7 @@ import (
 	"main.go/config"
 	"main.go/db"
 	"main.go/handler"
+	"main.go/kafka"
 	"main.go/routes"
 	"main.go/storage"
 	"main.go/vault"
@@ -62,16 +64,14 @@ func main() {
 	if err != nil {
 		log.Println("No .env file found")
 	}
-
-	Rdb := config.InitRedisClient()
-	//Need to remove this
-	t := time.Now()
-	if err := Rdb.Ping(context.Background()).Err(); err != nil {
-		log.Fatal("Redis ping failed:", err)
+	brokers := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
+	producer, err := kafka.NewProducer(brokers)
+	if err != nil {
+		log.Fatal("Kafka producer creation failure: ", err)
 	}
-	log.Println("Redis ping latency:", time.Since(t))
 
-	//Need to add this news3store in config
+	defer producer.Close()
+
 	bucket := os.Getenv("S3_BUCKET")
 	region := os.Getenv("AWS_REGION")
 
@@ -85,8 +85,8 @@ func main() {
 	}
 
 	h := &handler.Handler{
-		Redis:   Rdb,
 		S3store: s3store,
+		Kafka:   producer,
 	}
 	cfg := config.LoadConfig()
 

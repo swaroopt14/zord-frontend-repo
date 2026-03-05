@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"context"
+	"crypto/sha256"
 	"encoding/csv"
 	"encoding/json"
+	"log"
 	"net/http"
 	"path/filepath"
 	"runtime"
@@ -13,6 +16,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
+	"main.go/model"
+	"main.go/services"
+	"main.go/vault"
 )
 
 type BulkResult struct {
@@ -128,7 +134,7 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 				traceID := uuid.New().String()
 				idempotencyKey := uuid.New().String()
 
-				data, duplicateID, err := h.processIntentCore(
+				data, duplicateID, err := h.processBulkIntentRow(
 					c.Request.Context(),
 					job.Payload,
 					tenantID,
@@ -239,4 +245,66 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 		"total":   len(results),
 		"results": results,
 	})
+}
+
+func (h *Handler) processBulkIntentRow(
+	ctx context.Context,
+	rawPayload []byte,
+	tenantId uuid.UUID,
+	traceId string,
+	idempotencyKey string,
+	payloadSize int,
+	contentType string,
+	sourceType string,
+) (*model.AckMessage, uuid.UUID, error) {
+
+	encryptedPayload, err := vault.Encrypt(rawPayload)
+	if err != nil {
+		log.Printf("Error encrypting payload for bulk row, trace_id=%s: %v", traceId, err)
+		return nil, uuid.Nil, err
+	}
+
+	msg := model.RawIntentMessage{
+		TenantID:       tenantId.String(),
+		TraceID:        traceId,
+		IdempotencyKey: idempotencyKey,
+		PayloadSize:    payloadSize,
+		Payload:        encryptedPayload,
+		ContentType:    contentType,
+		SourceType:     sourceType,
+	}
+
+	id, err := services.PersistIdempotency(ctx, msg)
+	if err != nil {
+		log.Printf("Error persisting idempotency key for bulk row, trace_id=%s: %v", traceId, err)
+		return nil, uuid.Nil, err
+	}
+	if id != uuid.Nil {
+		return nil, id, nil
+	}
+
+
+	data, err := services.ProcessRawIntent(msg, h.S3store)
+	if err != nil {
+		log.Printf("Error processing raw intent for bulk row, trace_id=%s: %v", traceId, err)
+		return nil, uuid.Nil, err
+	}
+	if data == nil {
+		log.Printf("S3 data is nil for bulk row, trace_id=%s", traceId)
+		return nil, uuid.Nil, err
+	}
+
+	
+	hash := sha256.Sum256(rawPayload)
+	msg.PayloadHash = hash[:]
+
+
+	if err := services.RawIntent(ctx, msg, data, false); err != nil {
+		log.Printf("Error persisting raw intent for bulk row, trace_id=%s: %v", traceId, err)
+		return nil, uuid.Nil, err
+	}
+
+	services.SendToIntentEngine(msg, data, h.Kafka, false)
+
+	return data, uuid.Nil, nil
 }

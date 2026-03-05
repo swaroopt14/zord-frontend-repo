@@ -8,8 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"main.go/messaging"
-	"main.go/model"
 )
 
 func (h *Handler) WebhookHandler(context *gin.Context) {
@@ -44,20 +42,20 @@ func (h *Handler) WebhookHandler(context *gin.Context) {
 
 	traceId := uuid.New().String()
 
-	msg := model.RawIntentMessage{
-		TenantID:       tenantIdStr,
-		TraceID:        traceId,
-		PayloadHash:    rawPayload,
-		IdempotencyKey: idempotencyKey,
-	}
+	// msg := model.RawIntentMessage{
+	// 	TenantID:       tenantIdStr,
+	// 	TraceID:        traceId,
+	// 	PayloadHash:    rawPayload,
+	// 	IdempotencyKey: idempotencyKey,
+	// }
 
-	err := messaging.ProduceWebhookMessage(context.Request.Context(), msg, h.Redis)
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{
-			"error": "failed to enqueue webhook",
-		})
-		return
-	}
+	// err := kafka.ProduceWebhookMessage(context.Request.Context(), msg, h.Redis)
+	// if err != nil {
+	// 	context.JSON(http.StatusInternalServerError, gin.H{
+	// 		"error": "failed to enqueue webhook",
+	// 	})
+	// 	return
+	// }
 
 	// Webhooks usually expect a 200/202 OK quickly.
 	// We don't necessarily need to wait for full processing unless we want to return synchronous errors.

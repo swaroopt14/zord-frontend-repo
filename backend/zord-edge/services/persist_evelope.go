@@ -6,15 +6,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 	"main.go/db"
-	"main.go/messaging"
+	"main.go/kafka"
 	"main.go/model"
 	"main.go/vault"
 )
 
 func RawIntent(ctx context.Context,
-	msg model.RawIntentMessage, ack *model.AckMessage, rdb *redis.Client, isWebhook bool) error {
+	msg model.RawIntentMessage, ack *model.AckMessage, isWebhook bool) error {
 
 	envelopeID, err := uuid.Parse(ack.EnvelopeId)
 	if err != nil {
@@ -85,24 +84,24 @@ func RawIntent(ctx context.Context,
 }
 
 func SendToIntentEngine(
-	msg model.RawIntentMessage, ack *model.AckMessage, rdb *redis.Client, isWebhook bool) {
+	msg model.RawIntentMessage, ack *model.AckMessage, pro *kafka.Producer, isWebhook bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	envelopeID, err := uuid.Parse(ack.EnvelopeId)
 	if err != nil {
 		log.Printf("Invalid EnvelopeId: %s", ack.EnvelopeId)
-		return
+		return err
 	}
 	trace_id, err := uuid.Parse(msg.TraceID)
 	if err != nil {
 		log.Printf("Invalid TraceID: %s", msg.TraceID)
-		return
+		return err
 	}
 	tenantUUID, err := uuid.Parse(msg.TenantID)
 	if err != nil {
 		log.Printf("Invalid TenantId: %s", msg.TenantID)
-		return
+		return err
 	}
 	ObjRef := ack.ObjectRef
 
@@ -151,7 +150,8 @@ func SendToIntentEngine(
 		ReceivedAt:       ack.ReceivedAt,
 		Source:           msg.SourceType,
 		IdempotencyKey:   msg.IdempotencyKey,
-		EncryptedPayload: msg.Payload}
+		EncryptedPayload: msg.Payload,
+	}
 
 	// Prepare payload for intent engine
 	// if isWebhook {
@@ -168,11 +168,12 @@ func SendToIntentEngine(
 	// 	envelope.Payload = json.RawMessage(msg.RawPayload)
 	// }
 
-	//Send to Intent Engine via Redis
+	//Send to Intent Engine via Kafka
 
-	err = messaging.SendRawIntentMessage(ctx, NewEnvelope, rdb)
+	err = kafka.SendRawIntentMessage(ctx, NewEnvelope, pro)
 	if err != nil {
 		log.Printf("Failed to send raw intent message: %v", err)
+		return err
 	}
-
+	return nil
 }
