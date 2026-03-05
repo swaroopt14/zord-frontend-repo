@@ -26,6 +26,10 @@ func CanonicalIntentToOutboxEvent(
 		AggregateType: "intent",
 		AggregateID:   intId,
 		EventType:     "eventTypePlaceholder",
+
+		SchemaVersion: "v1",
+		Amount:        intent.Amount,
+		Currency:      intent.Currency,
 		Payload:       payload,
 		Status:        "PENDING",
 		CreatedAt:     time.Now(),

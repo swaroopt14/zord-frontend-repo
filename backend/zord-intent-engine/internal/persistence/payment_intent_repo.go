@@ -96,21 +96,24 @@ VALUES (
 	}
 
 	outboxQuery := `
-	INSERT INTO outbox (
-		trace_id,
-		envelope_id,
-		tenant_id,
-		aggregate_type,
-		aggregate_id,
-		event_type,
-		payload,
-		status,
-		retry_count,
-		next_attempt_at,
-		created_at
-	) VALUES (
-		$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
-	)`
+INSERT INTO outbox (
+    trace_id,
+    envelope_id,
+    tenant_id,
+    aggregate_type,
+    aggregate_id,
+    event_type,
+    schema_version,
+    amount,
+    currency,
+    payload,
+    status,
+    retry_count,
+    next_attempt_at,
+    created_at
+) VALUES (
+    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
+)`
 
 	_, err = tx.ExecContext(
 		ctx,
@@ -121,6 +124,9 @@ VALUES (
 		outbox.AggregateType,
 		outbox.AggregateID,
 		outbox.EventType,
+		outbox.SchemaVersion,
+		outbox.Amount,
+		outbox.Currency,
 		outbox.Payload,
 		outbox.Status,
 		outbox.RetryCount,
