@@ -102,7 +102,9 @@ func (p *Producer) Publish(ctx context.Context, topic string, key string, event 
 // }
 
 func SendRawIntentMessage(ctx context.Context, Event model.Event, pro *Producer) error {
+
 	topic := os.Getenv("KAFKA_TOPIC")
+
 	err := pro.Publish(ctx,
 		topic,
 		Event.EnvelopeID.String(),
@@ -114,5 +116,20 @@ func SendRawIntentMessage(ctx context.Context, Event model.Event, pro *Producer)
 	}
 
 	log.Println("Kafka Event queued for async publish")
+	return nil
+}
+
+// Close gracefully shuts down the Kafka producer
+func (p *Producer) Close() error {
+
+	if p == nil || p.producer == nil {
+		return nil
+	}
+
+	// AsyncClose flushes pending messages before shutdown
+	p.producer.AsyncClose()
+
+	log.Println("Kafka producer shutdown initiated")
+
 	return nil
 }

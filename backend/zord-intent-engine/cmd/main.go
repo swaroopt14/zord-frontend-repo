@@ -149,29 +149,28 @@ func main() {
 
 	log.Printf("Started %d workers for Ingress processing", workerPoolSize)
 
-	go func() {
-		log.Println("Kafka consumer started")
-		handler := func(msg []byte) error {
-			var event models.Event
-			err = json.Unmarshal(msg, &event)
-			if err != nil {
-				log.Printf("Invalid Kafka event payload: %v", err)
-				return err
-			}
-			jobChan <- &event
-
-			return nil
-		}
-		err = kafka.StartConsumer(
-			brokers,
-			groupID,
-			topic,
-			handler,
-		)
+	handler := func(msg []byte) error {
+		var event models.Event
+		err := json.Unmarshal(msg, &event)
 		if err != nil {
-			log.Fatalf("Kafka consumer failed: %v", err)
+			log.Printf("Invalid Kafka event payload: %v", err)
+			return err
 		}
-	}()
+		jobChan <- &event
+
+		return nil
+	}
+	err = kafka.StartConsumer(
+		ctx,
+		brokers,
+		groupID,
+		topic,
+		handler,
+	)
+	if err != nil {
+		log.Fatalf("Kafka consumer failed: %v", err)
+	}
+	log.Println("Kafka consumer started")
 
 	// -------- HTTP SERVER --------
 	log.Println("Intent Engine (Service-2) running on :8083")

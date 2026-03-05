@@ -24,7 +24,7 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 	tenantId := context.MustGet("tenant_id").(uuid.UUID)
 	IdempotencyKey := context.GetString("idempotency_key")
 	PayloadSize := context.GetInt("payload_size")
-	ContentType := context.GetString("Content-Type")
+	ContentType := context.ContentType()
 	SourceType := context.GetString("source_type")
 
 	encryptedPayload, err := vault.Encrypt(rawPayload)
@@ -109,7 +109,16 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 		"Received_At": data.ReceivedAt,
 	})
 
-	// Emit Kafka Event Logic
-	services.SendToIntentEngine(msg, data, h.Kafka, false)
-
+	// Async Kafka publish
+	go func() {
+		err := services.SendToIntentEngine(msg, data, h.Kafka, false)
+		if err != nil {
+			log.Printf(
+				"Async intent engine publish failed trace_id=%s envelope_id=%s error=%v",
+				msg.TraceID,
+				data.EnvelopeId,
+				err,
+			)
+		}
+	}()
 }

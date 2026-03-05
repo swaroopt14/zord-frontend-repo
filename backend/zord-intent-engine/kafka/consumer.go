@@ -12,7 +12,7 @@ type Consumer struct {
 	handler func([]byte) error
 }
 
-func StartConsumer(brockers []string, groupID, topic string, handler func([]byte) error) error {
+func StartConsumer(ctx context.Context, brokers []string, groupID, topic string, handler func([]byte) error) error {
 	config := sarama.NewConfig()
 	config.Version = sarama.V2_8_0_0
 
@@ -23,7 +23,7 @@ func StartConsumer(brockers []string, groupID, topic string, handler func([]byte
 	config.Consumer.Offsets.Initial = sarama.OffsetNewest
 	config.Consumer.Offsets.AutoCommit.Enable = true
 
-	group, err := sarama.NewConsumerGroup(brockers, groupID, config)
+	group, err := sarama.NewConsumerGroup(brokers, groupID, config)
 	if err != nil {
 		return err
 	}
@@ -34,13 +34,22 @@ func StartConsumer(brockers []string, groupID, topic string, handler func([]byte
 	}
 
 	go func() {
+		defer group.Close()
 		for {
-			err := group.Consume(context.Background(), []string{topic}, consumer)
+			if ctx.Err() != nil {
+				return
+			}
+			err := group.Consume(ctx, []string{topic}, consumer)
 			if err != nil {
 				log.Printf("Kafka consume error: %v", err)
 			}
+			consumer.ready = make(chan bool)
 		}
 	}()
+	<-consumer.ready
+
+	log.Println("Kafka consumer is ready")
+
 	return nil
 
 }

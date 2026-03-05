@@ -61,7 +61,6 @@ func Authenticate() gin.HandlerFunc {
 			}
 
 			context.Set("tenant_id", response.TenantId)
-			context.Set("Content-Type", ContentType)
 			context.Set("source_type", SourceType)
 			context.Next()
 

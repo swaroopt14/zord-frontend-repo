@@ -67,9 +67,10 @@ func main() {
 	brokers := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
 	producer, err := kafka.NewProducer(brokers)
 	if err != nil {
-		log.Fatal("Kafka publish failed: ", err)
-		return
+		log.Fatal("Kafka producer creation failure: ", err)
 	}
+
+	defer producer.Close()
 
 	bucket := os.Getenv("S3_BUCKET")
 	region := os.Getenv("AWS_REGION")
@@ -84,7 +85,6 @@ func main() {
 	}
 
 	h := &handler.Handler{
-		//	Redis:   Rdb,
 		S3store: s3store,
 		Kafka:   producer,
 	}
