@@ -4,34 +4,43 @@ pipeline {
   options {
     disableConcurrentBuilds()
     timestamps()
-    // Disable the implicit "Declarative: Checkout SCM" so we can wipe the workspace first.
     skipDefaultCheckout(true)
   }
 
   parameters {
     string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Git branch to deploy')
-    string(name: 'GIT_CREDENTIALS_ID', defaultValue: 'github-pat', description: 'Jenkins credential ID for cloning the private GitHub repo over HTTPS')
+    string(name: 'GIT_CREDENTIALS_ID', defaultValue: 'github-pat', description: 'Jenkins credential ID for cloning the GitHub repo')
+    booleanParam(name: 'RUN_INFRA', defaultValue: true, description: 'Start local infra services (Postgres/Redis/Kafka/Chroma)')
   }
 
   environment {
     GIT_URL = 'https://github.com/Arealis-network/Arealis-Zord.git'
-    COMPOSE_FILE = 'docker-compose.ec2.yml'
-    APP_ENV_FILE = 'backend/zord-intent-engine/.env'
-    PROMPT_ENV_FILE = 'backend/zord-prompt-layer/.env'
+    COMPOSE_FILE = 'docker-compose.prod.yml'
+    ENV_DIR = 'deploy/production/env'
+    SECRETS_DIR = 'deploy/production/secrets'
+
     AWS_REGION = 'ap-south-1'
     CANONICAL_REGION = 'ap-southeast-2'
     EDGE_BUCKET = 'arealis-zord-vault'
     INTENT_BUCKET = 'canonical-worm-storage'
     AWS_EC2_METADATA_DISABLED = 'true'
+
+    OTEL_EXPORTER_OTLP_ENDPOINT = 'otel-collector:4317'
+    OTEL_EXPORTER_OTLP_INSECURE = 'true'
+
+    EDGE_DB_HOST = 'zord-edge-postgres'
+    INTENT_DB_HOST = 'zord-intent-postgres'
+    RELAY_DB_HOST = 'zord-relay-postgres'
+    TOKEN_DB_HOST = 'zord-token-enclave-postgres'
+    REDIS_ADDR = 'zord-redis:6379'
+    KAFKA_BROKERS = 'zord-kafka:9092'
+    CHROMA_URL = 'http://chroma:8000'
   }
 
   stages {
     stage('Checkout') {
       steps {
         deleteDir()
-
-        // Don't run raw `git` in a shell for private repos; it will prompt for creds and fail.
-        // Use Jenkins-managed credentials for a non-interactive checkout of the requested branch.
         checkout([
           $class: 'GitSCM',
           branches: [[name: "*/${params.BRANCH_NAME}"]],
@@ -51,6 +60,7 @@ pipeline {
           test -f "${COMPOSE_FILE}"
           docker --version
           docker compose version
+          mkdir -p "${ENV_DIR}" "${SECRETS_DIR}"
         '''
       }
     }
@@ -60,18 +70,145 @@ pipeline {
         withCredentials([
           string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
           string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
+          string(credentialsId: 'edge-db-user', variable: 'EDGE_DB_USER'),
+          string(credentialsId: 'edge-db-password', variable: 'EDGE_DB_PASSWORD'),
+          string(credentialsId: 'edge-db-name', variable: 'EDGE_DB_NAME'),
+          string(credentialsId: 'intent-db-user', variable: 'INTENT_DB_USER'),
+          string(credentialsId: 'intent-db-password', variable: 'INTENT_DB_PASSWORD'),
+          string(credentialsId: 'intent-db-name', variable: 'INTENT_DB_NAME'),
+          string(credentialsId: 'relay-db-user', variable: 'RELAY_DB_USER'),
+          string(credentialsId: 'relay-db-password', variable: 'RELAY_DB_PASSWORD'),
+          string(credentialsId: 'relay-db-name', variable: 'RELAY_DB_NAME'),
+          string(credentialsId: 'token-db-user', variable: 'TOKEN_DB_USER'),
+          string(credentialsId: 'token-db-password', variable: 'TOKEN_DB_PASSWORD'),
+          string(credentialsId: 'token-db-name', variable: 'TOKEN_DB_NAME'),
+          string(credentialsId: 'token-enclave-master-key', variable: 'TOKEN_ENCLAVE_MASTER_KEY'),
+          string(credentialsId: 'pii-token-secret', variable: 'PII_TOKEN_SECRET'),
+          string(credentialsId: 'gemini-api-key', variable: 'GEMINI_API_KEY'),
+          string(credentialsId: 'gemini-api-keys', variable: 'GEMINI_API_KEYS'),
+          file(credentialsId: 'edge-signing-key', variable: 'EDGE_SIGNING_KEY_FILE')
         ]) {
           sh '''
             set -eu
-            cat > "${APP_ENV_FILE}" <<EOF
+            cat > "${ENV_DIR}/zord-edge.env" <<EOF
+DB_HOST=${EDGE_DB_HOST}
+DB_PORT=5432
+DB_USER=${EDGE_DB_USER}
+DB_PASSWORD=${EDGE_DB_PASSWORD}
+DB_NAME=${EDGE_DB_NAME}
+DB_SSLMODE=disable
+REDIS_ADDR=${REDIS_ADDR}
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 AWS_REGION=${AWS_REGION}
 S3_BUCKET=${EDGE_BUCKET}
-CANONICAL_AWS_REGION=${CANONICAL_REGION}
-CANONICAL_S3_BUCKET=${INTENT_BUCKET}
 AWS_EC2_METADATA_DISABLED=${AWS_EC2_METADATA_DISABLED}
+OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
+OTEL_EXPORTER_OTLP_INSECURE=${OTEL_EXPORTER_OTLP_INSECURE}
+SIGNING_KEY_PATH=/run/secrets/ed25519_private.pem
 EOF
+
+            cat > "${ENV_DIR}/zord-intent-engine.env" <<EOF
+DB_HOST=${INTENT_DB_HOST}
+DB_PORT=5432
+DB_USER=${INTENT_DB_USER}
+DB_PASSWORD=${INTENT_DB_PASSWORD}
+DB_NAME=${INTENT_DB_NAME}
+DB_SSLMODE=disable
+REDIS_ADDR=${REDIS_ADDR}
+ZORD_PII_ENCLAVE_URL=http://zord-token-enclave:8087
+PII_TOKEN_SECRET=${PII_TOKEN_SECRET}
+AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+AWS_REGION=${CANONICAL_REGION}
+S3_BUCKET=${INTENT_BUCKET}
+AWS_EC2_METADATA_DISABLED=${AWS_EC2_METADATA_DISABLED}
+OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
+OTEL_EXPORTER_OTLP_INSECURE=${OTEL_EXPORTER_OTLP_INSECURE}
+EOF
+
+            cat > "${ENV_DIR}/zord-relay.env" <<EOF
+KAFKA_BROKERS=${KAFKA_BROKERS}
+KAFKA_CONSUMER_GROUP=zord-relay-group
+KAFKA_READY_TOPIC=z.intent.ready.v1
+KAFKA_DLQ_TOPIC=z.intent.dlq.v1
+KAFKA_PUBLISH_FAILURE_DLQ_TOPIC=z.intent.publish_failure.dlq.v1
+KAFKA_POISON_EVENT_DLQ_TOPIC=z.intent.poison_event.dlq.v1
+INTENT_ENGINE_BASE_URL=http://zord-intent-engine:8083
+OUTBOX_POLL_INTERVAL=5s
+OUTBOX_BATCH_SIZE=10
+OUTBOX_WORKER_COUNT=8
+OUTBOX_MAX_ATTEMPTS=7
+OUTBOX_MAX_AGE=8h
+OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
+OTEL_EXPORTER_OTLP_INSECURE=${OTEL_EXPORTER_OTLP_INSECURE}
+EOF
+
+            cat > "${ENV_DIR}/zord-token-enclave.env" <<EOF
+PORT=8087
+DB_HOST=${TOKEN_DB_HOST}
+DB_PORT=5432
+DB_USER=${TOKEN_DB_USER}
+DB_PASSWORD=${TOKEN_DB_PASSWORD}
+DB_NAME=${TOKEN_DB_NAME}
+DB_SSLMODE=disable
+MASTER_KEY=${TOKEN_ENCLAVE_MASTER_KEY}
+OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
+OTEL_EXPORTER_OTLP_INSECURE=${OTEL_EXPORTER_OTLP_INSECURE}
+EOF
+
+            cat > "${ENV_DIR}/zord-prompt-layer.env" <<EOF
+SERVICE_NAME=zord-prompt-layer
+HTTP_PORT=8086
+GEMINI_API_KEY=${GEMINI_API_KEY}
+GEMINI_API_KEYS=${GEMINI_API_KEYS}
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
+EDGE_READ_DSN=postgres://${EDGE_DB_USER}:${EDGE_DB_PASSWORD}@${EDGE_DB_HOST}:5432/${EDGE_DB_NAME}?sslmode=disable
+INTENT_READ_DSN=postgres://${INTENT_DB_USER}:${INTENT_DB_PASSWORD}@${INTENT_DB_HOST}:5432/${INTENT_DB_NAME}?sslmode=disable
+RELAY_READ_DSN=postgres://${RELAY_DB_USER}:${RELAY_DB_PASSWORD}@${RELAY_DB_HOST}:5432/${RELAY_DB_NAME}?sslmode=disable
+CHROMA_URL=${CHROMA_URL}
+CHROMA_COLLECTION=zord_prompt_chunks
+DEFAULT_TOP_K=5
+EMBEDDING_MODEL_PATH=./assets/models/bge-small-en-v1.5/model.onnx
+TOKENIZER_PATH=./assets/models/bge-small-en-v1.5/tokenizer.json
+EMBEDDING_INPUT_IDS_NAME=input_ids
+EMBEDDING_ATTENTION_MASK_NAME=attention_mask
+EMBEDDING_TOKEN_TYPE_IDS_NAME=token_type_ids
+EMBEDDING_OUTPUT_NAME=last_hidden_state
+EMBEDDING_MAX_LENGTH=256
+OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
+OTEL_EXPORTER_OTLP_INSECURE=${OTEL_EXPORTER_OTLP_INSECURE}
+EOF
+
+            cat > "${ENV_DIR}/zord-console.env" <<EOF
+NODE_ENV=production
+NEXT_TELEMETRY_DISABLED=1
+PORT=3000
+HOSTNAME=0.0.0.0
+ZORD_EDGE_URL=http://zord-edge:8080
+ZORD_RELAY_URL=http://zord-relay:8082
+ZORD_INTENT_ENGINE_URL=http://zord-intent-engine:8083
+ZORD_PII_ENCLAVE_URL=http://zord-token-enclave:8087
+EOF
+
+            cat > ".env" <<EOF
+EDGE_DB_USER=${EDGE_DB_USER}
+EDGE_DB_PASSWORD=${EDGE_DB_PASSWORD}
+EDGE_DB_NAME=${EDGE_DB_NAME}
+INTENT_DB_USER=${INTENT_DB_USER}
+INTENT_DB_PASSWORD=${INTENT_DB_PASSWORD}
+INTENT_DB_NAME=${INTENT_DB_NAME}
+RELAY_DB_USER=${RELAY_DB_USER}
+RELAY_DB_PASSWORD=${RELAY_DB_PASSWORD}
+RELAY_DB_NAME=${RELAY_DB_NAME}
+TOKEN_DB_USER=${TOKEN_DB_USER}
+TOKEN_DB_PASSWORD=${TOKEN_DB_PASSWORD}
+TOKEN_DB_NAME=${TOKEN_DB_NAME}
+EOF
+
+            cp "${EDGE_SIGNING_KEY_FILE}" "${SECRETS_DIR}/ed25519_private.pem"
+            chmod 600 "${SECRETS_DIR}/ed25519_private.pem"
           '''
         }
       }
@@ -82,7 +219,11 @@ EOF
         sh '''
           set -eux
           docker compose -f "${COMPOSE_FILE}" down --remove-orphans || true
-          docker compose -f "${COMPOSE_FILE}" up -d --build
+          if [ "${RUN_INFRA}" = "true" ]; then
+            docker compose -f "${COMPOSE_FILE}" --profile infra up -d --build
+          else
+            docker compose -f "${COMPOSE_FILE}" up -d --build
+          fi
         '''
       }
     }
@@ -92,7 +233,8 @@ EOF
         sh '''
           set -eux
           docker compose -f "${COMPOSE_FILE}" ps
-          curl -fsS http://127.0.0.1/api/health
+          curl -fsS http://127.0.0.1:8080/health
+          curl -fsS http://127.0.0.1:3000/api/health
         '''
       }
     }

@@ -32,12 +32,8 @@ services:
     networks:
       - zord-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    # Container healthcheck intentionally omitted for minimal scratch image.
+    # Use platform/orchestrator health probes instead.
 
   postgres:
     image: postgres:16-alpine

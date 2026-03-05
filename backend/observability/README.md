@@ -9,7 +9,7 @@
 
 ### Step 1: Start Observability Stack
 ```bash
-cd observability
+cd backend/observability
 docker compose up -d
 ```
 

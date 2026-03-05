@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 type GeminiClient struct {
@@ -21,7 +23,10 @@ func NewGeminiClient(apiKeys []string, model, baseURL string) *GeminiClient {
 		APIKeys: apiKeys,
 		Model:   model,
 		BaseURL: baseURL,
-		HTTP:    &http.Client{Timeout: 30 * time.Second},
+		HTTP: &http.Client{
+			Timeout:   30 * time.Second,
+			Transport: otelhttp.NewTransport(http.DefaultTransport),
+		},
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
 	"zord-token-enclave/internal/config"
 	"zord-token-enclave/internal/crypto"
@@ -14,9 +15,13 @@ import (
 	"zord-token-enclave/internal/handlers"
 	"zord-token-enclave/internal/repository"
 	"zord-token-enclave/internal/services"
+	"zord-token-enclave/tracing"
 )
 
 func main() {
+	cleanup := tracing.InitTracing("zord-token-enclave")
+	defer cleanup()
+
 	cfg := config.Load()
 
 	// ✅ Connect DB using Docker-provided env
@@ -65,7 +70,11 @@ func main() {
 	tokenHandler := handlers.NewTokenHandler(tokenSvc)
 
 	// ✅ Gin router
-	r := gin.Default()
+	r := gin.New()
+	r.Use(
+		gin.Recovery(),
+		otelgin.Middleware("zord-token-enclave"),
+	)
 
 	r.GET("v1/health", func(c *gin.Context) {
 		if err := database.Ping(); err != nil {

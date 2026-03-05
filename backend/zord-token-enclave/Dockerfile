@@ -1,32 +1,31 @@
 # ---- Build stage ----
 FROM golang:1.25-alpine AS builder
 
-WORKDIR /app
+RUN apk add --no-cache git ca-certificates
 
-# Install git (sometimes needed for go mod)
-RUN apk add --no-cache git
+WORKDIR /src
 
-# Copy go mod files first (for caching)
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the rest of the source
 COPY . .
 
-# Build the binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o zord-token-enclave ./cmd
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -trimpath -ldflags "-s -w" -o /out/zord-token-enclave ./cmd
 
-# ---- Runtime stage ----
-FROM alpine:latest
+# ---- Runtime stage (minimal) ----
+FROM scratch
 
 WORKDIR /app
 
-# Certificates for HTTPS (if needed)
-RUN apk add --no-cache ca-certificates
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /out/zord-token-enclave /app/zord-token-enclave
 
-# Copy binary from builder
-COPY --from=builder /app/zord-token-enclave /app/zord-token-enclave
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+USER 65532:65532
 
 EXPOSE 8087
 
-CMD ["/app/zord-token-enclave"]
+ENTRYPOINT ["/app/zord-token-enclave"]

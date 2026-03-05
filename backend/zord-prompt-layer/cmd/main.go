@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
 	"zord-prompt-layer/client"
 	"zord-prompt-layer/config"
@@ -16,6 +17,7 @@ import (
 	"zord-prompt-layer/repositories"
 	"zord-prompt-layer/routes"
 	"zord-prompt-layer/services"
+	"zord-prompt-layer/tracing"
 )
 
 func main() {
@@ -30,8 +32,14 @@ func main() {
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
-	router.Use(gin.Recovery())
+	router.Use(
+		gin.Recovery(),
+		otelgin.Middleware(cfg.ServiceName),
+	)
 	router.Use(corsMiddleware())
+
+	cleanup := tracing.InitTracing(cfg.ServiceName)
+	defer cleanup()
 
 	healthHandler := handler.NewHealthHandler(cfg.ServiceName)
 

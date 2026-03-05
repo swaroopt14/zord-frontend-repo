@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 	"zord-relay/model"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 type IntentClient struct {
@@ -30,7 +32,8 @@ func NewIntentClient(baseURL string) *IntentClient {
 	return &IntentClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout:   10 * time.Second,
+			Transport: otelhttp.NewTransport(http.DefaultTransport),
 		},
 	}
 }
