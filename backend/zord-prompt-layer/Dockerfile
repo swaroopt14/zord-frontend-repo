@@ -36,9 +36,6 @@ WORKDIR /app
 COPY --from=builder /out/zord-prompt-layer /app/zord-prompt-layer
 COPY --from=onnx /opt/onnxruntime /opt/onnxruntime
 COPY assets /app/assets
-# Use committed defaults so the image can be built on a fresh clone.
-# Runtime env vars (e.g. via docker-compose `env_file`) can still override as needed.
-COPY .env.example /app/.env
 
 USER 10001
 
