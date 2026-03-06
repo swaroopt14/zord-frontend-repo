@@ -32,6 +32,18 @@ pipeline {
     INTENT_DB_HOST = 'zord-intent-postgres'
     RELAY_DB_HOST = 'zord-relay-postgres'
     TOKEN_DB_HOST = 'zord-token-enclave-postgres'
+    EDGE_DB_USER = 'zord_user'
+    EDGE_DB_PASSWORD = 'zord_password'
+    EDGE_DB_NAME = 'zord_edge_db'
+    INTENT_DB_USER = 'intent_user'
+    INTENT_DB_PASSWORD = 'intent_password'
+    INTENT_DB_NAME = 'zord_intent_engine_db'
+    RELAY_DB_USER = 'relay_user'
+    RELAY_DB_PASSWORD = 'relay_password'
+    RELAY_DB_NAME = 'zord_relay_db'
+    TOKEN_DB_USER = 'token_user'
+    TOKEN_DB_PASSWORD = 'token_password'
+    TOKEN_DB_NAME = 'zord_token_enclave_db'
     REDIS_ADDR = 'zord-redis:6379'
     KAFKA_BROKERS = 'zord-kafka:9092'
     CHROMA_URL = 'http://chroma:8000'
@@ -71,18 +83,6 @@ pipeline {
         withCredentials([
           string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
           string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
-          string(credentialsId: 'edge-db-user', variable: 'EDGE_DB_USER'),
-          string(credentialsId: 'edge-db-password', variable: 'EDGE_DB_PASSWORD'),
-          string(credentialsId: 'edge-db-name', variable: 'EDGE_DB_NAME'),
-          string(credentialsId: 'intent-db-user', variable: 'INTENT_DB_USER'),
-          string(credentialsId: 'intent-db-password', variable: 'INTENT_DB_PASSWORD'),
-          string(credentialsId: 'intent-db-name', variable: 'INTENT_DB_NAME'),
-          string(credentialsId: 'relay-db-user', variable: 'RELAY_DB_USER'),
-          string(credentialsId: 'relay-db-password', variable: 'RELAY_DB_PASSWORD'),
-          string(credentialsId: 'relay-db-name', variable: 'RELAY_DB_NAME'),
-          string(credentialsId: 'token-db-user', variable: 'TOKEN_DB_USER'),
-          string(credentialsId: 'token-db-password', variable: 'TOKEN_DB_PASSWORD'),
-          string(credentialsId: 'token-db-name', variable: 'TOKEN_DB_NAME'),
           string(credentialsId: 'token-enclave-master-key', variable: 'TOKEN_ENCLAVE_MASTER_KEY'),
           string(credentialsId: 'zord-vault-key', variable: 'ZORD_VAULT_KEY'),
           string(credentialsId: 'gemini-api-key', variable: 'GEMINI_API_KEY'),
