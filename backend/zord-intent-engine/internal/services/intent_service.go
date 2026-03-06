@@ -442,7 +442,7 @@ func (s *IntentService) processWebhook(
 		EnvelopeID:     in.EnvelopeID.String(),
 		TenantID:       in.TenantID.String(),
 		IdempotencyKey: in.IdempotencyKey,
-		SalientHash:    "in.PayloadHash", // Might be empty
+		SalientHash:    "NA", // Might be empty
 		IntentType:     "WEBHOOK",
 		SchemaVersion:  "v1",
 		Amount:         decimal.Zero,
