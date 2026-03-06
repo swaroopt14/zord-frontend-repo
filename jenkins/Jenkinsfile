@@ -44,6 +44,7 @@ pipeline {
     TOKEN_DB_USER = 'token_user'
     TOKEN_DB_PASSWORD = 'token_password'
     TOKEN_DB_NAME = 'zord_token_enclave_db'
+    ZORD_VAULT_KEY = '00Ofxp50eVCizf58ZoX4Zy2T83O38sMSrc3s9Cpb/ac='
     REDIS_ADDR = 'zord-redis:6379'
     KAFKA_BROKERS = 'zord-kafka:9092'
     CHROMA_URL = 'http://chroma:8000'
@@ -84,7 +85,6 @@ pipeline {
           string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
           string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
           string(credentialsId: 'token-enclave-master-key', variable: 'TOKEN_ENCLAVE_MASTER_KEY'),
-          string(credentialsId: 'zord-vault-key', variable: 'ZORD_VAULT_KEY'),
           string(credentialsId: 'gemini-api-key', variable: 'GEMINI_API_KEY'),
           string(credentialsId: 'gemini-api-keys', variable: 'GEMINI_API_KEYS'),
           file(credentialsId: 'edge-signing-key', variable: 'EDGE_SIGNING_KEY_FILE')
@@ -99,6 +99,7 @@ DB_PASSWORD=${EDGE_DB_PASSWORD}
 DB_NAME=${EDGE_DB_NAME}
 DB_SSLMODE=disable
 REDIS_ADDR=${REDIS_ADDR}
+ZORD_VAULT_KEY=${ZORD_VAULT_KEY}
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 AWS_REGION=${AWS_REGION}
