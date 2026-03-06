@@ -8,6 +8,7 @@ COPY . .
 # Build for the container's native architecture to keep local dev (Apple Silicon) working.
 # If you need amd64 images, set `--platform=linux/amd64` at build time.
 ENV CGO_ENABLED=1 GOOS=linux
+RUN go mod tidy
 RUN go build -trimpath -ldflags "-s -w" -o /out/zord-prompt-layer ./cmd/main.go
 
 FROM debian:bookworm-slim AS onnx
