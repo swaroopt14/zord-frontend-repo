@@ -83,7 +83,7 @@ pipeline {
           string(credentialsId: 'token-db-password', variable: 'TOKEN_DB_PASSWORD'),
           string(credentialsId: 'token-db-name', variable: 'TOKEN_DB_NAME'),
           string(credentialsId: 'token-enclave-master-key', variable: 'TOKEN_ENCLAVE_MASTER_KEY'),
-          string(credentialsId: 'pii-token-secret', variable: 'PII_TOKEN_SECRET'),
+          string(credentialsId: 'zord-vault-key', variable: 'ZORD_VAULT_KEY'),
           string(credentialsId: 'gemini-api-key', variable: 'GEMINI_API_KEY'),
           string(credentialsId: 'gemini-api-keys', variable: 'GEMINI_API_KEYS'),
           file(credentialsId: 'edge-signing-key', variable: 'EDGE_SIGNING_KEY_FILE')
@@ -117,7 +117,7 @@ DB_NAME=${INTENT_DB_NAME}
 DB_SSLMODE=disable
 REDIS_ADDR=${REDIS_ADDR}
 ZORD_PII_ENCLAVE_URL=http://zord-token-enclave:8087
-PII_TOKEN_SECRET=${PII_TOKEN_SECRET}
+ZORD_VAULT_KEY=${ZORD_VAULT_KEY}
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 AWS_REGION=${CANONICAL_REGION}

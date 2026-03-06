@@ -18,6 +18,8 @@ backend/.env*
 .DS_Store
 .yaswanth
 .env
+**/.env
+**/.env.*
 
 # --- Personal/Development folders ---
 .yaswanth
