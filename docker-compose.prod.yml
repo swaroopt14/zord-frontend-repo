@@ -30,7 +30,8 @@ services:
     env_file:
       - ./deploy/production/env/zord-edge.env
     secrets:
-      - edge_signing_key
+      - source: edge_signing_key
+        target: ed25519_private.pem
     environment:
       - SIGNING_KEY_PATH=/run/secrets/ed25519_private.pem
     ports:
