@@ -35,6 +35,7 @@ pipeline {
     REDIS_ADDR = 'zord-redis:6379'
     KAFKA_BROKERS = 'zord-kafka:9092'
     CHROMA_URL = 'http://chroma:8000'
+    RUN_INFRA = "${params.RUN_INFRA}"
   }
 
   stages {
@@ -219,7 +220,7 @@ EOF
         sh '''
           set -eux
           docker compose -f "${COMPOSE_FILE}" down --remove-orphans || true
-          if [ "${RUN_INFRA}" = "true" ]; then
+          if [ "${RUN_INFRA:-true}" = "true" ]; then
             docker compose -f "${COMPOSE_FILE}" --profile infra up -d --build
           else
             docker compose -f "${COMPOSE_FILE}" up -d --build
