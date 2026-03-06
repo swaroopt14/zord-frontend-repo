@@ -176,6 +176,7 @@ func (s *IntentService) ProcessIncomingIntent(
 		ObjectRef:        event.ObjectRef,
 		IdempotencyKey:   event.IdempotencyKey,
 		EncryptedPayload: event.EncryptedPayload,
+		PayloadHash:      event.PayloadHash,
 	}
 	// -------- STEP 0: Transport guards --------
 
@@ -347,7 +348,8 @@ func (s *IntentService) ProcessIncomingIntent(
 		TenantID:   in.TenantID.String(),
 
 		IdempotencyKey: in.IdempotencyKey,
-		SalientHash:    in.PayloadHash,
+		SalientHash:    "NA",
+		PayloadHash:    in.PayloadHash,
 
 		IntentType:       canonicalInput.IntentType,
 		CanonicalVersion: "v1",
@@ -440,7 +442,7 @@ func (s *IntentService) processWebhook(
 		EnvelopeID:     in.EnvelopeID.String(),
 		TenantID:       in.TenantID.String(),
 		IdempotencyKey: in.IdempotencyKey,
-		SalientHash:    in.PayloadHash, // Might be empty
+		SalientHash:    "in.PayloadHash", // Might be empty
 		IntentType:     "WEBHOOK",
 		SchemaVersion:  "v1",
 		Amount:         decimal.Zero,
@@ -468,6 +470,7 @@ func (s *IntentService) processWebhook(
 		AggregateID:   uuid.MustParse(canonical.IntentID),
 		EventType:     "WEBHOOK_RECEIVED",
 		Payload:       payload,
+		PayloadHash:   canonical.PayloadHash,
 		Status:        "PENDING",
 		CreatedAt:     time.Now(),
 	}
