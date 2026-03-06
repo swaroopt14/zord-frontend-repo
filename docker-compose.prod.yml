@@ -29,12 +29,8 @@ services:
     image: arealis/zord-edge:local
     env_file:
       - ./deploy/production/env/zord-edge.env
-    secrets:
-      - source: edge_signing_key
-        target: ed25519_private.pem
-        uid: "10001"
-        gid: "10001"
-        mode: 0400
+    volumes:
+      - ./deploy/production/secrets/ed25519_private.pem:/run/secrets/ed25519_private.pem:ro
     environment:
       - SIGNING_KEY_PATH=/run/secrets/ed25519_private.pem
     ports:
@@ -215,10 +211,6 @@ services:
     networks:
       - zord-backend
     restart: unless-stopped
-
-secrets:
-  edge_signing_key:
-    file: ./deploy/production/secrets/ed25519_private.pem
 
 volumes:
   postgres_edge_data:

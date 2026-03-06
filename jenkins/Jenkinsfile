@@ -210,7 +210,7 @@ TOKEN_DB_NAME=${TOKEN_DB_NAME}
 EOF
 
             cp "${EDGE_SIGNING_KEY_FILE}" "${SECRETS_DIR}/ed25519_private.pem"
-            chmod 600 "${SECRETS_DIR}/ed25519_private.pem"
+            chmod 444 "${SECRETS_DIR}/ed25519_private.pem"
           '''
         }
       }
