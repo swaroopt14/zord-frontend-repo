@@ -32,6 +32,9 @@ services:
     secrets:
       - source: edge_signing_key
         target: ed25519_private.pem
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
     environment:
       - SIGNING_KEY_PATH=/run/secrets/ed25519_private.pem
     ports:
