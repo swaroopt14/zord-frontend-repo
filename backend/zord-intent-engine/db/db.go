@@ -17,6 +17,7 @@ func CreateTables() error {
 		tenant_id UUID NOT NULL,
     idempotency_key TEXT,
     salient_hash TEXT NOT NULL,
+	payload_hash BYTEA NOT NULL, 
     intent_type TEXT NOT NULL,
     canonical_version TEXT NOT NULL,
     schema_version TEXT,
@@ -63,7 +64,8 @@ func CreateTables() error {
 	schema_version TEXT,
 	amount NUMERIC,
 	currency CHAR(3),
-    payload JSONB NOT NULL,     -- downstream message body (no raw PII)
+   	payload JSONB NOT NULL,     -- downstream message body (no raw PII)
+	payload_hash BYTEA NOT NULL,
     status TEXT NOT NULL DEFAULT 'PENDING',
     retry_count INT NOT NULL DEFAULT 0,
     next_attempt_at TIMESTAMPTZ,

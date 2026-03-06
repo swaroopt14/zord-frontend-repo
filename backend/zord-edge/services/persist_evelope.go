@@ -151,6 +151,7 @@ func SendToIntentEngine(
 		Source:           msg.SourceType,
 		IdempotencyKey:   msg.IdempotencyKey,
 		EncryptedPayload: msg.Payload,
+		PayloadHash:      msg.PayloadHash,
 	}
 
 	// Prepare payload for intent engine

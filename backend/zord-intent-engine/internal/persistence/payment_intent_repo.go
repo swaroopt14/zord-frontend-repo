@@ -37,7 +37,7 @@ func (r *PaymentIntentRepo) Save(
 	query := `
 	INSERT INTO payment_intents (
     intent_id, envelope_id, tenant_id,
-    trace_id, idempotency_key, salient_hash,
+    trace_id, idempotency_key, salient_hash,payload_hash,
     intent_type, canonical_version, schema_version,
     amount, currency, deadline_at,
     constraints, beneficiary_type, pii_tokens, beneficiary,
@@ -53,7 +53,7 @@ VALUES (
     $13,$14,$15,$16,
     $17,$18,
     $19,$20,$21,
-    $22
+    $22,$23
 )`
 
 	_, err = tx.ExecContext(
@@ -66,6 +66,7 @@ VALUES (
 		intent.TraceID,        // $4  ✅ new
 		intent.IdempotencyKey, // $5  ✅ new
 		intent.SalientHash,    // $6  ✅ new
+		intent.PayloadHash,
 
 		intent.IntentType,       // $7
 		intent.CanonicalVersion, // $8
@@ -107,12 +108,13 @@ INSERT INTO outbox (
     amount,
     currency,
     payload,
+		payload_hash,
     status,
     retry_count,
     next_attempt_at,
     created_at
 ) VALUES (
-    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
+    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$12
 )`
 
 	_, err = tx.ExecContext(
@@ -128,6 +130,7 @@ INSERT INTO outbox (
 		outbox.Amount,
 		outbox.Currency,
 		outbox.Payload,
+		outbox.PayloadHash,
 		outbox.Status,
 		outbox.RetryCount,
 		outbox.NextRetryAt,
