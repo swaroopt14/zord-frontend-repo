@@ -5,11 +5,12 @@ import (
 	"log"
 	"time"
 
+	"zord-edge/db"
+	"zord-edge/kafka"
+	"zord-edge/model"
+	"zord-edge/vault"
+
 	"github.com/google/uuid"
-	"main.go/db"
-	"main.go/kafka"
-	"main.go/model"
-	"main.go/vault"
 )
 
 func RawIntent(ctx context.Context,

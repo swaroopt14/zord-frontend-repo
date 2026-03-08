@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"main.go/kafka"
-	"main.go/storage"
+	"zord-edge/kafka"
+	"zord-edge/storage"
 )
 
 type Handler struct {

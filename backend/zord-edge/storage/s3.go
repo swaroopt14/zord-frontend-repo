@@ -11,12 +11,12 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *S3Store) StoreRawPayload(Payload []byte, TenantId string) (string, time.Time, string, error) {
+func (s *S3Store) StoreRawPayload(Payload []byte, TenantId string, TenantName string) (string, time.Time, string, error) {
 	EnvelopeID := uuid.New().String()
 	receivedTime := time.Now().UTC()
 	year, month, day := receivedTime.Date()
 
-	ObjectKey := fmt.Sprintf("raw/%s/%04d/%02d/%02d/%s", TenantId,
+	ObjectKey := fmt.Sprintf("%s/%s/envelopes/%04d/%02d/%02d/%s.bin", TenantName, TenantId,
 		year,
 		int(month),
 		day,

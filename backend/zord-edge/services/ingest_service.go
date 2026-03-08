@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"main.go/model"
+	"zord-edge/model"
 )
 
 // intent *model.Payment_Intent,
