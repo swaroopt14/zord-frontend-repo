@@ -4,9 +4,10 @@ import (
 	"net/http"
 	"strconv"
 
+	"zord-edge/db"
+	"zord-edge/services"
+
 	"github.com/gin-gonic/gin"
-	"main.go/db"
-	"main.go/services"
 )
 
 // ListTenants handles GET /v1/tenants

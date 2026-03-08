@@ -4,9 +4,10 @@ import (
 	"context"
 	"log"
 
+	"zord-edge/db"
+	"zord-edge/model"
+
 	"github.com/google/uuid"
-	"main.go/db"
-	"main.go/model"
 )
 
 func PersistIdempotency(ctx context.Context, msg model.RawIntentMessage) (uuid.UUID, error) {

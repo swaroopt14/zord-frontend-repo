@@ -9,4 +9,5 @@ type RawIntentMessage struct {
 	Payload        []byte `json:"raw_payload"`
 	ContentType    string `json:"content_type"`
 	SourceType     string `json:"source_type"`
+	TenantName     string
 }
