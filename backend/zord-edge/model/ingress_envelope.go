@@ -29,7 +29,7 @@ type IngressEnvelope struct {
 	PayloadSize       int       `json:"payload_size" db:"payload_size"`
 	PayloadHash       []byte    `json:"payload_hash" db:"payload_hash"`
 	EnvelopeHash      []byte    `json:"envelope_hash" db:"envelope_hash"`
-	EnvelopeSignature []byte    `json:"envelope_signature" db:"envelope_signature"`
+	EnvelopeSignature string    `json:"envelope_signature" db:"envelope_signature"`
 	Status            Status    `json:"status" db:"status"`
 	ObjectRef         string    `json:"object_ref" db:"object_ref"`
 	ReceivedAt        time.Time `json:"received_at" db:"received_at"`
