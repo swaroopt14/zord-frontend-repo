@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/base64"
 	"log"
 	"time"
 
@@ -35,6 +36,8 @@ func RawIntent(ctx context.Context,
 
 	EnvelopeHash := BuildEnvelopeHash(msg, ack)
 	EnvelopeSignature := vault.SignEnvelopeHash(EnvelopeHash)
+	encodedSig := base64.StdEncoding.EncodeToString(EnvelopeSignature)
+	storedSignature := "ZORD_" + encodedSig
 
 	var envelope model.IngressEnvelope
 
@@ -66,7 +69,7 @@ func RawIntent(ctx context.Context,
 			PayloadSize:       msg.PayloadSize,
 			PayloadHash:       msg.PayloadHash,
 			EnvelopeHash:      EnvelopeHash,
-			EnvelopeSignature: EnvelopeSignature,
+			EnvelopeSignature: storedSignature,
 			ObjectRef:         ObjRef,
 			Status:            "RECEIVED",
 			ReceivedAt:        ack.ReceivedAt,
