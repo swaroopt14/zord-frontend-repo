@@ -6,8 +6,9 @@ import (
 	"io"
 	"net/http"
 
+	"zord-edge/validator"
+
 	"github.com/gin-gonic/gin"
-	"main.go/validator"
 )
 
 func ValidateIntentRequest() gin.HandlerFunc {

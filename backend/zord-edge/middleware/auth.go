@@ -4,9 +4,10 @@ import (
 	"net/http"
 	"strings"
 
+	"zord-edge/db"
+	"zord-edge/services"
+
 	"github.com/gin-gonic/gin"
-	"main.go/db"
-	"main.go/services"
 )
 
 func Authenticate() gin.HandlerFunc {
@@ -32,8 +33,12 @@ func Authenticate() gin.HandlerFunc {
 				return
 			}
 			ContentType := context.GetHeader("Content-Type")
-			if ContentType != "application/json" {
-				context.JSON(http.StatusBadRequest, gin.H{"Error": "Content-Type must be application/json"})
+			if !strings.HasPrefix(ContentType, "application/json") &&
+				!strings.HasPrefix(ContentType, "multipart/form-data") {
+
+				context.JSON(http.StatusBadRequest, gin.H{
+					"Error": "Unsupported Content-Type",
+				})
 				context.Abort()
 				return
 			}
@@ -57,7 +62,7 @@ func Authenticate() gin.HandlerFunc {
 			}
 
 			context.Set("tenant_id", response.TenantId)
-			context.Set("Content-Type", ContentType)
+			context.Set("tenant_name", response.TenantName)
 			context.Set("source_type", SourceType)
 			context.Next()
 

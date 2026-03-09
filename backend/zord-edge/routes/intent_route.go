@@ -3,9 +3,9 @@ package routes
 import (
 	"github.com/gin-gonic/gin"
 
-	"main.go/handler"
-	"main.go/middleware"
-	"main.go/validator"
+	"zord-edge/handler"
+	"zord-edge/middleware"
+	"zord-edge/validator"
 )
 
 func Routes(router *gin.Engine, h *handler.Handler) {
@@ -32,12 +32,21 @@ func Routes(router *gin.Engine, h *handler.Handler) {
 	protected := router.Group("/v1")
 	protected.Use(
 		middleware.Authenticate(),
-		middleware.ValidateIntentRequest(),
-		middleware.GetIdempotencyKey(),
 		middleware.TraceMiddleware(),
 	)
-	{
-		protected.POST("/ingest", h.IntentHandler)
-	}
+
+	// JSON ingest (needs JSON validation + idempotency header)
+	protected.POST(
+		"/ingest",
+		middleware.ValidateIntentRequest(),
+		middleware.GetIdempotencyKey(),
+		h.IntentHandler,
+	)
+
+	// Bulk ingest (multipart, so no JSON validation, no header idempotency)
+	protected.POST(
+		"/bulk-ingest",
+		h.BulkIntentHandler,
+	)
 
 }

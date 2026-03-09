@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -13,7 +14,7 @@ import (
 	"zord-intent-engine/internal/services"
 	"zord-intent-engine/internal/validator"
 	"zord-intent-engine/internal/vault"
-	"zord-intent-engine/messaging"
+	"zord-intent-engine/kafka"
 
 	"zord-intent-engine/config"
 	"zord-intent-engine/db"
@@ -37,7 +38,6 @@ func main() {
 		log.Fatal("failed to create tables:", err)
 	}
 
-	Rdb := config.InitRedis()
 	cfg := config.LoadConfig()
 
 	err := vault.InitVaultKey(cfg.VaultKey)
@@ -46,6 +46,9 @@ func main() {
 	}
 
 	ctx := context.Background()
+	brokers := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
+	topic := os.Getenv("KAFKA_TOPIC")
+	groupID := "intent-engine-group"
 
 	// -------- Repositories --------
 	dlqRepo := persistence.NewDLQRepo(db.DB)
@@ -153,18 +156,28 @@ func main() {
 
 	log.Printf("Started %d workers for Ingress processing", workerPoolSize)
 
-	go func() {
-		log.Println("Ingress consumer started (Dispatcher)")
-
-		for {
-			incoming, err := messaging.ConsumeIngressMessage(ctx, Rdb)
-			if err != nil {
-				log.Printf("Error consuming ingress message: %v\n", err)
-				continue
-			}
-			jobChan <- incoming
+	handler := func(msg []byte) error {
+		var event models.Event
+		err := json.Unmarshal(msg, &event)
+		if err != nil {
+			log.Printf("Invalid Kafka event payload: %v", err)
+			return err
 		}
-	}()
+		jobChan <- &event
+
+		return nil
+	}
+	err = kafka.StartConsumer(
+		ctx,
+		brokers,
+		groupID,
+		topic,
+		handler,
+	)
+	if err != nil {
+		log.Fatalf("Kafka consumer failed: %v", err)
+	}
+	log.Println("Kafka consumer started")
 
 	// -------- HTTP SERVER --------
 	log.Println("Intent Engine (Service-2) running on :8083")

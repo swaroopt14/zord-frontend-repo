@@ -15,4 +15,5 @@ type Event struct {
 	Source           string
 	IdempotencyKey   string
 	EncryptedPayload []byte
+	PayloadHash      []byte
 }

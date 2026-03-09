@@ -5,11 +5,12 @@ import (
 	"log"
 	"net/http"
 
+	"zord-edge/model"
+	"zord-edge/services"
+	"zord-edge/vault"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"main.go/model"
-	"main.go/services"
-	"main.go/vault"
 )
 
 func (h *Handler) IntentHandler(context *gin.Context) {
@@ -24,15 +25,15 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 	tenantId := context.MustGet("tenant_id").(uuid.UUID)
 	IdempotencyKey := context.GetString("idempotency_key")
 	PayloadSize := context.GetInt("payload_size")
-	ContentType := context.GetString("Content-Type")
+	ContentType := context.ContentType()
 	SourceType := context.GetString("source_type")
+	Tenant_name := context.GetString("tenant_name")
 
 	encryptedPayload, err := vault.Encrypt(rawPayload)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"error": "failed to encrypt payload"})
 		return
 	}
-	//log.Printf("Encrypted Payload %v", encryptedPayload)
 
 	msg := model.RawIntentMessage{
 		TenantID:       tenantId.String(),
@@ -42,6 +43,7 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 		Payload:        encryptedPayload,
 		ContentType:    ContentType,
 		SourceType:     SourceType,
+		TenantName:     Tenant_name,
 	}
 
 	id, err := services.PersistIdempotency(context.Request.Context(), msg)
@@ -65,7 +67,7 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 	}
 	//Need to replace Hashed payload with Encrypted Payload before sending to S3
 
-	data, err := services.ProcessRawIntent(msg, h.S3store)
+	data, err := services.ProcessRawIntent(context.Request.Context(), msg, h.S3store)
 	if err != nil {
 		log.Printf("Error processing intent: %v", err)
 		context.JSON(http.StatusInternalServerError, gin.H{
@@ -92,7 +94,7 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 
 	msg.PayloadHash = PayloadHash
 
-	if err := services.RawIntent(context.Request.Context(), msg, data, h.Redis, false); err != nil {
+	if err := services.RawIntent(context.Request.Context(), msg, data); err != nil {
 		log.Printf("Error persisting raw intent: %v", err)
 		context.JSON(http.StatusInternalServerError, gin.H{
 			"TraceID":    msg.TraceID,
@@ -110,7 +112,16 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 		"Received_At": data.ReceivedAt,
 	})
 
-	// Emit Kafka Event Logic
-	go services.SendToIntentEngine(msg, data, h.Redis, false)
-
+	// Async Kafka publish
+	go func() {
+		err := services.SendToIntentEngine(msg, data, h.Kafka)
+		if err != nil {
+			log.Printf(
+				"Async intent engine publish failed trace_id=%s envelope_id=%s error=%v",
+				msg.TraceID,
+				data.EnvelopeId,
+				err,
+			)
+		}
+	}()
 }

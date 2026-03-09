@@ -4,10 +4,11 @@ import (
 	"log"
 	"net/http"
 
+	"zord-edge/db"
+	"zord-edge/model"
+	"zord-edge/services"
+
 	"github.com/gin-gonic/gin"
-	"main.go/db"
-	"main.go/model"
-	"main.go/services"
 )
 
 func Tenant_Registry(context *gin.Context) {

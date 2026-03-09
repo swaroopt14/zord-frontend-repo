@@ -1,17 +1,16 @@
 package config
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"log"
 	"os"
 	"time"
 
+	"zord-edge/db"
+
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
-	"github.com/redis/go-redis/v9"
-	"main.go/db"
 )
 
 type Config struct {
@@ -55,27 +54,6 @@ func InitDB() {
 	db.DB.SetMaxOpenConns(100)
 	db.DB.SetMaxIdleConns(50)
 	db.DB.SetConnMaxLifetime(5 * time.Minute)
-}
-
-func InitRedisClient() *redis.Client {
-	addr := os.Getenv("REDIS_ADDR")
-	if addr == "" {
-		addr = "localhost:6379"
-	}
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         addr, // or from env
-		Password:     "",
-		DB:           0,
-		PoolSize:     100,
-		MinIdleConns: 20,
-	})
-
-	// optional health check
-	if err := rdb.Ping(context.Background()).Err(); err != nil {
-		log.Fatal("failed to connect to redis:", err)
-	}
-
-	return rdb
 }
 
 func LoadConfig() *Config {

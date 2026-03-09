@@ -5,20 +5,23 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
+
+	"zord-edge/config"
+	"zord-edge/db"
+	"zord-edge/handler"
+	"zord-edge/kafka"
+	"zord-edge/routes"
+	"zord-edge/storage"
+	"zord-edge/vault"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
-	"main.go/config"
-	"main.go/db"
-	"main.go/handler"
-	"main.go/routes"
-	"main.go/storage"
-	"main.go/tracing"
-	"main.go/vault"
+	"zord-edge/tracing"
 )
 
 var (
@@ -69,16 +72,14 @@ func main() {
 	if err != nil {
 		log.Println("No .env file found")
 	}
-
-	Rdb := config.InitRedisClient()
-	//Need to remove this
-	t := time.Now()
-	if err := Rdb.Ping(context.Background()).Err(); err != nil {
-		log.Fatal("Redis ping failed:", err)
+	brokers := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
+	producer, err := kafka.NewProducer(brokers)
+	if err != nil {
+		log.Fatal("Kafka producer creation failure: ", err)
 	}
-	log.Println("Redis ping latency:", time.Since(t))
 
-	//Need to add this news3store in config
+	defer producer.Close()
+
 	bucket := os.Getenv("S3_BUCKET")
 	region := os.Getenv("AWS_REGION")
 
@@ -92,8 +93,8 @@ func main() {
 	}
 
 	h := &handler.Handler{
-		Redis:   Rdb,
 		S3store: s3store,
+		Kafka:   producer,
 	}
 	cfg := config.LoadConfig()
 
