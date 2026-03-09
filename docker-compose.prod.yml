@@ -122,7 +122,7 @@ services:
       - POSTGRES_DB=${EDGE_DB_NAME}
     volumes:
       - postgres_edge_data:/var/lib/postgresql/data
-      - ./backend/zord-edge/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./backend/zord-edge/db:/docker-entrypoint-initdb.d:ro
     networks:
       - zord-backend
     restart: unless-stopped
@@ -151,7 +151,7 @@ services:
       - POSTGRES_DB=${RELAY_DB_NAME}
     volumes:
       - postgres_relay_data:/var/lib/postgresql/data
-      - ./backend/zord-relay/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./backend/zord-relay/db:/docker-entrypoint-initdb.d:ro
     networks:
       - zord-backend
     restart: unless-stopped
