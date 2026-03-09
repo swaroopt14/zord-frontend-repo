@@ -47,6 +47,7 @@ pipeline {
     ZORD_VAULT_KEY = '00Ofxp50eVCizf58ZoX4Zy2T83O38sMSrc3s9Cpb/ac='
     REDIS_ADDR = 'zord-redis:6379'
     KAFKA_BROKERS = 'zord-kafka:9092'
+    KAFKA_TOPIC = 'vault.envelope.accepted.v1'
     CHROMA_URL = 'http://chroma:8000'
     RUN_INFRA = "${params.RUN_INFRA}"
   }
@@ -99,6 +100,8 @@ DB_PASSWORD=${EDGE_DB_PASSWORD}
 DB_NAME=${EDGE_DB_NAME}
 DB_SSLMODE=disable
 REDIS_ADDR=${REDIS_ADDR}
+KAFKA_BROKERS=${KAFKA_BROKERS}
+KAFKA_TOPIC=${KAFKA_TOPIC}
 ZORD_VAULT_KEY=${ZORD_VAULT_KEY}
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
@@ -118,6 +121,8 @@ DB_PASSWORD=${INTENT_DB_PASSWORD}
 DB_NAME=${INTENT_DB_NAME}
 DB_SSLMODE=disable
 REDIS_ADDR=${REDIS_ADDR}
+KAFKA_BROKERS=${KAFKA_BROKERS}
+KAFKA_TOPIC=${KAFKA_TOPIC}
 ZORD_PII_ENCLAVE_URL=http://zord-token-enclave:8087
 ZORD_VAULT_KEY=${ZORD_VAULT_KEY}
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -235,8 +240,27 @@ EOF
         sh '''
           set -eux
           docker compose -f "${COMPOSE_FILE}" ps
-          curl -fsS http://127.0.0.1:8080/health
-          curl -fsS http://127.0.0.1:3000/api/health
+
+          wait_for_url() {
+            url="$1"
+            attempts="${2:-30}"
+            sleep_sec="${3:-2}"
+            i=1
+            while [ "$i" -le "$attempts" ]; do
+              if curl -fsS "$url" >/dev/null 2>&1; then
+                echo "Healthy: $url"
+                return 0
+              fi
+              echo "Waiting for $url (attempt $i/$attempts)"
+              sleep "$sleep_sec"
+              i=$((i+1))
+            done
+            echo "Health check failed: $url"
+            return 1
+          }
+
+          wait_for_url "http://127.0.0.1:8080/health" 45 2
+          wait_for_url "http://127.0.0.1:3000/api/health" 45 2
         '''
       }
     }
