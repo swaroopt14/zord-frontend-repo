@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"zord-intent-engine/internal/models"
 	"zord-intent-engine/internal/services"
 	"zord-intent-engine/internal/validator"
@@ -24,10 +25,14 @@ import (
 	//"zord-intent-engine/internal/pii"
 
 	"zord-intent-engine/storage"
+	"zord-intent-engine/tracing"
 )
 
 func main() {
 	// -------- INIT --------
+	cleanup := tracing.InitTracing("zord-intent-engine")
+	defer cleanup()
+
 	config.InitDB()
 	if err := db.CreateTables(); err != nil {
 		log.Fatal("failed to create tables:", err)
@@ -78,7 +83,9 @@ func main() {
 	intentHandler := handlers.NewIntentHandler(intentQueryRepo)
 	outboxHandler := handlers.NewOutboxHandler(outboxPullRepo)
 
-	http.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 
@@ -93,25 +100,25 @@ func main() {
 		}
 	})
 
-	http.HandleFunc("/v1/dlq", dlqHandler.List)
-	http.HandleFunc("/v1/dlq/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/dlq", dlqHandler.List)
+	mux.HandleFunc("/v1/dlq/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/dlq" || r.URL.Path == "/v1/dlq/" {
 			dlqHandler.List(w, r)
 		} else {
 			dlqHandler.GetByID(w, r) // NEW: /v1/dlq/{dlq_id}
 		}
 	})
-	http.HandleFunc("/v1/intents/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/intents/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/intents" || r.URL.Path == "/v1/intents/" {
 			intentHandler.List(w, r)
 		} else {
 			intentHandler.GetByID(w, r)
 		}
 	})
-	http.HandleFunc("/v1/intents", intentHandler.List)
-	http.HandleFunc("/internal/outbox/lease", outboxHandler.Lease)
-	http.HandleFunc("/internal/outbox/ack", outboxHandler.Ack)
-	http.HandleFunc("/internal/outbox/nack", outboxHandler.Nack)
+	mux.HandleFunc("/v1/intents", intentHandler.List)
+	mux.HandleFunc("/internal/outbox/lease", outboxHandler.Lease)
+	mux.HandleFunc("/internal/outbox/ack", outboxHandler.Ack)
+	mux.HandleFunc("/internal/outbox/nack", outboxHandler.Nack)
 
 	// -------- REDIS CONSUMER (PRIMARY ENTRYPOINT) --------
 
@@ -174,5 +181,9 @@ func main() {
 
 	// -------- HTTP SERVER --------
 	log.Println("Intent Engine (Service-2) running on :8083")
-	log.Fatal(http.ListenAndServe(":8083", nil))
+	server := &http.Server{
+		Addr:    ":8083",
+		Handler: otelhttp.NewHandler(mux, "http"),
+	}
+	log.Fatal(server.ListenAndServe())
 }

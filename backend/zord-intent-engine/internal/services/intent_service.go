@@ -24,6 +24,7 @@ import (
 	"zord-intent-engine/storage"
 
 	"github.com/shopspring/decimal"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 type IntentService struct {
@@ -31,6 +32,11 @@ type IntentService struct {
 	//tokenizer *pii.Tokenizer
 	repo CanonicalIntentRepository
 	s3   *storage.S3Store
+}
+
+var enclaveHTTPClient = &http.Client{
+	Timeout:   10 * time.Second,
+	Transport: otelhttp.NewTransport(http.DefaultTransport),
 }
 
 // Repository abstraction
@@ -136,7 +142,7 @@ func callEnclaveTokenize(ctx context.Context, req enclaveTokenizeRequest) (map[s
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(httpReq)
+	resp, err := enclaveHTTPClient.Do(httpReq)
 	if err != nil {
 		return nil, err
 	}

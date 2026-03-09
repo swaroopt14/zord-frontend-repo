@@ -24,8 +24,9 @@ services: # Define the containers/services to run
       - JAEGER_ENDPOINT=http://host.docker.internal:14268/api/traces # Jaeger tracing endpoint
       - AWS_REGION=ap-south-1
       - AWS_EC2_METADATA_DISABLED=true
-      - S3_BUCKET=arealis-zord-vault 
-    depends_on:
+      - S3_BUCKET=arealis-zord-vault
+      - SIGNING_KEY_PATH=/run/secrets/ed25519_private.pem
+    depends_on: # Service dependencies (wait for health checks)
       postgres:
         condition: service_healthy
       broker1:
@@ -36,20 +37,11 @@ services: # Define the containers/services to run
         condition: service_healthy
     networks: # Networks this service connects to
       - zord-network
+    volumes:
+      - ./ed25519_private.pem:/run/secrets/ed25519_private.pem:ro
     restart: unless-stopped # Restart policy (restart unless manually stopped)
-    healthcheck: # Health check configuration
-      test: [
-          "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "http://localhost:8080/v1/health",
-        ] # Health check command
-      interval: 30s # Check interval
-      timeout: 10s # Check timeout
-      retries: 3 # Number of retries before marking unhealthy
-      start_period: 40s # Initial delay before starting health checks
+    # Container healthcheck intentionally omitted for minimal scratch image.
+    # Use platform/orchestrator health probes instead.
 
   postgres: # PostgreSQL database service
     image: postgres:16-alpine # Docker image to use

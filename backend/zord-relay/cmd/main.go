@@ -9,11 +9,13 @@ import (
 	"syscall"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"zord-relay/config"
 	"zord-relay/db"
 	"zord-relay/handler"
 	"zord-relay/kafka"
 	"zord-relay/services"
+	"zord-relay/tracing"
 	"zord-relay/utils"
 
 	"github.com/gin-gonic/gin"
@@ -27,6 +29,9 @@ const (
 func main() {
 	utils.InitLogger()
 	defer utils.SyncLogger()
+
+	cleanup := tracing.InitTracing("zord-relay")
+	defer cleanup()
 
 	cfg := config.Load()
 
@@ -55,7 +60,8 @@ func main() {
 	}()
 
 	// Health check server
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	healthHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 
@@ -68,12 +74,16 @@ func main() {
 			http.Error(w, "failed to encode health response", http.StatusInternalServerError)
 		}
 	})
+	mux.Handle("/health", otelhttp.NewHandler(healthHandler, "health"))
 
 	healthPort := os.Getenv("HEALTH_PORT")
 	if healthPort == "" {
 		healthPort = "8082"
 	}
-	healthServer := &http.Server{Addr: ":" + healthPort}
+	healthServer := &http.Server{
+		Addr:    ":" + healthPort,
+		Handler: mux,
+	}
 	go func() {
 		utils.Logger.Info("Starting health check server on :" + healthPort)
 		if err := healthServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {

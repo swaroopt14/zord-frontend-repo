@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,8 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"zord-edge/tracing"
 )
 
 var (
@@ -48,12 +51,16 @@ func init() {
 
 func main() {
 	// Initialize tracing
-	// cleanup := tracing.InitTracing("zord-edge")
-	// defer cleanup()
+	cleanup := tracing.InitTracing("zord-edge")
+	defer cleanup()
 
 	gin.SetMode(gin.ReleaseMode)
 	server := gin.New()
-	server.Use(gin.Recovery())
+	server.Use(
+		gin.Recovery(),
+		otelgin.Middleware("zord-edge"),
+		prometheusMiddleware(),
+	)
 
 	config.InitDB()
 	if db.DB == nil {
@@ -95,7 +102,11 @@ func main() {
 	if err != nil {
 		log.Fatal("failed to initialize vault key:", err)
 	}
-	err = vault.InitSigningKey("ed25519_private.pem")
+	signingKeyPath := os.Getenv("SIGNING_KEY_PATH")
+	if signingKeyPath == "" {
+		signingKeyPath = "ed25519_private.pem"
+	}
+	err = vault.InitSigningKey(signingKeyPath)
 	if err != nil {
 		log.Fatal("failed to load signing key:", err)
 	}
@@ -128,9 +139,15 @@ func prometheusMiddleware() gin.HandlerFunc {
 		c.Next()
 
 		duration := time.Since(start).Seconds()
-		status := string(rune(c.Writer.Status()))
+		status := strconv.Itoa(c.Writer.Status())
 
-		httpRequestsTotal.WithLabelValues(c.Request.Method, c.FullPath(), status).Inc()
-		httpRequestDuration.WithLabelValues(c.Request.Method, c.FullPath()).Observe(duration)
+		path := c.FullPath()
+		if path == "" {
+			// Avoid high-cardinality metrics labels for unmatched routes.
+			path = "/unmatched"
+		}
+
+		httpRequestsTotal.WithLabelValues(c.Request.Method, path, status).Inc()
+		httpRequestDuration.WithLabelValues(c.Request.Method, path).Observe(duration)
 	}
 }

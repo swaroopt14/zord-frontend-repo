@@ -1,42 +1,34 @@
 # Build stage
 FROM golang:1.25-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache git gcc musl-dev
+RUN apk add --no-cache git ca-certificates
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN go mod tidy
+
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -trimpath -ldflags "-s -w" -o /out/zord-edge ./cmd/main.go
+
+# Final stage (minimal)
+FROM scratch
 
 WORKDIR /app
 
-# Copy go mod files
-COPY go.mod go.sum ./
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /out/zord-edge /app/zord-edge
+COPY --from=builder /src/schemas /app/schemas
 
-# Download dependencies
-RUN go mod download
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+USER 65532:65532
 
-# Copy source code
-COPY . .
-
-# Build the application
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/main.go
-
-# Final stage
-FROM alpine:latest
-
-# Install runtime dependencies
-RUN apk --no-cache add ca-certificates postgresql-client
-
-WORKDIR /root/
-
-# Copy binary from builder
-COPY --from=builder /app/main .
-
-# Copy schemas directory
-COPY --from=builder /app/schemas ./schemas
-
-#Copy backend/zord-edge/ed25519_private.pem
-COPY ed25519_private.pem /root/ed25519_private.pem
-
-# Expose port
 EXPOSE 8080
 
-# Run application
-CMD ["./main"]
+ENTRYPOINT ["/app/zord-edge"]

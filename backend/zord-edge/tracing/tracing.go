@@ -4,36 +4,53 @@ import (
 	"context"
 	"log"
 	"os"
+	"strconv"
+	"time"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 )
 
-// InitTracing initializes OpenTelemetry tracing for zord-edge
+// InitTracing initializes OpenTelemetry tracing for zord-edge.
 func InitTracing(serviceName string) func() {
-	// Get Jaeger endpoint from environment or use default
-	jaegerEndpoint := os.Getenv("JAEGER_ENDPOINT")
-	if jaegerEndpoint == "" {
-		jaegerEndpoint = "http://localhost:14268/api/traces"
+	ctx := context.Background()
+
+	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if endpoint == "" {
+		endpoint = "localhost:4317"
 	}
 
-	// Create Jaeger exporter
-	exp, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(jaegerEndpoint)))
+	insecure := true
+	if v := os.Getenv("OTEL_EXPORTER_OTLP_INSECURE"); v != "" {
+		if parsed, err := strconv.ParseBool(v); err == nil {
+			insecure = parsed
+		}
+	}
+
+	opts := []otlptracegrpc.Option{otlptracegrpc.WithEndpoint(endpoint)}
+	if insecure {
+		opts = append(opts, otlptracegrpc.WithInsecure())
+	}
+
+	exp, err := otlptracegrpc.New(ctx, opts...)
 	if err != nil {
-		log.Printf("Failed to create Jaeger exporter: %v", err)
+		log.Printf("Failed to create OTLP exporter: %v", err)
 		return func() {}
 	}
 
-	// Create resource with service information
-	res, err := resource.New(context.Background(),
+	res, err := resource.New(ctx,
+		resource.WithFromEnv(),
+		resource.WithProcess(),
+		resource.WithTelemetrySDK(),
 		resource.WithAttributes(
 			semconv.ServiceNameKey.String(serviceName),
 			semconv.ServiceVersionKey.String("1.0.0"),
-			semconv.ServiceInstanceIDKey.String("edge-1"),
 		),
 	)
 	if err != nil {
@@ -43,22 +60,51 @@ func InitTracing(serviceName string) func() {
 
 	// Create trace provider
 	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exp),
+		trace.WithBatcher(exp, trace.WithBatchTimeout(5*time.Second)),
 		trace.WithResource(res),
 	)
 
 	// Set global trace provider
 	otel.SetTracerProvider(tp)
 
+	// Create metric provider
+	metricExp, err := otlpmetricgrpc.New(ctx, metricOpts(endpoint, insecure)...)
+	if err != nil {
+		log.Printf("Failed to create OTLP metric exporter: %v", err)
+	}
+
+	var mp *metric.MeterProvider
+	if metricExp != nil {
+		reader := metric.NewPeriodicReader(metricExp, metric.WithInterval(10*time.Second))
+		mp = metric.NewMeterProvider(
+			metric.WithReader(reader),
+			metric.WithResource(res),
+		)
+		otel.SetMeterProvider(mp)
+	}
+
 	// Set global propagator for trace context
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 
-	log.Printf("OpenTelemetry tracing initialized for service: %s", serviceName)
+	log.Printf("OpenTelemetry tracing initialized for service: %s (endpoint=%s)", serviceName, endpoint)
 
 	// Return cleanup function
 	return func() {
+		if mp != nil {
+			if err := mp.Shutdown(context.Background()); err != nil {
+				log.Printf("Error shutting down meter provider: %v", err)
+			}
+		}
 		if err := tp.Shutdown(context.Background()); err != nil {
 			log.Printf("Error shutting down tracer provider: %v", err)
 		}
 	}
+}
+
+func metricOpts(endpoint string, insecure bool) []otlpmetricgrpc.Option {
+	opts := []otlpmetricgrpc.Option{otlpmetricgrpc.WithEndpoint(endpoint)}
+	if insecure {
+		opts = append(opts, otlpmetricgrpc.WithInsecure())
+	}
+	return opts
 }
