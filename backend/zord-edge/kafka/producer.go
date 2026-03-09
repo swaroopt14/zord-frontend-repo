@@ -90,17 +90,6 @@ func (p *Producer) Publish(ctx context.Context, topic string, key string, event 
 
 }
 
-// func ProduceWebhookMessage(ctx context.Context, msg model.RawIntentMessage, rdb *redis.Client) error {
-// 	data, err := json.Marshal(msg)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	err = rdb.LPush(ctx, "Webhook_Data", data).Err()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
 
 func SendRawIntentMessage(ctx context.Context, Event model.Event, pro *Producer) error {
 

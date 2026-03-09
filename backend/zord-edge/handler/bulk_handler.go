@@ -284,7 +284,7 @@ func (h *Handler) processBulkIntentRow(
 		return nil, id, nil
 	}
 
-	data, err := services.ProcessRawIntent(msg, h.S3store)
+	data, err := services.ProcessRawIntent(ctx, msg, h.S3store)
 	if err != nil {
 		log.Printf("Error processing raw intent for bulk row, trace_id=%s: %v", traceId, err)
 		return nil, uuid.Nil, err
@@ -297,12 +297,12 @@ func (h *Handler) processBulkIntentRow(
 	hash := sha256.Sum256(rawPayload)
 	msg.PayloadHash = hash[:]
 
-	if err := services.RawIntent(ctx, msg, data, false); err != nil {
+	if err := services.RawIntent(ctx, msg, data); err != nil {
 		log.Printf("Error persisting raw intent for bulk row, trace_id=%s: %v", traceId, err)
 		return nil, uuid.Nil, err
 	}
 
-	services.SendToIntentEngine(msg, data, h.Kafka, false)
+	services.SendToIntentEngine(msg, data, h.Kafka)
 
 	return data, uuid.Nil, nil
 }
