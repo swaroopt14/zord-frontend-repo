@@ -77,13 +77,14 @@ func (c *GeminiClient) Generate(prompt string) (string, error) {
 	var lastErr error
 
 	for _, key := range c.APIKeys {
-		url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", c.BaseURL, c.Model, key)
+		url := fmt.Sprintf("%s/models/%s:generateContent", c.BaseURL, c.Model)
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(bodyBytes))
 		if err != nil {
 			lastErr = err
 			continue
 		}
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Goog-Api-Key", key)
 
 		resp, err := c.HTTP.Do(req)
 		if err != nil {

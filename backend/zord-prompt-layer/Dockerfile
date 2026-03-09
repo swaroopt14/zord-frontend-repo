@@ -17,9 +17,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /opt/onnxruntime && \
-    curl -L -o /tmp/onnxruntime.tgz https://github.com/microsoft/onnxruntime/releases/download/v1.24.1/onnxruntime-linux-x64-1.24.1.tgz && \
-    tar -xzf /tmp/onnxruntime.tgz -C /opt/onnxruntime --strip-components=1 && \
+ARG TARGETARCH
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) ONNX_ARCH="x64" ;; \
+      arm64) ONNX_ARCH="aarch64" ;; \
+      *) echo "Unsupported TARGETARCH: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    ONNX_TGZ="onnxruntime-linux-${ONNX_ARCH}-1.24.1.tgz"; \
+    mkdir -p /opt/onnxruntime; \
+    curl -L -o /tmp/onnxruntime.tgz "https://github.com/microsoft/onnxruntime/releases/download/v1.24.1/${ONNX_TGZ}"; \
+    tar -xzf /tmp/onnxruntime.tgz -C /opt/onnxruntime --strip-components=1; \
     rm /tmp/onnxruntime.tgz
 
 FROM debian:bookworm-slim

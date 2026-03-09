@@ -50,6 +50,9 @@ func InitTracing(serviceName string) func() {
 	)
 	if err != nil {
 		log.Printf("Failed to create resource: %v", err)
+		if shutdownErr := traceExp.Shutdown(ctx); shutdownErr != nil {
+			log.Printf("Failed to shutdown trace exporter after resource init failure: %v", shutdownErr)
+		}
 		return func() {}
 	}
 

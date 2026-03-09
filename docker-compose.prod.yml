@@ -23,6 +23,7 @@ x-go-service: &go-service
 services:
   zord-edge:
     <<: *go-service
+    user: "0:0"
     build:
       context: ./backend/zord-edge
       dockerfile: Dockerfile

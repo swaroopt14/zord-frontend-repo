@@ -143,7 +143,8 @@ func prometheusMiddleware() gin.HandlerFunc {
 
 		path := c.FullPath()
 		if path == "" {
-			path = c.Request.URL.Path
+			// Avoid high-cardinality metrics labels for unmatched routes.
+			path = "/unmatched"
 		}
 
 		httpRequestsTotal.WithLabelValues(c.Request.Method, path, status).Inc()
