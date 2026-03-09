@@ -9,9 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"main.go/model"
-	"main.go/services"
-	"main.go/vault"
+	"zord-edge/model"
+	"zord-edge/services"
+	"zord-edge/vault"
 )
 
 func (h *Handler) WebhookHandler(context *gin.Context) {
