@@ -7,11 +7,12 @@ import (
 	"net/http"
 	"time"
 
+	"zord-edge/model"
+	"zord-edge/services"
+	"zord-edge/vault"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"main.go/model"
-	"main.go/services"
-	"main.go/vault"
 )
 
 func (h *Handler) WebhookHandler(context *gin.Context) {
