@@ -29,9 +29,9 @@ services:
       dockerfile: Dockerfile
     image: arealis/zord-edge:local
     env_file:
-      - ./deploy/production/env/zord-edge.env
+      - ./k8s-file/production/env/zord-edge.env
     volumes:
-      - ./deploy/production/secrets/ed25519_private.pem:/run/secrets/ed25519_private.pem:ro
+      - ./k8s-file/production/secrets/ed25519_private.pem:/run/secrets/ed25519_private.pem:ro
     environment:
       - SIGNING_KEY_PATH=/run/secrets/ed25519_private.pem
     ports:
@@ -47,7 +47,7 @@ services:
       dockerfile: Dockerfile
     image: arealis/zord-intent-engine:local
     env_file:
-      - ./deploy/production/env/zord-intent-engine.env
+      - ./k8s-file/production/env/zord-intent-engine.env
 
   zord-relay:
     <<: *go-service
@@ -56,7 +56,7 @@ services:
       dockerfile: Dockerfile
     image: arealis/zord-relay:local
     env_file:
-      - ./deploy/production/env/zord-relay.env
+      - ./k8s-file/production/env/zord-relay.env
 
   zord-token-enclave:
     <<: *go-service
@@ -65,7 +65,7 @@ services:
       dockerfile: Dockerfile
     image: arealis/zord-token-enclave:local
     env_file:
-      - ./deploy/production/env/zord-token-enclave.env
+      - ./k8s-file/production/env/zord-token-enclave.env
 
   zord-prompt-layer:
     restart: unless-stopped
@@ -83,7 +83,7 @@ services:
       dockerfile: Dockerfile
     image: arealis/zord-prompt-layer:local
     env_file:
-      - ./deploy/production/env/zord-prompt-layer.env
+      - ./k8s-file/production/env/zord-prompt-layer.env
     networks:
       - zord-backend
 
@@ -100,7 +100,7 @@ services:
       dockerfile: Dockerfile
     image: arealis/zord-console:local
     env_file:
-      - ./deploy/production/env/zord-console.env
+      - ./k8s-file/production/env/zord-console.env
     ports:
       - "3000:3000"
     networks:
@@ -227,3 +227,4 @@ networks:
   zord-backend:
     driver: bridge
     internal: true
+

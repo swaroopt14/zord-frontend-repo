@@ -16,8 +16,8 @@ pipeline {
   environment {
     GIT_URL = 'https://github.com/Arealis-network/Arealis-Zord.git'
     COMPOSE_FILE = 'docker-compose.prod.yml'
-    ENV_DIR = 'deploy/production/env'
-    SECRETS_DIR = 'deploy/production/secrets'
+    ENV_DIR = 'k8s-file/production/env'
+    SECRETS_DIR = 'k8s-file/production/secrets'
 
     AWS_REGION = 'ap-south-1'
     CANONICAL_REGION = 'ap-southeast-2'
@@ -256,3 +256,4 @@ EOF
     }
   }
 }
+

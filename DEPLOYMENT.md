@@ -137,14 +137,14 @@ cd Arealis-Zord
 
 ## B) Create folders for env + secrets
 ```bash
-mkdir -p deploy/production/env
-mkdir -p deploy/production/secrets
+mkdir -p k8s-file/production/env
+mkdir -p k8s-file/production/secrets
 ```
 
 ## C) Create the signing key (required)
 ```bash
-ssh-keygen -t ed25519 -f deploy/production/secrets/ed25519_private.pem -N ""
-chmod 600 deploy/production/secrets/ed25519_private.pem
+ssh-keygen -t ed25519 -f k8s-file/production/secrets/ed25519_private.pem -N ""
+chmod 600 k8s-file/production/secrets/ed25519_private.pem
 ```
 
 ## D) Create the main `.env` (for infra containers)
@@ -169,7 +169,7 @@ TOKEN_DB_NAME=zord_token_enclave_db
 
 ## E) Create service env files (copy exactly)
 
-### `deploy/production/env/zord-edge.env`
+### `k8s-file/production/env/zord-edge.env`
 ```env
 DB_HOST=zord-edge-postgres
 DB_PORT=5432
@@ -191,7 +191,7 @@ OTEL_EXPORTER_OTLP_INSECURE=true
 SIGNING_KEY_PATH=/run/secrets/ed25519_private.pem
 ```
 
-### `deploy/production/env/zord-intent-engine.env`
+### `k8s-file/production/env/zord-intent-engine.env`
 ```env
 DB_HOST=zord-intent-postgres
 DB_PORT=5432
@@ -213,7 +213,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
 OTEL_EXPORTER_OTLP_INSECURE=true
 ```
 
-### `deploy/production/env/zord-relay.env`
+### `k8s-file/production/env/zord-relay.env`
 ```env
 KAFKA_BROKERS=zord-kafka:9092
 KAFKA_CONSUMER_GROUP=zord-relay-group
@@ -233,7 +233,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
 OTEL_EXPORTER_OTLP_INSECURE=true
 ```
 
-### `deploy/production/env/zord-token-enclave.env`
+### `k8s-file/production/env/zord-token-enclave.env`
 ```env
 PORT=8087
 DB_HOST=zord-token-enclave-postgres
@@ -248,7 +248,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
 OTEL_EXPORTER_OTLP_INSECURE=true
 ```
 
-### `deploy/production/env/zord-prompt-layer.env`
+### `k8s-file/production/env/zord-prompt-layer.env`
 ```env
 SERVICE_NAME=zord-prompt-layer
 HTTP_PORT=8086
@@ -276,7 +276,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
 OTEL_EXPORTER_OTLP_INSECURE=true
 ```
 
-### `deploy/production/env/zord-console.env`
+### `k8s-file/production/env/zord-console.env`
 ```env
 NODE_ENV=production
 NEXT_TELEMETRY_DISABLED=1
@@ -307,4 +307,5 @@ docker compose -f docker-compose.prod.yml down
 
 ## Notes
 1. If you don’t run any observability stack, OTEL settings can stay as-is (they just won’t export).
-2. Keep `deploy/production/env/*` and `deploy/production/secrets/*` private. Do **not** commit.
+2. Keep `k8s-file/production/env/*` and `k8s-file/production/secrets/*` private. Do **not** commit.
+
