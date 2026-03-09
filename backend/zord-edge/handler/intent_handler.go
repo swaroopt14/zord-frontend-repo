@@ -64,7 +64,7 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 	}
 	//Need to replace Hashed payload with Encrypted Payload before sending to S3
 
-	data, err := services.ProcessRawIntent(msg, h.S3store)
+	data, err := services.ProcessRawIntent(context.Request.Context(), msg, h.S3store)
 	if err != nil {
 		log.Printf("Error processing intent: %v", err)
 		context.JSON(http.StatusInternalServerError, gin.H{
@@ -91,7 +91,7 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 
 	msg.PayloadHash = PayloadHash
 
-	if err := services.RawIntent(context.Request.Context(), msg, data, false); err != nil {
+	if err := services.RawIntent(context.Request.Context(), msg, data); err != nil {
 		log.Printf("Error persisting raw intent: %v", err)
 		context.JSON(http.StatusInternalServerError, gin.H{
 			"TraceID":    msg.TraceID,
@@ -111,7 +111,7 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 
 	// Async Kafka publish
 	go func() {
-		err := services.SendToIntentEngine(msg, data, h.Kafka, false)
+		err := services.SendToIntentEngine(msg, data, h.Kafka)
 		if err != nil {
 			log.Printf(
 				"Async intent engine publish failed trace_id=%s envelope_id=%s error=%v",

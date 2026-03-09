@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"log"
 
 	"main.go/model"
@@ -8,11 +9,13 @@ import (
 )
 
 func ProcessRawIntent(
+	ctx context.Context,
 	msg model.RawIntentMessage,
 	s3store *storage.S3Store,
 ) (*model.AckMessage, error) {
 
 	envelopeID, receivedAt, objRef, err := s3store.StoreRawPayload(
+		ctx,
 		[]byte(msg.Payload),
 		msg.TenantID,
 	)
