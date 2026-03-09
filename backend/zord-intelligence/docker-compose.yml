@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+
+  # PostgreSQL for zord-intelligence only
+  # Port 5435 → avoids clashing with other zord services on 5432, 5433, 5434
+  postgres:
+    image: postgres:16-alpine
+    container_name: zord-intelligence-postgres
+    environment:
+      POSTGRES_USER: zpi
+      POSTGRES_PASSWORD: zpi_secret
+      POSTGRES_DB: zord_intelligence
+    ports:
+      - "5435:5432"
+    volumes:
+      # Run init.sql automatically on first start
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - zord_intelligence_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zpi -d zord_intelligence"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  zord_intelligence_data:
