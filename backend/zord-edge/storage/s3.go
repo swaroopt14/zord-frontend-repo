@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *S3Store) StoreRawPayload(ctx context.Context, Payload []byte, TenantId string) (string, time.Time, string, error) {
+func (s *S3Store) StoreRawPayload(ctx context.Context, Payload []byte, TenantId string, TenantName string) (string, time.Time, string, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
