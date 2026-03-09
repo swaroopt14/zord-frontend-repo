@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 
-	"main.go/model"
-	"main.go/storage"
+	"zord-edge/model"
+	"zord-edge/storage"
 )
 
 func ProcessRawIntent(
@@ -18,6 +18,7 @@ func ProcessRawIntent(
 		ctx,
 		[]byte(msg.Payload),
 		msg.TenantID,
+		msg.TenantName,
 	)
 	if err != nil {
 		log.Println("S3 Upload Failed", err)

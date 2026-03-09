@@ -2,14 +2,16 @@ package services
 
 import (
 	"context"
+	"encoding/base64"
 	"log"
 	"time"
 
+	"zord-edge/db"
+	"zord-edge/kafka"
+	"zord-edge/model"
+	"zord-edge/vault"
+
 	"github.com/google/uuid"
-	"main.go/db"
-	"main.go/kafka"
-	"main.go/model"
-	"main.go/vault"
 )
 
 func RawIntent(ctx context.Context,
@@ -34,6 +36,8 @@ func RawIntent(ctx context.Context,
 
 	EnvelopeHash := BuildEnvelopeHash(msg, ack)
 	EnvelopeSignature := vault.SignEnvelopeHash(EnvelopeHash)
+	encodedSig := base64.StdEncoding.EncodeToString(EnvelopeSignature)
+	storedSignature := "ZORD_" + encodedSig
 
 	envelope := model.IngressEnvelope{
 		TraceID:           trace_id,
@@ -96,6 +100,7 @@ func SendToIntentEngine(
 		Source:           msg.SourceType,
 		IdempotencyKey:   msg.IdempotencyKey,
 		EncryptedPayload: msg.Payload,
+		PayloadHash:      msg.PayloadHash,
 	}
 
 	err = kafka.SendRawIntentMessage(ctx, NewEnvelope, pro)

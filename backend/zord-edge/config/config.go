@@ -7,9 +7,10 @@ import (
 	"os"
 	"time"
 
+	"zord-edge/db"
+
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
-	"main.go/db"
 )
 
 type Config struct {

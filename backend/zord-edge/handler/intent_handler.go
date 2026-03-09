@@ -5,11 +5,12 @@ import (
 	"log"
 	"net/http"
 
+	"zord-edge/model"
+	"zord-edge/services"
+	"zord-edge/vault"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"main.go/model"
-	"main.go/services"
-	"main.go/vault"
 )
 
 func (h *Handler) IntentHandler(context *gin.Context) {
@@ -26,6 +27,7 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 	PayloadSize := context.GetInt("payload_size")
 	ContentType := context.ContentType()
 	SourceType := context.GetString("source_type")
+	Tenant_name := context.GetString("tenant_name")
 
 	encryptedPayload, err := vault.Encrypt(rawPayload)
 	if err != nil {
@@ -41,6 +43,7 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 		Payload:        encryptedPayload,
 		ContentType:    ContentType,
 		SourceType:     SourceType,
+		TenantName:     Tenant_name,
 	}
 
 	id, err := services.PersistIdempotency(context.Request.Context(), msg)

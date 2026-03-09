@@ -40,4 +40,5 @@ type CanonicalIntent struct {
 	CanonicalRef  string `db:"canonical_ref"`
 	CanonicalHash string `db:"canonical_hash"`
 	PrevHash      string `db:"prev_hash"`
+	PayloadHash   []byte
 }

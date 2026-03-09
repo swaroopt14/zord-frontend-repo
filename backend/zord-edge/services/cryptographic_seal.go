@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"time"
 
-	"main.go/model"
+	"zord-edge/model"
 )
 
 func BuildEnvelopeHash(msg model.RawIntentMessage, ack *model.AckMessage) []byte {

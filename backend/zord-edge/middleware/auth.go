@@ -4,9 +4,10 @@ import (
 	"net/http"
 	"strings"
 
+	"zord-edge/db"
+	"zord-edge/services"
+
 	"github.com/gin-gonic/gin"
-	"main.go/db"
-	"main.go/services"
 )
 
 func Authenticate() gin.HandlerFunc {
@@ -61,6 +62,7 @@ func Authenticate() gin.HandlerFunc {
 			}
 
 			context.Set("tenant_id", response.TenantId)
+			context.Set("tenant_name", response.TenantName)
 			context.Set("source_type", SourceType)
 			context.Next()
 

@@ -3,9 +3,9 @@ package routes
 import (
 	"github.com/gin-gonic/gin"
 
-	"main.go/handler"
-	"main.go/middleware"
-	"main.go/validator"
+	"zord-edge/handler"
+	"zord-edge/middleware"
+	"zord-edge/validator"
 )
 
 func Routes(router *gin.Engine, h *handler.Handler) {

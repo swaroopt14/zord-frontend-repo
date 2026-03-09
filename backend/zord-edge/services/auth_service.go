@@ -8,12 +8,14 @@ import (
 	"errors"
 	"strings"
 
+	"zord-edge/security"
+
 	"github.com/google/uuid"
-	"main.go/security"
 )
 
 type AuthResult struct {
-	TenantId uuid.UUID
+	TenantId   uuid.UUID
+	TenantName string
 }
 
 func TenantReg(ctx context.Context, db *sql.DB, merchantName string) (uuid.UUID, string, error) {
@@ -70,12 +72,13 @@ func ValidateApiKey(ctx context.Context, db *sql.DB, rawapikey string) (*AuthRes
 
 	var tenantId uuid.UUID
 	var hash string
+	var tenantName string
 
 	err = db.QueryRowContext(ctx,
-		`SELECT tenant_id,key_hash 
+		`SELECT tenant_id,key_hash,tenant_name 
 			 FROM tenants
 			 WHERE key_prefix=$1 AND is_active=true`, prefix,
-	).Scan(&tenantId, &hash)
+	).Scan(&tenantId, &hash, &tenantName)
 	if err != nil {
 		return nil, errors.New("invalid API Key")
 	}
@@ -84,6 +87,7 @@ func ValidateApiKey(ctx context.Context, db *sql.DB, rawapikey string) (*AuthRes
 		return nil, errors.New("Invalid API Key ")
 	}
 
-	return &AuthResult{TenantId: tenantId}, nil
+	return &AuthResult{TenantId: tenantId,
+		TenantName: tenantName}, nil
 
 }

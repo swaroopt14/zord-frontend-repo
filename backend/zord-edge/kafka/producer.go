@@ -7,8 +7,9 @@ import (
 	"os"
 	"time"
 
+	"zord-edge/model"
+
 	"github.com/IBM/sarama"
-	"main.go/model"
 )
 
 type Producer struct {

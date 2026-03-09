@@ -19,7 +19,7 @@ func (s *S3Store) StoreRawPayload(ctx context.Context, Payload []byte, TenantId 
 	receivedTime := time.Now().UTC()
 	year, month, day := receivedTime.Date()
 
-	ObjectKey := fmt.Sprintf("raw/%s/%04d/%02d/%02d/%s", TenantId,
+	ObjectKey := fmt.Sprintf("%s/%s/envelopes/%04d/%02d/%02d/%s.bin", TenantName, TenantId,
 		year,
 		int(month),
 		day,

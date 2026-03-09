@@ -7,17 +7,18 @@ import (
 	"strings"
 	"time"
 
+	"zord-edge/config"
+	"zord-edge/db"
+	"zord-edge/handler"
+	"zord-edge/kafka"
+	"zord-edge/routes"
+	"zord-edge/storage"
+	"zord-edge/vault"
+
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"main.go/config"
-	"main.go/db"
-	"main.go/handler"
-	"main.go/kafka"
-	"main.go/routes"
-	"main.go/storage"
-	"main.go/vault"
 )
 
 var (

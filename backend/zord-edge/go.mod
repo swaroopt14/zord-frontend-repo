@@ -1,4 +1,4 @@
-module main.go
+module zord-edge
 
 go 1.25.0
 

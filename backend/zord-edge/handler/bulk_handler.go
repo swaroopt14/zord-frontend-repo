@@ -13,12 +13,13 @@ import (
 	"sync"
 	"time"
 
+	"zord-edge/model"
+	"zord-edge/services"
+	"zord-edge/vault"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
-	"main.go/model"
-	"main.go/services"
-	"main.go/vault"
 )
 
 type BulkResult struct {
