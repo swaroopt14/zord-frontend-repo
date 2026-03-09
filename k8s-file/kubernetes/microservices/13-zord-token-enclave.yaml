@@ -14,46 +14,56 @@ spec:
         app: zord-token-enclave
     spec:
       containers:
-      - name: zord-token-enclave
-        image: arealis/zord-token-enclave:local
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8087
-        env:
-        - name: PORT
-          value: "8087"
-        - name: DB_HOST
-          valueFrom:
-            configMapKeyRef:
-              name: zord-config
-              key: TOKEN_DB_HOST
-        - name: DB_PORT
-          valueFrom:
-            configMapKeyRef:
-              name: zord-config
-              key: TOKEN_DB_PORT
-        - name: DB_USER
-          valueFrom:
-            configMapKeyRef:
-              name: zord-config
-              key: TOKEN_DB_USER
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: zord-secrets
-              key: TOKEN_DB_PASSWORD
-        - name: DB_NAME
-          valueFrom:
-            configMapKeyRef:
-              name: zord-config
-              key: TOKEN_DB_NAME
-        - name: DB_SSLMODE
-          value: disable
-        - name: MASTER_KEY
-          valueFrom:
-            secretKeyRef:
-              name: zord-secrets
-              key: TOKEN_ENCLAVE_MASTER_KEY
+        - name: zord-token-enclave
+          image: arealis/zord-token-enclave:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8087
+          env:
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: zord-config
+                  key: OTEL_EXPORTER_OTLP_ENDPOINT
+            - name: OTEL_EXPORTER_OTLP_INSECURE
+              valueFrom:
+                configMapKeyRef:
+                  name: zord-config
+                  key: OTEL_EXPORTER_OTLP_INSECURE
+            - name: PORT
+              value: "8087"
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: zord-config
+                  key: TOKEN_DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: zord-config
+                  key: TOKEN_DB_PORT
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: zord-config
+                  key: TOKEN_DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: zord-secrets
+                  key: TOKEN_DB_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: zord-config
+                  key: TOKEN_DB_NAME
+            - name: DB_SSLMODE
+              value: disable
+            - name: MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: zord-secrets
+                  key: TOKEN_ENCLAVE_MASTER_KEY
 ---
 apiVersion: v1
 kind: Service

@@ -1,10 +1,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: arealis-zord-secrets
+  name: arealis-zord
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-wave: "0"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -12,7 +12,7 @@ spec:
   source:
     repoURL: https://github.com/Arealis-network/Arealis-Zord.git
     targetRevision: prod
-    path: k8s-file/kubernetes/secrets
+    path: k8s-file/kubernetes/argocd-full
   destination:
     server: https://kubernetes.default.svc
     namespace: arealis-zord
@@ -22,4 +22,3 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-
