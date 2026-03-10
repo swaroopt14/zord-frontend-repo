@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -16,12 +18,13 @@ import (
 	"zord-edge/storage"
 	"zord-edge/vault"
 
+	"zord-edge/tracing"
+
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
-	"zord-edge/tracing"
 )
 
 var (
@@ -126,7 +129,15 @@ func main() {
 	})
 
 	log.Println("Starting Zord Edge service on port 8080 with observability enabled")
-	if err := server.Run(":8080"); err != nil {
+	srv := &http.Server{
+		Addr:              ":8080",
+		Handler:           server,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      20 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal("Server failed to start:", err)
 	}
 }
