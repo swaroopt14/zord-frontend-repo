@@ -18,8 +18,10 @@ func StartConsumer(
 	config := sarama.NewConfig()
 	config.Version = sarama.V2_8_0_0
 
-	config.Consumer.Group.Rebalance.Strategy = sarama.BalanceStrategyRange
-	config.Consumer.Offsets.Initial = sarama.OffsetNewest
+	config.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{
+		sarama.NewBalanceStrategyRange(),
+	}
+	config.Consumer.Offsets.Initial = sarama.OffsetOldest
 
 	consumerGroup, err := sarama.NewConsumerGroup(brokers, groupID, config)
 	if err != nil {

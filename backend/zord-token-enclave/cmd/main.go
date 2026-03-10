@@ -86,23 +86,40 @@ func main() {
 
 		pii := map[string]string{}
 
+		// account number (root)
 		if v, ok := canonical["account_number"].(string); ok {
 			pii["account_number"] = v
 		}
-		if v, ok := canonical["ifsc"].(string); ok {
-			pii["ifsc"] = v
+
+		// beneficiary fields
+		if beneficiary, ok := canonical["beneficiary"].(map[string]interface{}); ok {
+
+			if name, ok := beneficiary["name"].(string); ok {
+				pii["name"] = name
+			}
+
+			if instrument, ok := beneficiary["instrument"].(map[string]interface{}); ok {
+
+				if ifsc, ok := instrument["ifsc"].(string); ok {
+					pii["ifsc"] = ifsc
+				}
+
+				if vpa, ok := instrument["vpa"].(string); ok {
+					pii["vpa"] = vpa
+				}
+			}
 		}
-		if v, ok := canonical["vpa"].(string); ok {
-			pii["vpa"] = v
-		}
-		if v, ok := canonical["name"].(string); ok {
-			pii["name"] = v
-		}
-		if v, ok := canonical["phone"].(string); ok {
-			pii["phone"] = v
-		}
-		if v, ok := canonical["email"].(string); ok {
-			pii["email"] = v
+
+		// remitter fields
+		if remitter, ok := canonical["remitter"].(map[string]interface{}); ok {
+
+			if phone, ok := remitter["phone"].(string); ok {
+				pii["phone"] = phone
+			}
+
+			if email, ok := remitter["email"].(string); ok {
+				pii["email"] = email
+			}
 		}
 
 		tokens, err := tokenSvc.TokenizePII(

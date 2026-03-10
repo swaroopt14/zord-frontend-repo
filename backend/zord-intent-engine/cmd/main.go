@@ -146,13 +146,32 @@ func main() {
 			}
 
 			if dlq != nil {
-				log.Printf("Worker %d: ⚠️ Intent rejected [tenant=%s envelope=%s reason=%s]",
-					id, job.TenantID, job.EnvelopeID, dlq.ReasonCode)
+				log.Printf(
+					"Worker %d: ⚠️ Intent rejected [tenant=%s envelope=%s reason=%s]",
+					id,
+					job.TenantID,
+					job.EnvelopeID,
+					dlq.ReasonCode,
+				)
 				continue
 			}
 
-			log.Printf("Worker %d: Intent processed successfully [intent_id=%s envelope=%s]",
-				id, canonical.IntentID, job.EnvelopeID)
+			// 🟡 Tokenization fallback case
+			if canonical == nil {
+				log.Printf(
+					"Worker %d: Tokenization queued for async processing [envelope=%s]",
+					id,
+					job.EnvelopeID,
+				)
+				continue
+			}
+
+			log.Printf(
+				"Worker %d: Intent processed successfully [intent_id=%s envelope=%s]",
+				id,
+				canonical.IntentID,
+				job.EnvelopeID,
+			)
 
 			// ACK logic would go here
 		}

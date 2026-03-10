@@ -393,32 +393,79 @@ func (s *IntentService) ProcessTokenizeResult(
 	log.Printf("ProcessTokenizeResult: EnvelopeID=%s", event.EnvelopeID)
 
 	tokenMap := event.Tokens
+	canonicalInput := event.Canonical
 
-	beneficiaryTokenized := map[string]any{
-		"name_token": tokenMap["name"],
+	// -------- JSON fields --------
+
+	piiJSON, err := json.Marshal(tokenMap)
+	if err != nil {
+		return nil, err
 	}
 
-	beneficiaryJSON, _ := json.Marshal(beneficiaryTokenized)
-	piiJSON, _ := json.Marshal(tokenMap)
+	beneficiaryTokenized := map[string]any{
+		"instrument": map[string]any{
+			"kind":       canonicalInput.Beneficiary.Instrument.Kind,
+			"ifsc_token": tokenMap["ifsc"],
+			"vpa_token":  tokenMap["vpa"],
+		},
+		"name_token": tokenMap["name"],
+		"country":    canonicalInput.Beneficiary.Country,
+	}
 
-	canonical := models.CanonicalIntent{
+	beneficiaryJSON, err := json.Marshal(beneficiaryTokenized)
+	if err != nil {
+		return nil, err
+	}
+
+	constraintsJSON, err := json.Marshal(canonicalInput.Constraints)
+	if err != nil {
+		return nil, err
+	}
+
+	amount, err := parseAmount(canonicalInput.Amount.Value)
+	if err != nil {
+		return nil, err
+	}
+
+	// -------- Build CanonicalIntent --------
+
+	intent := models.CanonicalIntent{
 		TraceID:    event.TraceID,
 		IntentID:   uuid.NewString(),
 		EnvelopeID: event.EnvelopeID,
 		TenantID:   event.TenantID,
 
+		IntentType:       canonicalInput.IntentType,
+		CanonicalVersion: "v1",
+		SchemaVersion:    canonicalInput.SchemaVersion,
+
+		Amount:   amount,
+		Currency: canonicalInput.Amount.Currency,
+
+		Constraints: constraintsJSON,
+
+		BeneficiaryType: canonicalInput.Beneficiary.Instrument.Kind,
+		PIITokens:       piiJSON,
+		Beneficiary:     beneficiaryJSON,
+
 		Status:    "CREATED",
 		CreatedAt: time.Now().UTC(),
-
-		PIITokens:   piiJSON,
-		Beneficiary: beneficiaryJSON,
 	}
 
-	payload, _ := json.Marshal(canonical)
+	payload, err := json.Marshal(intent)
+	if err != nil {
+		return nil, err
+	}
 
-	outbox, _ := CanonicalIntentToOutboxEvent(canonical, payload)
+	outbox, err := CanonicalIntentToOutboxEvent(intent, payload)
+	if err != nil {
+		return nil, err
+	}
 
-	saved, _ := s.repo.Save(ctx, canonical, outbox)
+	saved, err := s.repo.Save(ctx, intent, outbox)
+	if err != nil {
+		return nil, err
+	}
 
 	return &saved, nil
 }
