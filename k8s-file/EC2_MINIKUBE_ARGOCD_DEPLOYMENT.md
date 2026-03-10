@@ -189,7 +189,7 @@ Now run:
 ```bash
 argocd repo add https://github.com/Arealis-network/Arealis-Zord.git \
   --username arumullayaswanth \
-  --password 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
+  --password g50t
 ```
 
 Verify:
