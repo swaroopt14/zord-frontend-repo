@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { MOCK_INTENT_IDS } from '../mock'
+import { getCustomerSearchEntries, getSmartSuggestions, rankSearchEntries } from '../search-catalog'
 
 type Environment = 'sandbox' | 'production'
 
@@ -11,6 +12,45 @@ interface CustomerTopBarProps {
   tenant?: string
   environment?: Environment
   onEnvironmentChange?: (env: Environment) => void
+}
+
+const SANDBOX_SUPPORTED_ROUTES = new Set<string>([
+  '/customer/overview',
+  '/customer/exceptions',
+  '/customer/work-queue',
+  '/customer/intents',
+  '/customer/intents/create',
+  '/customer/intents/replay',
+  '/customer/workflow-timeline',
+  '/customer/evidence',
+  '/customer/evidence/explorer',
+  '/customer/evidence/export',
+  '/customer/integrations/webhooks',
+  '/customer/integrations/api-logs',
+  '/customer/integrations/adapters',
+  '/customer/reports/ledger',
+  '/customer/reports/settlement',
+  '/customer/reports/discrepancy',
+])
+
+const isIntentDetailPath = (path: string) => /^\/customer\/intents\/[^/]+$/.test(path)
+
+const toSandboxPath = (path: string) => {
+  const normalized = path === '/customer' ? '/customer/overview' : path
+  if (normalized.startsWith('/customer/sandbox')) return normalized
+  if (normalized === '/customer/intents/create') return '/customer/sandbox/intents/create'
+  if (SANDBOX_SUPPORTED_ROUTES.has(normalized) || isIntentDetailPath(normalized)) {
+    return normalized.replace('/customer', '/customer/sandbox')
+  }
+  return '/customer/sandbox/overview'
+}
+
+const toProductionPath = (path: string) => {
+  if (path.startsWith('/customer/sandbox')) {
+    const converted = path.replace('/customer/sandbox', '/customer')
+    return converted === '/customer' ? '/customer/overview' : converted
+  }
+  return path === '/customer' ? '/customer/overview' : path
 }
 
 export function CustomerTopBar({ tenant, environment = 'production', onEnvironmentChange }: CustomerTopBarProps) {
@@ -23,6 +63,8 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
   const [toasts, setToasts] = useState<Array<{ id: string; title: string; desc?: string; type?: 'success' | 'warning' | 'error' | 'info' }>>([])
   const notifRef = useRef<HTMLDivElement>(null)
   const userRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const pathname = usePathname()
   const router = useRouter()
 
   useEffect(() => {
@@ -36,7 +78,11 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setShowSearch(true) }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowSearch(true)
+        window.setTimeout(() => searchInputRef.current?.focus(), 0)
+      }
       if (e.key === 'Escape') setShowSearch(false)
     }
     document.addEventListener('keydown', handleKeyDown)
@@ -73,7 +119,41 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
     return () => window.removeEventListener('cx:toast', onToast as EventListener)
   }, [])
 
-  const handleEnvChange = (env: Environment) => { setCurrentEnv(env); onEnvironmentChange?.(env) }
+  useEffect(() => {
+    const onOpenSearch = (e: Event) => {
+      const detail = (e as CustomEvent<{ query?: string }>).detail
+      if (detail?.query) setSearchQuery(detail.query)
+      setShowSearch(true)
+      window.setTimeout(() => searchInputRef.current?.focus(), 0)
+    }
+    window.addEventListener('cx:open-global-search', onOpenSearch as EventListener)
+    return () => window.removeEventListener('cx:open-global-search', onOpenSearch as EventListener)
+  }, [])
+
+  useEffect(() => {
+    setCurrentEnv(environment)
+  }, [environment])
+
+  const handleEnvChange = (env: Environment) => {
+    const currentPath = pathname || '/customer/overview'
+    const nextPath = env === 'sandbox' ? toSandboxPath(currentPath) : toProductionPath(currentPath)
+    setCurrentEnv(env)
+    onEnvironmentChange?.(env)
+    if (nextPath !== currentPath) {
+      router.push(nextPath)
+    }
+  }
+
+  const homeHref = currentEnv === 'sandbox' ? '/customer/sandbox/overview' : '/customer/overview'
+  const searchEntries = useMemo(() => getCustomerSearchEntries(currentEnv), [currentEnv])
+  const resultEntries = useMemo(() => rankSearchEntries(searchQuery, searchEntries, 10), [searchEntries, searchQuery])
+  const smartSuggestions = useMemo(() => getSmartSuggestions(searchQuery, currentEnv), [currentEnv, searchQuery])
+
+  const openSearchResult = (href: string) => {
+    setShowSearch(false)
+    setSearchQuery('')
+    router.push(href)
+  }
 
   if (!mounted) return <div className="h-14" style={{ background: 'var(--glass-surface)' }} />
 
@@ -138,7 +218,7 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
         {/* Left Section */}
         <div className="flex items-center h-full">
           {/* Logo */}
-          <Link href="/customer/overview" className="px-4 h-full flex items-center gap-2.5 transition-colors duration-[120ms]"
+          <Link href={homeHref} className="px-4 h-full flex items-center gap-2.5 transition-colors duration-[120ms]"
             style={{ color: 'var(--glass-item-active)' }}
           >
             <div className="w-8 h-8 rounded-[10px] flex items-center justify-center" style={{ background: 'var(--cx-primary)', boxShadow: '0 2px 6px rgba(124,58,237,0.25)' }}>
@@ -149,13 +229,39 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
             </span>
           </Link>
 
-          {/* Tenant + Environment moved into the notifications panel (bell icon). */}
+          <div
+            className="mx-2 flex items-center rounded-[12px] p-0.5"
+            style={{ background: 'var(--glass-item-hover-bg)', border: '1px solid var(--glass-border)' }}
+            aria-label="Environment toggle"
+          >
+            <button
+              onClick={() => handleEnvChange('production')}
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-[10px] transition-all duration-[120ms]"
+              style={
+                currentEnv === 'production'
+                  ? { background: 'var(--cx-success)', color: '#fff', boxShadow: '0 1px 4px rgba(20,184,166,0.25)' }
+                  : { color: 'var(--glass-item-text)' }
+              }
+            >
+              LIVE
+            </button>
+            <button
+              onClick={() => handleEnvChange('sandbox')}
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-[10px] transition-all duration-[120ms]"
+              style={
+                currentEnv === 'sandbox'
+                  ? { background: 'var(--cx-energy)', color: '#fff', boxShadow: '0 1px 4px rgba(249,115,22,0.25)' }
+                  : { color: 'var(--glass-item-text)' }
+              }
+            >
+              SANDBOX
+            </button>
+          </div>
         </div>
 
         {/* Center — Global Search */}
         <div className="flex-1 flex justify-center max-w-md mx-4">
-          <button
-            onClick={() => setShowSearch(true)}
+          <div
             className="w-full flex items-center justify-between px-3.5 py-2 rounded-[10px] text-sm transition-all duration-[120ms]"
             style={{ background: 'var(--glass-item-hover-bg)', border: '1px solid var(--glass-border)', color: 'var(--glass-item-text)' }}
           >
@@ -163,10 +269,25 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
               </svg>
-              <span className="text-xs">Search intents, evidence, logs...</span>
+              <input
+                value={searchQuery}
+                onFocus={() => setShowSearch(true)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  if (!showSearch) setShowSearch(true)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && resultEntries[0]) {
+                    openSearchResult(resultEntries[0].href)
+                  }
+                }}
+                placeholder="Search intent, beneficiary, trace, report..."
+                className="w-full bg-transparent text-xs outline-none"
+                style={{ color: 'var(--glass-item-active)' }}
+              />
             </div>
             <kbd className="px-1.5 py-0.5 text-[10px] font-mono rounded" style={{ background: 'var(--glass-badge-bg)', color: 'var(--glass-badge-text)' }}>⌘K</kbd>
-          </button>
+          </div>
         </div>
 
         {/* Right Section */}
@@ -211,33 +332,15 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
                       </div>
                     </div>
 
-                    <div
-                      className="flex items-center rounded-[12px] p-0.5 flex-shrink-0"
-                      style={{ background: 'var(--glass-item-hover-bg)', border: '1px solid var(--glass-border)' }}
+                    <span
+                      className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide rounded-full flex-shrink-0"
+                      style={{
+                        background: currentEnv === 'sandbox' ? 'rgba(249,115,22,0.12)' : 'rgba(20,184,166,0.12)',
+                        color: currentEnv === 'sandbox' ? 'var(--cx-energy)' : 'var(--cx-success)',
+                      }}
                     >
-                      <button
-                        onClick={() => handleEnvChange('production')}
-                        className="px-2.5 py-1 text-[11px] font-semibold rounded-[10px] transition-all duration-[120ms]"
-                        style={
-                          currentEnv === 'production'
-                            ? { background: 'var(--cx-success)', color: '#fff', boxShadow: '0 1px 4px rgba(20,184,166,0.25)' }
-                            : { color: 'var(--glass-item-text)' }
-                        }
-                      >
-                        PROD
-                      </button>
-                      <button
-                        onClick={() => handleEnvChange('sandbox')}
-                        className="px-2.5 py-1 text-[11px] font-semibold rounded-[10px] transition-all duration-[120ms]"
-                        style={
-                          currentEnv === 'sandbox'
-                            ? { background: 'var(--cx-energy)', color: '#fff', boxShadow: '0 1px 4px rgba(249,115,22,0.25)' }
-                            : { color: 'var(--glass-item-text)' }
-                        }
-                      >
-                        SANDBOX
-                      </button>
-                    </div>
+                      {currentEnv === 'sandbox' ? 'Sandbox Mode' : 'Live Mode'}
+                    </span>
                   </div>
                 </div>
                 <div className="max-h-72 overflow-y-auto cx-glass-scroll">
@@ -343,10 +446,11 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
               </svg>
               <input
+                ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search intent_id, evidence_pack, webhook_id, api_log..."
+                placeholder="Search intent_id, beneficiary_token, trace_id, route..."
                 className="flex-1 text-base outline-none bg-transparent"
                 style={{ color: 'var(--glass-item-active)' }}
                 autoFocus
@@ -354,25 +458,46 @@ export function CustomerTopBar({ tenant, environment = 'production', onEnvironme
               <kbd className="ml-3 px-2 py-1 text-xs font-mono rounded" style={{ background: 'var(--glass-badge-bg)', color: 'var(--glass-badge-text)', border: '1px solid var(--glass-border)' }}>ESC</kbd>
             </div>
             <div className="p-5 max-h-80 overflow-y-auto cx-glass-scroll">
-              <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--glass-item-text)' }}>Quick Actions</p>
-              {[
-                { label: 'Go to Intent Journal', icon: '📋' },
-                { label: 'Open Evidence Explorer', icon: '🔍' },
-                { label: 'View Failed Webhooks', icon: '⚡' },
-                { label: 'Check SLA Dashboard', icon: '📊' },
-              ].map((item, i) => (
+              <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--glass-item-text)' }}>Global Results</p>
+              {smartSuggestions.map((item) => (
                 <button
-                  key={i}
-                  onClick={() => setShowSearch(false)}
-                  className="flex items-center gap-3 w-full px-3 py-2.5 text-sm rounded-[10px] transition-colors duration-[120ms]"
+                  key={item.id}
+                  onClick={() => openSearchResult(item.href)}
+                  className="flex items-center justify-between gap-3 w-full px-3 py-2.5 text-sm rounded-[10px] transition-colors duration-[120ms]"
                   style={{ color: 'var(--glass-item-text)' }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--glass-item-hover-bg)'; e.currentTarget.style.color = 'var(--glass-item-active)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--glass-item-text)' }}
                 >
-                  <span>{item.icon}</span>
-                  <span>{item.label}</span>
+                  <span className="text-left">
+                    <span className="block text-xs font-semibold">{item.title}</span>
+                    <span className="block text-[11px] opacity-80">{item.subtitle}</span>
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'var(--glass-badge-bg)' }}>AI suggestion</span>
                 </button>
               ))}
+              {resultEntries.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => openSearchResult(item.href)}
+                  className="flex items-center justify-between gap-3 w-full px-3 py-2.5 text-sm rounded-[10px] transition-colors duration-[120ms]"
+                  style={{ color: 'var(--glass-item-text)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--glass-item-hover-bg)'; e.currentTarget.style.color = 'var(--glass-item-active)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--glass-item-text)' }}
+                >
+                  <span className="text-left min-w-0">
+                    <span className="block text-xs font-semibold truncate">{item.title}</span>
+                    <span className="block text-[11px] opacity-80 truncate">{item.subtitle}</span>
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full uppercase" style={{ background: 'var(--glass-badge-bg)' }}>
+                    {item.type}
+                  </span>
+                </button>
+              ))}
+              {searchQuery.trim() && resultEntries.length === 0 && smartSuggestions.length === 0 ? (
+                <div className="px-3 py-8 text-center text-sm" style={{ color: 'var(--glass-item-text)' }}>
+                  No results found. Try intent ID, trace ID, beneficiary token, or report name.
+                </div>
+              ) : null}
             </div>
             <div className="px-5 py-3 flex items-center justify-between text-xs" style={{ borderTop: '1px solid var(--glass-divider)', color: 'var(--glass-item-disabled)' }}>
               <div className="flex gap-4">
