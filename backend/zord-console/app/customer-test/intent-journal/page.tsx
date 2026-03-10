@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 
@@ -438,7 +438,7 @@ function rowSearchText(row: JournalRow) {
   return `${row.contractId} ${row.intentId} ${row.envelopeId} ${row.status} ${row.traceId} ${row.tenantId}`.toLowerCase()
 }
 
-export default function CustomerTestIntentJournalPage() {
+function CustomerTestIntentJournalContent() {
   const searchParams = useSearchParams()
   const [tableType, setTableType] = useState<TableType>('intents')
   const [rows, setRows] = useState<JournalRow[]>(mockIntents)
@@ -879,5 +879,21 @@ export default function CustomerTestIntentJournalPage() {
         <p className="text-base font-semibold text-gray-800">Desktop View Recommended</p>
       </div>
     </div>
+  )
+}
+
+export default function CustomerTestIntentJournalPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="w-full p-6 lg:p-8">
+          <main className="ct-main-panel mt-1 bg-gradient-to-b from-[#f9fbff] via-[#f7f8fa] to-[#f6f7fa] px-6 pb-7 pt-6">
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-6 text-sm text-gray-600">Loading intent journal...</div>
+          </main>
+        </div>
+      }
+    >
+      <CustomerTestIntentJournalContent />
+    </Suspense>
   )
 }
