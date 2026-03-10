@@ -1,10 +1,11 @@
 'use client'
 
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { getCustomerTestSearchEntries, rankCustomerTestSearchEntries } from '../search-catalog'
 
-export default function CustomerTestSearchPage() {
+function CustomerTestSearchContent() {
   const searchParams = useSearchParams()
   const query = searchParams.get('q') ?? ''
   const entries = rankCustomerTestSearchEntries(query, getCustomerTestSearchEntries(), 50)
@@ -38,5 +39,21 @@ export default function CustomerTestSearchPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function CustomerTestSearchPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="w-full p-6 lg:p-8">
+          <main className="ct-main-panel mt-1 bg-gradient-to-b from-[#f9fbff] via-[#f7f8fa] to-[#f6f7fa] px-6 pb-7 pt-6">
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-6 text-sm text-gray-600">Loading search...</div>
+          </main>
+        </div>
+      }
+    >
+      <CustomerTestSearchContent />
+    </Suspense>
   )
 }
