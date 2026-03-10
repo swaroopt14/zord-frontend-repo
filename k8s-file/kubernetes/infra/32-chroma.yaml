@@ -28,12 +28,34 @@ spec:
     spec:
       containers:
         - name: chroma
-          image: chromadb/chroma:latest
+          image: chromadb/chroma:0.5.5
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
+          env:
+            - name: IS_PERSISTENT
+              value: "TRUE"
+            - name: PERSIST_DIRECTORY
+              value: /data
+          volumeMounts:
+            - name: chroma-data
+              mountPath: /data
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /api/v1/heartbeat
               port: 8000
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            timeoutSeconds: 3
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /api/v1/heartbeat
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
+      volumes:
+        - name: chroma-data
+          emptyDir: {}
