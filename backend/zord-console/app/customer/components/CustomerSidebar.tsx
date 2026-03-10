@@ -71,6 +71,13 @@ const sections: NavSection[] = [
     ],
   },
   {
+    id: 'files', title: 'File Ops',
+    items: [
+      { label: 'Bulk CSV Upload', href: '/customer/files/upload', icon: icons.download },
+      { label: 'Ingestion Jobs', href: '/customer/files/jobs', icon: icons.queue },
+    ],
+  },
+  {
     id: 'evidence', title: 'Evidence',
     items: [
       { label: 'Evidence Packs', href: '/customer/evidence', icon: icons.box },
@@ -90,6 +97,9 @@ const sections: NavSection[] = [
   {
     id: 'reports', title: 'Reports',
     items: [
+      { label: 'RCA Reports', href: '/customer/reports/rca', icon: icons.warning },
+      { label: 'Cost Intelligence', href: '/customer/reports/cost-intelligence', icon: icons.money },
+      { label: 'Payment Intelligence', href: '/customer/reports/payment-intelligence', icon: icons.chart },
       { label: 'Settlement & Recon', href: '/customer/reports/settlement', icon: icons.money },
       { label: 'Ledger View', href: '/customer/reports/ledger', icon: icons.doc },
       { label: 'Discrepancy Inbox', href: '/customer/reports/discrepancy', icon: icons.alert, badge: 7 },
@@ -183,15 +193,11 @@ export function CustomerSidebar() {
   }
 
   const W = collapsed ? '72px' : '260px'
-  const q = query.trim().toLowerCase()
-  const filteredSections = q
-    ? sections
-        .map((s) => ({
-          ...s,
-          items: s.items.filter((i) => i.label.toLowerCase().includes(q)),
-        }))
-        .filter((s) => s.items.length > 0)
-    : sections
+  const filteredSections = sections
+
+  const openGlobalSearch = () => {
+    window.dispatchEvent(new CustomEvent('cx:open-global-search', { detail: { query } }))
+  }
 
   return (
     <div
@@ -264,18 +270,25 @@ export function CustomerSidebar() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Filter…"
+                placeholder="Global search…"
                 className="flex-1 bg-transparent outline-none text-[13px]"
                 style={{ color: 'var(--glass-item-active)' }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') openGlobalSearch()
+                }}
+                onFocus={() => {
+                  if (!query.trim()) return
+                  openGlobalSearch()
+                }}
               />
               {query ? (
                 <button
-                  onClick={() => setQuery('')}
+                  onClick={openGlobalSearch}
                   className="text-xs font-semibold px-2 py-1 rounded-lg"
                   style={{ color: 'var(--glass-item-text)', background: 'var(--glass-item-hover-bg)' }}
-                  title="Clear"
+                  title="Search"
                 >
-                  Clear
+                  Go
                 </button>
               ) : null}
             </div>
@@ -365,11 +378,6 @@ export function CustomerSidebar() {
           </div>
         ))}
 
-        {!collapsed && q && filteredSections.length === 0 ? (
-          <div className="px-3 py-6 text-sm" style={{ color: 'var(--glass-item-disabled)' }}>
-            No matches.
-          </div>
-        ) : null}
       </nav>
 
       {/* ── Footer ────────────────────────────────── */}

@@ -47,8 +47,8 @@ export default function ConsoleLoginPage() {
     })
     setCurrentRole('CUSTOMER_USER')
 
-    // In production, would redirect to email verification page
-    router.push('/console/ingestion')
+    // Route console auth flow to customer-test workspace for current testing.
+    router.push('/customer-test')
   }
 
   const handleLogin = async (
@@ -98,7 +98,7 @@ export default function ConsoleLoginPage() {
     })
     setCurrentRole('CUSTOMER_USER')
 
-    router.push('/console/ingestion')
+    router.push('/customer-test')
   }
 
   const handleLoginClick = () => {

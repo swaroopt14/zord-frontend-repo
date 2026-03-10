@@ -4,6 +4,9 @@
 
 /* Zord Console - AWS-Style Clean Theme */
 :root {
+  /* Google Docs 12pt equivalent baseline */
+  font-size: 16px;
+
   /* Page Background */
   --zord-page-bg: #F9FAFB;
   
@@ -43,6 +46,8 @@
 body {
   color: var(--zord-text-primary);
   background: var(--zord-page-bg);
+  font-size: 1rem;
+  line-height: 1.5;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;

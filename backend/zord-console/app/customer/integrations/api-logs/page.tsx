@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MOCK_INTENT_IDS } from '../../mock'
 
 interface ApiLog {
@@ -33,10 +33,13 @@ const methodColors: Record<string, string> = {
   DELETE: 'bg-red-50 text-red-700',
 }
 
+const PAGE_SIZE = 15
+
 export default function ApiLogsPage() {
   const [methodFilter, setMethodFilter] = useState<string>('all')
   const [query, setQuery] = useState<string>('')
-  const [selected, setSelected] = useState<ApiLog | null>(null)
+  const [activePage, setActivePage] = useState(1)
+  const [selectedId, setSelectedId] = useState<string | null>(logs[0]?.id ?? null)
 
   const filtered = useMemo(() => {
     const base = methodFilter === 'all' ? logs : logs.filter(l => l.method === methodFilter)
@@ -44,6 +47,31 @@ export default function ApiLogsPage() {
     if (!q) return base
     return base.filter((l) => `${l.path} ${l.source} ${l.method} ${l.statusCode}`.toLowerCase().includes(q))
   }, [methodFilter, query])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const pagedLogs = useMemo(() => {
+    const from = (activePage - 1) * PAGE_SIZE
+    return filtered.slice(from, from + PAGE_SIZE)
+  }, [activePage, filtered])
+  const selected = filtered.find((log) => log.id === selectedId) || null
+
+  useEffect(() => {
+    setActivePage(1)
+  }, [methodFilter, query])
+
+  useEffect(() => {
+    setActivePage((prev) => Math.min(prev, totalPages))
+  }, [totalPages])
+
+  useEffect(() => {
+    if (filtered.length === 0) {
+      setSelectedId(null)
+      return
+    }
+    if (!selectedId || !filtered.some((row) => row.id === selectedId)) {
+      setSelectedId(filtered[0].id)
+    }
+  }, [filtered, selectedId])
 
   return (
     <div className="p-6 space-y-6">
@@ -99,61 +127,102 @@ export default function ApiLogsPage() {
 
       {/* Logs Table */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-4">
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-50/50">
-              <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Time</th>
-              <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Method</th>
-              <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Path</th>
-              <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Status</th>
-              <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Latency</th>
-              <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Source</th>
-              <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Req / Res</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {filtered.map((log) => (
-              <tr
-                key={log.id}
-                className="hover:bg-gray-50/50 transition-colors cursor-pointer"
-                onClick={() => setSelected(log)}
-                title="View details"
-              >
-                <td className="px-5 py-3 text-xs font-mono text-cx-neutral">{log.timestamp}</td>
-                <td className="px-5 py-3">
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${methodColors[log.method] || 'bg-gray-100 text-gray-600'}`}>
-                    {log.method}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-sm font-mono text-cx-text">{log.path}</td>
-                <td className="px-5 py-3">
-                  <span className={`text-xs font-mono font-bold ${
-                    log.statusCode < 300 ? 'text-cx-teal-600' :
-                    log.statusCode < 500 ? 'text-cx-orange-600' :
-                    'text-red-600'
-                  }`}>
-                    {log.statusCode}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-xs font-mono text-cx-neutral tabular-nums">{log.latency}</td>
-                <td className="px-5 py-3 text-xs text-cx-neutral">{log.source}</td>
-                <td className="px-5 py-3 text-xs text-cx-neutral tabular-nums">{log.requestSize} / {log.responseSize}</td>
+        <div>
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50/50">
+                <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Time</th>
+                <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Method</th>
+                <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Path</th>
+                <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Status</th>
+                <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Latency</th>
+                <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Source</th>
+                <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Req / Res</th>
+                <th className="px-5 py-3 text-left text-[10px] font-semibold text-cx-neutral uppercase tracking-wider">Inspect</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {pagedLogs.map((log) => (
+                <tr
+                  key={log.id}
+                  className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${selectedId === log.id ? 'bg-violet-50/50' : ''}`}
+                  onClick={() => setSelectedId(log.id)}
+                  title="View details"
+                >
+                  <td className="px-5 py-3 text-xs font-mono text-cx-neutral">{log.timestamp}</td>
+                  <td className="px-5 py-3">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${methodColors[log.method] || 'bg-gray-100 text-gray-600'}`}>
+                      {log.method}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-sm font-mono text-cx-text">{log.path}</td>
+                  <td className="px-5 py-3">
+                    <span className={`text-xs font-mono font-bold ${
+                      log.statusCode < 300 ? 'text-cx-teal-600' :
+                      log.statusCode < 500 ? 'text-cx-orange-600' :
+                      'text-red-600'
+                    }`}>
+                      {log.statusCode}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-xs font-mono text-cx-neutral tabular-nums">{log.latency}</td>
+                  <td className="px-5 py-3 text-xs text-cx-neutral">{log.source}</td>
+                  <td className="px-5 py-3 text-xs text-cx-neutral tabular-nums">{log.requestSize} / {log.responseSize}</td>
+                  <td className="px-5 py-3">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setSelectedId(log.id)
+                      }}
+                      className="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-cx-text hover:bg-gray-50"
+                    >
+                      Inspect
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {pagedLogs.length === 0 ? (
+                <tr>
+                  <td className="px-5 py-4 text-sm text-cx-neutral" colSpan={8}>
+                    No logs found.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+          </div>
+          <div className="mt-3 flex items-center justify-center gap-2 text-xs text-cx-neutral">
+            <button
+              onClick={() => setActivePage((prev) => Math.max(1, prev - 1))}
+              className="rounded-md border border-gray-200 bg-white px-2.5 py-1 disabled:opacity-40"
+              disabled={activePage === 1}
+            >
+              Prev
+            </button>
+            <span>
+              {activePage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setActivePage((prev) => Math.min(totalPages, prev + 1))}
+              className="rounded-md border border-gray-200 bg-white px-2.5 py-1 disabled:opacity-40"
+              disabled={activePage === totalPages}
+            >
+              Next
+            </button>
+          </div>
         </div>
 
         <aside className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-cx-text">Request Detail</h3>
-              <p className="text-xs text-cx-neutral mt-0.5">Click a row to inspect</p>
+              <p className="text-xs text-cx-neutral mt-0.5">Click Inspect to view details</p>
             </div>
             {selected ? (
               <button
-                onClick={() => setSelected(null)}
+                onClick={() => setSelectedId(null)}
                 className="text-xs font-semibold text-cx-purple-600 hover:text-cx-purple-700"
               >
                 Clear
