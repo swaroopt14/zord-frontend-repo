@@ -57,7 +57,7 @@ minikube version
 Start Minikube:
 
 ```bash
-minikube start --driver=docker --cpus=4 --memory=8192
+minikube start --driver=docker --cpus=4 --memory=8192 --force
 kubectl get nodes
 ```
 
@@ -88,17 +88,15 @@ Wait until all Argo CD pods are `Running`.
 On EC2:
 
 ```bash
-kubectl port-forward svc/argocd-server -n argocd 8081:443 --address 127.0.0.1
+kubectl port-forward svc/argocd-server -n argocd 2027:443 --address 0.0.0.0
 ```
-
-From laptop:
-
+Check logs:
 ```bash
-ssh -i <your-key>.pem -L 8081:127.0.0.1:8081 ec2-user@<EC2_PUBLIC_IP>
+ps aux | grep port-forward
 ```
+🌐 Now Your ArgoCD URL Will Be
+- `https://<EC2_PUBLIC_IP>:2027`
 
-Open:
-- `https://localhost:8081`
 
 Get password:
 
@@ -110,6 +108,106 @@ Login:
 - Username: `admin`
 - Password: above output
 
+#### Install ArgoCD CLI
+```bash
+curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+chmod +x argocd
+mv argocd /usr/local/bin/
+```
+Verify installation:
+```bash
+argocd version
+```
+
+
+
+
+You're almost there 👍 — the CLI installed correctly. The error you see now is normal.
+
+```
+{"level":"fatal","msg":"Argo CD server address unspecified"}
+```
+
+This means the **ArgoCD CLI is not connected (logged in) to your ArgoCD server yet**.
+
+You must **login first**, then run `repo add`.
+
+---
+
+#### 1️⃣ Login to ArgoCD
+
+Since you exposed ArgoCD with port-forward earlier on **port 2027**, run:
+
+```bash
+argocd login 13.220.184.165:2027 --username admin --insecure
+```
+
+It will ask for the password.
+
+---
+
+#### 2️⃣ Get the Admin Password
+
+Run this command:
+
+```bash
+kubectl get secret argocd-initial-admin-secret -n argocd \
+-o jsonpath="{.data.password}" | base64 -d
+```
+
+Example output:
+
+```
+dKJ9kL3xR2P8Wn
+```
+
+Use that password when logging in.
+
+---
+
+### 3️⃣ Verify Login
+
+Run:
+
+```bash
+argocd account get-user-info
+```
+
+Expected output:
+
+```
+Logged In: true
+Username: admin
+```
+
+---
+
+### 4️⃣ Add Your GitHub Repository
+
+Now run:
+
+```bash
+argocd repo add https://github.com/Arealis-network/Arealis-Zord.git \
+  --username arumullayaswanth \
+  --password g50t
+```
+
+Verify:
+
+```bash
+argocd repo list
+```
+
+---
+
+
+
+
+
+
+
+
+
 ## 7) Clone Repo
 
 ```bash
@@ -117,6 +215,18 @@ git clone https://github.com/Arealis-network/Arealis-Zord.git
 cd Arealis-Zord
 git checkout prod
 ```
+
+# Create the Namespace
+Run:
+```bash
+kubectl create namespace arealis-zord
+```
+Verify it:
+```bash
+kubectl get namespaces
+```
+You should see:
+- arealis-zord
 
 ## 8) Configure Secrets
 
@@ -146,6 +256,7 @@ Then deploy platform via Argo CD:
 ```bash
 kubectl apply -n argocd -f k8s-file/argocd/arealis-zord-application.yaml
 kubectl get applications -n argocd
+kubectl -n argocd describe application arealis-zord
 ```
 
 ## 10) Deploy with Root App (Platform Only)
