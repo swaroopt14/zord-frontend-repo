@@ -17,7 +17,6 @@ pipeline {
 
   environment {
     GIT_URL = 'https://github.com/Arealis-network/Arealis-Zord.git'
-    SCANNER_HOME = tool 'sonar-scanner'
     GO_MODULE_DIRS = 'backend/zord-edge backend/zord-intent-engine backend/zord-outcome-engine backend/zord-relay backend/zord-token-enclave backend/zord-contracts backend/zord-prompt-layer'
     FRONTEND_DIR = 'backend/zord-console'
     PATH = "/usr/local/go/bin:${env.PATH}"
@@ -80,31 +79,40 @@ pipeline {
 
     stage('Sonarqube Analysis') {
       steps {
-        withSonarQubeEnv("${params.SONARQUBE_SERVER}") {
-          sh '''
-            set -eu
+        script {
+          echo "Using Jenkins SonarQube server: ${params.SONARQUBE_SERVER}"
+          def scannerHome = tool 'sonar-scanner'
+          echo "Resolved SonarScanner tool: ${scannerHome}"
 
-            GO_COVERAGE_REPORTS="$(find coverage -name '*.out' -print | paste -sd, -)"
+          withSonarQubeEnv("${params.SONARQUBE_SERVER}") {
+            sh """
+              set -eux
+              echo "SONAR_HOST_URL=\${SONAR_HOST_URL}"
+              test -n "\${SONAR_AUTH_TOKEN}"
+              test -x "${scannerHome}/bin/sonar-scanner"
 
-            if [ -n "${GO_COVERAGE_REPORTS}" ]; then
-              "${SCANNER_HOME}/bin/sonar-scanner" \
-                -Dsonar.projectName="${SONAR_PROJECT_NAME}" \
-                -Dsonar.projectKey="${SONAR_PROJECT_KEY}" \
-                -Dsonar.sources=backend \
-                -Dsonar.tests=backend \
-                -Dsonar.go.coverage.reportPaths="${GO_COVERAGE_REPORTS}" \
-                -Dsonar.exclusions=**/node_modules/**,**/.next/**,**/coverage/**,**/assets/models/**,**/public/** \
-                -Dsonar.sourceEncoding=UTF-8
-            else
-              "${SCANNER_HOME}/bin/sonar-scanner" \
-                -Dsonar.projectName="${SONAR_PROJECT_NAME}" \
-                -Dsonar.projectKey="${SONAR_PROJECT_KEY}" \
-                -Dsonar.sources=backend \
-                -Dsonar.tests=backend \
-                -Dsonar.exclusions=**/node_modules/**,**/.next/**,**/coverage/**,**/assets/models/**,**/public/** \
-                -Dsonar.sourceEncoding=UTF-8
-            fi
-          '''
+              GO_COVERAGE_REPORTS="\$(find coverage -name '*.out' -print | paste -sd, - || true)"
+
+              if [ -n "\${GO_COVERAGE_REPORTS}" ]; then
+                "${scannerHome}/bin/sonar-scanner" \
+                  -Dsonar.projectName="${SONAR_PROJECT_NAME}" \
+                  -Dsonar.projectKey="${SONAR_PROJECT_KEY}" \
+                  -Dsonar.sources=backend \
+                  -Dsonar.tests=backend \
+                  -Dsonar.go.coverage.reportPaths="\${GO_COVERAGE_REPORTS}" \
+                  -Dsonar.exclusions=**/node_modules/**,**/.next/**,**/coverage/**,**/assets/models/**,**/public/** \
+                  -Dsonar.sourceEncoding=UTF-8
+              else
+                "${scannerHome}/bin/sonar-scanner" \
+                  -Dsonar.projectName="${SONAR_PROJECT_NAME}" \
+                  -Dsonar.projectKey="${SONAR_PROJECT_KEY}" \
+                  -Dsonar.sources=backend \
+                  -Dsonar.tests=backend \
+                  -Dsonar.exclusions=**/node_modules/**,**/.next/**,**/coverage/**,**/assets/models/**,**/public/** \
+                  -Dsonar.sourceEncoding=UTF-8
+              fi
+            """
+          }
         }
       }
     }
