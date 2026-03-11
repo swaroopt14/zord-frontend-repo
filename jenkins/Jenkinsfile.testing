@@ -98,7 +98,6 @@ pipeline {
                   -Dsonar.projectName="${SONAR_PROJECT_NAME}" \
                   -Dsonar.projectKey="${SONAR_PROJECT_KEY}" \
                   -Dsonar.sources=backend \
-                  -Dsonar.tests=backend \
                   -Dsonar.go.coverage.reportPaths="\${GO_COVERAGE_REPORTS}" \
                   -Dsonar.exclusions=**/node_modules/**,**/.next/**,**/coverage/**,**/assets/models/**,**/public/** \
                   -Dsonar.sourceEncoding=UTF-8
@@ -107,7 +106,6 @@ pipeline {
                   -Dsonar.projectName="${SONAR_PROJECT_NAME}" \
                   -Dsonar.projectKey="${SONAR_PROJECT_KEY}" \
                   -Dsonar.sources=backend \
-                  -Dsonar.tests=backend \
                   -Dsonar.exclusions=**/node_modules/**,**/.next/**,**/coverage/**,**/assets/models/**,**/public/** \
                   -Dsonar.sourceEncoding=UTF-8
               fi
