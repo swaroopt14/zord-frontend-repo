@@ -20,6 +20,7 @@ pipeline {
     SCANNER_HOME = tool 'sonar-scanner'
     GO_MODULE_DIRS = 'backend/zord-edge backend/zord-intent-engine backend/zord-outcome-engine backend/zord-relay backend/zord-token-enclave backend/zord-contracts backend/zord-prompt-layer'
     FRONTEND_DIR = 'backend/zord-console'
+    PATH = "/usr/local/go/bin:${env.PATH}"
   }
 
   stages {
@@ -42,6 +43,8 @@ pipeline {
       steps {
         sh '''
           set -eux
+          command -v go
+          go version
           rm -rf coverage
           mkdir -p coverage
 
@@ -63,6 +66,9 @@ pipeline {
         dir("${FRONTEND_DIR}") {
           sh '''
             set -eux
+            command -v node
+            node -v
+            npm -v
             npm ci
             npm run lint
             npm run build
