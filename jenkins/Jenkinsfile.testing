@@ -53,7 +53,7 @@ pipeline {
               name="$(basename "${module}")"
               (
                 cd "${module}"
-                go mod download
+                go mod tidy
                 go test ./... -covermode=count -coverprofile="../../coverage/${name}.out"
               )
             fi
