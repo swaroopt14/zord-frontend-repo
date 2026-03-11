@@ -84,7 +84,6 @@ body {
   .zord-page {
     min-height: 100%;
     background: var(--zord-page-bg);
-    background: var(--zord-page-bg);
   }
   
   /* Page Header (White bar at top) */
