@@ -21,13 +21,13 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 		return
 	}
 	rawPayload := rawPayloadAny.([]byte)
-	traceId := context.GetString("trace_id")
-	tenantId := context.MustGet("tenant_id").(uuid.UUID)
-	IdempotencyKey := context.GetString("idempotency_key")
-	PayloadSize := context.GetInt("payload_size")
-	ContentType := context.ContentType()
-	SourceType := context.GetString("source_type")
-	Tenant_name := context.GetString("tenant_name")
+	traceID := context.GetString("trace_id")
+	tenantID := context.MustGet("tenant_id").(uuid.UUID)
+	idempotencyKey := context.GetString("idempotency_key")
+	payloadSize := context.GetInt("payload_size")
+	contentType := context.ContentType()
+	sourceType := context.GetString("source_type")
+	tenantName := context.GetString("tenant_name")
 
 	encryptedPayload, err := vault.Encrypt(rawPayload)
 	if err != nil {
@@ -36,14 +36,14 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 	}
 
 	msg := model.RawIntentMessage{
-		TenantID:       tenantId.String(),
-		TraceID:        traceId,
-		IdempotencyKey: IdempotencyKey,
-		PayloadSize:    PayloadSize,
+		TenantID:       tenantID.String(),
+		TraceID:        traceID,
+		IdempotencyKey: idempotencyKey,
+		PayloadSize:    payloadSize,
 		Payload:        encryptedPayload,
-		ContentType:    ContentType,
-		SourceType:     SourceType,
-		TenantName:     Tenant_name,
+		ContentType:    contentType,
+		SourceType:     sourceType,
+		TenantName:     tenantName,
 	}
 
 	id, err := services.PersistIdempotency(context.Request.Context(), msg)
@@ -89,10 +89,10 @@ func (h *Handler) IntentHandler(context *gin.Context) {
 	}
 
 	//Hash Payload Using SHA256
-	Hash := sha256.Sum256(rawPayload)
-	PayloadHash := Hash[:]
+	hash := sha256.Sum256(rawPayload)
+	payloadHash := hash[:]
 
-	msg.PayloadHash = PayloadHash
+	msg.PayloadHash = payloadHash
 
 	if err := services.RawIntent(context.Request.Context(), msg, data); err != nil {
 		log.Printf("Error persisting raw intent: %v", err)
