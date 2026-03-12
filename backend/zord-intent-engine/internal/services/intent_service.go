@@ -30,8 +30,9 @@ import (
 type IntentService struct {
 	validator *validator.Validator
 	//tokenizer *pii.Tokenizer
-	repo CanonicalIntentRepository
-	s3   *storage.S3Store
+	repo          CanonicalIntentRepository
+	s3            *storage.S3Store
+	tokenizeQueue *KafkaTokenizeQueue
 }
 
 var enclaveHTTPClient = &http.Client{
@@ -67,12 +68,14 @@ func NewIntentService(
 	//t *pii.Tokenizer,
 	r CanonicalIntentRepository,
 	s3 *storage.S3Store, // ✅ ADD
+	q *KafkaTokenizeQueue,
 ) *IntentService {
 	return &IntentService{
 		validator: v,
 		//tokenizer: t,
-		repo: r,
-		s3:   s3,
+		repo:          r,
+		s3:            s3,
+		tokenizeQueue: q,
 	}
 }
 
@@ -98,32 +101,6 @@ type enclaveTokenizeRequest struct {
 		Email         string `json:"email"`
 	} `json:"pii"`
 }
-
-// func firstNonEmpty(vals ...string) string {
-// 	for _, v := range vals {
-// 		v = strings.TrimSpace(v)
-// 		if v != "" {
-// 			return v
-// 		}
-// 	}
-// 	return ""
-// }
-
-// func nestedString(m map[string]any, keys ...string) string {
-// 	var cur any = m
-// 	for _, k := range keys {
-// 		obj, ok := cur.(map[string]any)
-// 		if !ok {
-// 			return ""
-// 		}
-// 		cur, ok = obj[k]
-// 		if !ok {
-// 			return ""
-// 		}
-// 	}
-// 	s, _ := cur.(string)
-// 	return strings.TrimSpace(s)
-// }
 
 func callEnclaveTokenize(ctx context.Context, req enclaveTokenizeRequest) (map[string]string, error) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("ZORD_PII_ENCLAVE_URL")), "/")
@@ -160,7 +137,6 @@ func callEnclaveTokenize(ctx context.Context, req enclaveTokenizeRequest) (map[s
 		return nil, err
 	}
 	return out.Tokens, nil
-
 }
 
 /* ---------------- Pipeline ---------------- */
@@ -184,6 +160,7 @@ func (s *IntentService) ProcessIncomingIntent(
 		EncryptedPayload: event.EncryptedPayload,
 		PayloadHash:      event.PayloadHash,
 	}
+
 	// -------- STEP 0: Transport guards --------
 
 	log.Printf("ProcessIncomingIntent: Source=%s EnvelopeID=%s", in.Source, in.EnvelopeID)
@@ -214,12 +191,12 @@ func (s *IntentService) ProcessIncomingIntent(
 	}
 
 	// -------- STEP 5: Parse raw payload into domain model --------
-	decryptedPayload, err := vault.DecryptPayload(in.EncryptedPayload) // best effort, log + continue if fails
+	decryptedPayload, err := vault.DecryptPayload(in.EncryptedPayload)
 	if err != nil {
 		log.Printf("⚠️ Payload decryption failed for EnvelopeID=%s: %v", in.EnvelopeID, err)
 		return nil, &models.DLQEntry{ReasonCode: "PAYLOAD_DECRYPTION_FAILED"}, nil
 	}
-	//log.Println("Payload decrypted successfully", string(decryptedPayload))
+
 	var parsed models.ParsedIncomingIntent
 	if err := json.Unmarshal(decryptedPayload, &parsed); err != nil {
 		return nil, &models.DLQEntry{
@@ -268,45 +245,57 @@ func (s *IntentService) ProcessIncomingIntent(
 
 	// -------- STEP 8: TOKENIZATION --------
 
-	// accountTokenRef, err := s.tokenizer.TokenizeAccountNumber(
-	// 	canonicalInput.AccountNumber,
-	// )
-	// if err != nil {
-	// 	return nil, nil, err
-	// }
-	// -------- STEP 8: TOKENIZATION (PII ENCLAVE SERVICE) --------
 	tokenReq := enclaveTokenizeRequest{
 		TenantID: in.TenantID.String(),
 		TraceID:  in.TraceID.String(),
-		PII: struct {
-			AccountNumber string `json:"account_number"`
-			IFSC          string `json:"ifsc"`
-			VPA           string `json:"vpa"`
-			Name          string `json:"name"`
-			Phone         string `json:"phone"`
-			Email         string `json:"email"`
-		}{
-			AccountNumber: canonicalInput.AccountNumber,
-			IFSC:          canonicalInput.Beneficiary.Instrument.IFSC,
-			VPA:           canonicalInput.Beneficiary.Instrument.VPA,
-			Name:          canonicalInput.Beneficiary.Name,
-			Phone:         canonicalInput.Remitter.Phone,
-			Email:         canonicalInput.Remitter.Email,
-		},
 	}
-	//log.Println("Data sent for tokenization", tokenReq)
+
+	tokenReq.PII.AccountNumber = canonicalInput.AccountNumber
+	tokenReq.PII.IFSC = canonicalInput.Beneficiary.Instrument.IFSC
+	tokenReq.PII.VPA = canonicalInput.Beneficiary.Instrument.VPA
+	tokenReq.PII.Name = canonicalInput.Beneficiary.Name
+	tokenReq.PII.Phone = canonicalInput.Remitter.Phone
+	tokenReq.PII.Email = canonicalInput.Remitter.Email
+
 	tokenMap, err := callEnclaveTokenize(ctx, tokenReq)
+
 	if err != nil {
-		return nil, nil, err
+
+		log.Printf("Token enclave unavailable, publishing tokenize request to Kafka: %v", err)
+
+		// -------- KAFKA FALLBACK --------
+
+		if s.tokenizeQueue == nil {
+			return nil, nil, err
+		}
+
+		req := models.TokenizeRequestEvent{
+			EventType:      "PII_TOKENIZE_REQUEST",
+			TraceID:        in.TraceID.String(),
+			EnvelopeID:     in.EnvelopeID.String(),
+			TenantID:       in.TenantID.String(),
+			ObjectRef:      in.ObjectRef,
+			IdempotencyKey: in.IdempotencyKey,
+			Source:         in.Source,
+			ReceivedAt:     time.Now().UTC(),
+			Canonical:      canonicalInput,
+		}
+
+		err = s.tokenizeQueue.PublishTokenizeRequest(ctx, req)
+		if err != nil {
+			log.Printf("Kafka publish failed: %v", err)
+			return nil, nil, err
+		}
+
+		log.Printf("Tokenization request queued in Kafka for EnvelopeID=%s", in.EnvelopeID)
+
+		// Stop pipeline for now
+		return nil, nil, nil
 	}
 
 	// Persist full token map in pii_tokens JSONB
-	piiJSON, err := json.Marshal(tokenMap)
-	if err != nil {
-		return nil, nil, err
-	}
+	piiJSON, _ := json.Marshal(tokenMap)
 
-	// Replace raw beneficiary PII with token references before persist
 	beneficiaryTokenized := map[string]any{
 		"instrument": map[string]any{
 			"kind":       canonicalInput.Beneficiary.Instrument.Kind,
@@ -316,34 +305,11 @@ func (s *IntentService) ProcessIncomingIntent(
 		"name_token": tokenMap["name"],
 		"country":    canonicalInput.Beneficiary.Country,
 	}
-	beneficiaryJSON, err := json.Marshal(beneficiaryTokenized)
-	if err != nil {
-		return nil, nil, err
-	}
 
-	// -------- JSONB PREP --------
+	beneficiaryJSON, _ := json.Marshal(beneficiaryTokenized)
+	constraintsJSON, _ := json.Marshal(canonicalInput.Constraints)
 
-	// beneficiaryJSON, err := json.Marshal(canonicalInput.Beneficiary)
-	// if err != nil {
-	// 	return nil, nil, err
-	// }
-
-	// piiJSON, err := json.Marshal(map[string]string{
-	// 	"account_number": accountTokenRef,
-	// })
-	// if err != nil {
-	// 	return nil, nil, err
-	// }
-
-	constraintsJSON, err := json.Marshal(canonicalInput.Constraints)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	amount, err := parseAmount(canonicalInput.Amount.Value)
-	if err != nil {
-		return nil, nil, err
-	}
+	amount, _ := parseAmount(canonicalInput.Amount.Value)
 
 	// -------- STEP 9: BUILD CANONICAL INTENT --------
 
@@ -376,33 +342,20 @@ func (s *IntentService) ProcessIncomingIntent(
 
 	// -------- STEP 10: OUTBOX + PERSISTENCE (ATOMIC DB) --------
 
-	canonicalPayload, err := json.Marshal(canonical)
-	if err != nil {
-		return nil, nil, err
-	}
-	outbox, err := CanonicalIntentToOutboxEvent(canonical, canonicalPayload)
+	canonicalPayload, _ := json.Marshal(canonical)
 
-	if err != nil {
-		return nil, nil, err
-	}
+	outbox, _ := CanonicalIntentToOutboxEvent(canonical, canonicalPayload)
 
-	saved, err := s.repo.Save(ctx, canonical, outbox)
-	if err != nil {
-		return nil, nil, err
-	}
+	saved, _ := s.repo.Save(ctx, canonical, outbox)
 
 	// -------- STEP 11: WORM SNAPSHOT (S3) --------
 
-	// versioning: v1 for now
 	version := 1
-	prevHash := "" // later: fetch last hash if version > 1
+	prevHash := ""
 
-	canonicalBytes, err := json.Marshal(saved)
-	if err != nil {
-		return &saved, nil, err
-	}
+	canonicalBytes, _ := json.Marshal(saved)
 
-	objectRef, hash, err := s.s3.StoreCanonicalSnapshot(
+	objectRef, hash, _ := s.s3.StoreCanonicalSnapshot(
 		ctx,
 		saved.TenantID,
 		saved.IntentID,
@@ -410,63 +363,140 @@ func (s *IntentService) ProcessIncomingIntent(
 		canonicalBytes,
 		prevHash,
 	)
-	if err != nil {
-		// ⚠️ Do NOT rollback DB. Log + alert + retry mechanism later.
-		return &saved, nil, err
-	}
 
 	// -------- STEP 12: UPDATE DB WITH WORM METADATA --------
 
-	err = s.repo.UpdateCanonicalSnapshotMeta(
+	s.repo.UpdateCanonicalSnapshotMeta(
 		ctx,
 		saved.IntentID,
 		objectRef,
 		hash,
 		prevHash,
 	)
-	if err != nil {
-		return &saved, nil, err
-	}
 
 	saved.CanonicalRef = objectRef
 	saved.CanonicalHash = hash
 	saved.PrevHash = prevHash
 
 	return &saved, nil, nil
-
 }
+
+/* ---------------- ASYNC TOKENIZATION RESULT (KAFKA) ---------------- */
+
+// ProcessTokenizeResult resumes the pipeline when tokenization
+// result arrives asynchronously from Kafka (pii.tokenize.result)
+func (s *IntentService) ProcessTokenizeResult(
+	ctx context.Context,
+	event *models.TokenizeResultEvent,
+) (*models.CanonicalIntent, error) {
+
+	log.Printf("ProcessTokenizeResult: EnvelopeID=%s", event.EnvelopeID)
+
+	tokenMap := event.Tokens
+	canonicalInput := event.Canonical
+
+	// -------- JSON fields --------
+
+	piiJSON, err := json.Marshal(tokenMap)
+	if err != nil {
+		return nil, err
+	}
+
+	beneficiaryTokenized := map[string]any{
+		"instrument": map[string]any{
+			"kind":       canonicalInput.Beneficiary.Instrument.Kind,
+			"ifsc_token": tokenMap["ifsc"],
+			"vpa_token":  tokenMap["vpa"],
+		},
+		"name_token": tokenMap["name"],
+		"country":    canonicalInput.Beneficiary.Country,
+	}
+
+	beneficiaryJSON, err := json.Marshal(beneficiaryTokenized)
+	if err != nil {
+		return nil, err
+	}
+
+	constraintsJSON, err := json.Marshal(canonicalInput.Constraints)
+	if err != nil {
+		return nil, err
+	}
+
+	amount, err := parseAmount(canonicalInput.Amount.Value)
+	if err != nil {
+		return nil, err
+	}
+
+	// -------- Build CanonicalIntent --------
+
+	intent := models.CanonicalIntent{
+		TraceID:    event.TraceID,
+		IntentID:   uuid.NewString(),
+		EnvelopeID: event.EnvelopeID,
+		TenantID:   event.TenantID,
+
+		IntentType:       canonicalInput.IntentType,
+		CanonicalVersion: "v1",
+		SchemaVersion:    canonicalInput.SchemaVersion,
+
+		Amount:   amount,
+		Currency: canonicalInput.Amount.Currency,
+
+		Constraints: constraintsJSON,
+
+		BeneficiaryType: canonicalInput.Beneficiary.Instrument.Kind,
+		PIITokens:       piiJSON,
+		Beneficiary:     beneficiaryJSON,
+
+		Status:    "CREATED",
+		CreatedAt: time.Now().UTC(),
+	}
+
+	payload, err := json.Marshal(intent)
+	if err != nil {
+		return nil, err
+	}
+
+	outbox, err := CanonicalIntentToOutboxEvent(intent, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	saved, err := s.repo.Save(ctx, intent, outbox)
+	if err != nil {
+		return nil, err
+	}
+
+	return &saved, nil
+}
+
+/* ---------------- WEBHOOK ---------------- */
 
 func (s *IntentService) processWebhook(
 	ctx context.Context,
 	in *models.IncomingIntent,
 ) (*models.CanonicalIntent, *models.DLQEntry, error) {
 
-	// 1. Create Canonical Intent (Webhook)
 	canonical := models.CanonicalIntent{
 		TraceID:        in.TraceID.String(),
 		IntentID:       uuid.NewString(),
 		EnvelopeID:     in.EnvelopeID.String(),
 		TenantID:       in.TenantID.String(),
 		IdempotencyKey: in.IdempotencyKey,
-		SalientHash:    "NA", // Might be empty
+		SalientHash:    "NA",
 		IntentType:     "WEBHOOK",
 		SchemaVersion:  "v1",
 		Amount:         decimal.Zero,
 		Currency:       "XXX",
 		Status:         "CREATED",
 		CreatedAt:      time.Now().UTC(),
-		// Initialize JSONB fields to empty JSON object to avoid "invalid input syntax for type json"
+
 		Constraints: json.RawMessage("{}"),
 		PIITokens:   json.RawMessage("{}"),
 		Beneficiary: json.RawMessage("{}"),
 	}
 
-	// 2. Create Outbox Event
-	// We must use aggregate_type='intent' due to DB constraint
-	payload := in.Payload
-	if len(payload) == 0 {
-		payload = []byte("{}")
-	}
+	payload := []byte("{}")
 
 	outbox := models.OutboxEvent{
 		TraceID:       canonical.TraceID,
@@ -476,54 +506,14 @@ func (s *IntentService) processWebhook(
 		AggregateID:   uuid.MustParse(canonical.IntentID),
 		EventType:     "WEBHOOK_RECEIVED",
 		Payload:       payload,
-		PayloadHash:   canonical.PayloadHash,
 		Status:        "PENDING",
 		CreatedAt:     time.Now(),
 	}
 
-	// 3. Save to DB (Atomic)
 	saved, err := s.repo.Save(ctx, canonical, outbox)
 	if err != nil {
-		log.Printf("processWebhook: Save failed for EnvelopeID=%s: %v", canonical.EnvelopeID, err)
 		return nil, nil, err
 	}
-	log.Printf("processWebhook: Save success for EnvelopeID=%s, IntentID=%s", canonical.EnvelopeID, saved.IntentID)
-
-	// 4. Store Snapshot in S3
-	version := 1
-	prevHash := ""
-	canonicalBytes, err := json.Marshal(saved)
-	if err != nil {
-		return &saved, nil, err
-	}
-
-	objectRef, hash, err := s.s3.StoreCanonicalSnapshot(
-		ctx,
-		saved.TenantID,
-		saved.IntentID,
-		version,
-		canonicalBytes,
-		prevHash,
-	)
-	if err != nil {
-		return &saved, nil, err
-	}
-
-	// 5. Update DB with Snapshot Metadata
-	err = s.repo.UpdateCanonicalSnapshotMeta(
-		ctx,
-		saved.IntentID,
-		objectRef,
-		hash,
-		prevHash,
-	)
-	if err != nil {
-		return &saved, nil, err
-	}
-
-	saved.CanonicalRef = objectRef
-	saved.CanonicalHash = hash
-	saved.PrevHash = prevHash
 
 	return &saved, nil, nil
 }

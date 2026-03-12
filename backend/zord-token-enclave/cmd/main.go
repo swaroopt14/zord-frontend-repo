@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
@@ -13,8 +15,10 @@ import (
 	"zord-token-enclave/internal/crypto"
 	"zord-token-enclave/internal/db"
 	"zord-token-enclave/internal/handlers"
+	"zord-token-enclave/internal/models"
 	"zord-token-enclave/internal/repository"
 	"zord-token-enclave/internal/services"
+	"zord-token-enclave/kafka"
 	"zord-token-enclave/tracing"
 )
 
@@ -65,6 +69,104 @@ func main() {
 
 	// ✅ Domain service
 	tokenSvc := services.NewTokenService(cryptoSvc, tokenRepo)
+
+	// -------- KAFKA SETUP --------
+	ctx := context.Background()
+
+	brokers := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
+
+	producer, err := kafka.NewProducer(brokers)
+	if err != nil {
+		log.Fatalf("Failed to create Kafka producer: %v", err)
+	}
+
+	tokenizeLogic := func(ctx context.Context, event models.TokenizeRequestEvent) error {
+
+		canonical := event.Canonical
+
+		pii := map[string]string{}
+
+		// account number (root)
+		if v, ok := canonical["account_number"].(string); ok {
+			pii["account_number"] = v
+		}
+
+		// beneficiary fields
+		if beneficiary, ok := canonical["beneficiary"].(map[string]interface{}); ok {
+
+			if name, ok := beneficiary["name"].(string); ok {
+				pii["name"] = name
+			}
+
+			if instrument, ok := beneficiary["instrument"].(map[string]interface{}); ok {
+
+				if ifsc, ok := instrument["ifsc"].(string); ok {
+					pii["ifsc"] = ifsc
+				}
+
+				if vpa, ok := instrument["vpa"].(string); ok {
+					pii["vpa"] = vpa
+				}
+			}
+		}
+
+		// remitter fields
+		if remitter, ok := canonical["remitter"].(map[string]interface{}); ok {
+
+			if phone, ok := remitter["phone"].(string); ok {
+				pii["phone"] = phone
+			}
+
+			if email, ok := remitter["email"].(string); ok {
+				pii["email"] = email
+			}
+		}
+
+		tokens, err := tokenSvc.TokenizePII(
+			ctx,
+			event.TenantID,
+			event.TraceID,
+			pii,
+		)
+		if err != nil {
+			return err
+		}
+
+		result := models.TokenizeResultEvent{
+			EventType:  "PII_TOKENIZE_RESULT",
+			TraceID:    event.TraceID,
+			EnvelopeID: event.EnvelopeID,
+			TenantID:   event.TenantID,
+			ObjectRef:  event.ObjectRef,
+			Tokens:     tokens,
+			Canonical:  canonical,
+		}
+
+		return producer.Publish(
+			ctx,
+			"pii.tokenize.result",
+			event.EnvelopeID,
+			result,
+		)
+	}
+
+	handler := kafka.BuildTokenizeHandler(
+		ctx,
+		tokenizeLogic,
+	)
+
+	go func() {
+		err := kafka.StartConsumer(
+			ctx,
+			brokers,
+			"token-enclave-group",
+			"pii.tokenize.request",
+			handler,
+		)
+		if err != nil {
+			log.Fatalf("Tokenize consumer failed: %v", err)
+		}
+	}()
 
 	// ✅ HTTP handlers
 	tokenHandler := handlers.NewTokenHandler(tokenSvc)
