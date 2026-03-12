@@ -50,6 +50,8 @@ func main() {
 	topic := os.Getenv("KAFKA_TOPIC")
 	groupID := "intent-engine-group"
 
+	resultTopic := "pii.tokenize.result"
+
 	// -------- Repositories --------
 	dlqRepo := persistence.NewDLQRepo(db.DB)
 	intentRepo := persistence.NewPaymentIntentRepo(db.DB)
@@ -72,10 +74,17 @@ func main() {
 		log.Fatal(err)
 	}
 
+	producer, err := kafka.NewProducer(brokers)
+	if err != nil {
+		log.Fatalf("Failed to create Kafka producer: %v", err)
+	}
+
+	tokenizeQueue := services.NewKafkaTokenizeQueue(producer)
 	intentService := services.NewIntentService(
 		intentValidator,
 		intentRepo,
 		s3store,
+		tokenizeQueue,
 	)
 
 	// -------- DLQ HTTP (READ-ONLY) --------
@@ -167,6 +176,27 @@ func main() {
 
 		return nil
 	}
+
+	resultHandler := func(msg []byte) error {
+
+		var event models.TokenizeResultEvent
+
+		err := json.Unmarshal(msg, &event)
+		if err != nil {
+			log.Printf("Invalid tokenize result event: %v", err)
+			return err
+		}
+
+		log.Printf("Received tokenize result for envelope=%s", event.EnvelopeID)
+
+		_, err = intentService.ProcessTokenizeResult(ctx, &event)
+		if err != nil {
+			log.Printf("Failed to process tokenize result: %v", err)
+			return err
+		}
+
+		return nil
+	}
 	err = kafka.StartConsumer(
 		ctx,
 		brokers,
@@ -178,6 +208,22 @@ func main() {
 		log.Fatalf("Kafka consumer failed: %v", err)
 	}
 	log.Println("Kafka consumer started")
+
+	// -------- TOKENIZE RESULT CONSUMER --------
+
+	go func() {
+		err := kafka.StartConsumer(
+			ctx,
+			brokers,
+			"intent-engine-tokenize-result-group",
+			resultTopic,
+			resultHandler,
+		)
+		if err != nil {
+			log.Fatalf("Kafka tokenize result consumer failed: %v", err)
+		}
+		log.Println("Kafka tokenize result consumer started")
+	}()
 
 	// -------- HTTP SERVER --------
 	log.Println("Intent Engine (Service-2) running on :8083")
