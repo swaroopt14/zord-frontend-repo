@@ -14,7 +14,6 @@ import (
 	"zord-prompt-layer/client"
 	"zord-prompt-layer/config"
 	"zord-prompt-layer/handler"
-	"zord-prompt-layer/repositories"
 	"zord-prompt-layer/routes"
 	"zord-prompt-layer/services"
 	"zord-prompt-layer/tracing"
@@ -51,8 +50,8 @@ func main() {
 	intentDB := mustOpenReadOnlyDB("intent-engine", cfg.IntentReadDSN)
 	relayDB := mustOpenReadOnlyDB("relay", cfg.RelayReadDSN)
 
-	retriever := repositories.NewLiveSQLRetriever(edgeDB, intentDB, relayDB)
-	ragService := services.NewDefaultRAGService(cfg.GeminiModel, cfg.DefaultTopK, retriever, llmService)
+	textToSQL := services.NewTextToSQLService(geminiClient, edgeDB, intentDB, relayDB)
+	ragService := services.NewDefaultRAGService(cfg.GeminiModel, cfg.DefaultTopK, textToSQL, llmService)
 	queryHandler := handler.NewQueryHandler(ragService)
 
 	routes.Register(router, healthHandler, queryHandler)

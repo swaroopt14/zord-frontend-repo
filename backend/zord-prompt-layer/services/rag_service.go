@@ -1,11 +1,11 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"zord-prompt-layer/dto"
-	"zord-prompt-layer/model"
 	"zord-prompt-layer/utils"
 )
 
@@ -15,16 +15,16 @@ type RAGService interface {
 
 type DefaultRAGService struct {
 	model     string
-	retriever EvidenceRetriever
+	textToSQL *TextToSQLService
 	llm       *LLMService
 	defaultK  int
 }
 
-func NewDefaultRAGService(model string, defaultK int, retriever EvidenceRetriever, llm *LLMService) *DefaultRAGService {
+func NewDefaultRAGService(model string, defaultK int, textToSQL *TextToSQLService, llm *LLMService) *DefaultRAGService {
 	return &DefaultRAGService{
 		model:     model,
 		defaultK:  defaultK,
-		retriever: retriever,
+		textToSQL: textToSQL,
 		llm:       llm,
 	}
 }
@@ -44,77 +44,66 @@ func (s *DefaultRAGService) Query(req dto.QueryRequest) (dto.QueryResponse, erro
 		traceID = utils.ExtractTraceID(req.Query)
 	}
 
-	chunks, err := s.retriever.Retrieve(req, intentID, traceID, topK)
+	citations, err := s.textToSQL.GenerateAndExecuteSQL(req)
 	if err != nil {
-		return dto.QueryResponse{}, fmt.Errorf("retrieval failed: %w", err)
+		return dto.QueryResponse{}, fmt.Errorf("text-to-sql failed: %w", err)
 	}
 
 	entities := dto.EntitiesFound{IntentID: intentID, TraceID: traceID}
-	citations := toCitations(chunks)
-	conf := confidenceFromChunks(chunks)
 
-	if len(chunks) == 0 {
+	if len(citations) == 0 {
 		return dto.QueryResponse{
-			Answer:        "I could not find reliable evidence for this query in the current data window.",
-			Confidence:    "low",
+			Answer:        "I searched the database but found no records matching your request for this tenant.",
+			Confidence:    "high",
 			ModelUsed:     s.model,
 			EntitiesFound: entities,
 			Citations:     []dto.Citation{},
 			NextActions: []string{
-				"Try adding time/status context (for example: failed in last 24h)",
-				"Add tenant_id/intent_id/trace_id for precise drill-down",
-				"Verify upstream services are writing fresh records",
+				"Try rephrasing your search criteria",
+				"Ensure the data has been ingested for this tenant",
 			},
 		}, nil
 	}
 
-	context := buildContext(chunks)
-	answer, err := s.llm.GenerateFromContext(req.Query, context)
+	contextStr := buildContext(citations)
+	finalJSONAnswer, err := s.llm.GenerateFromContext(req.Query, contextStr)
 	if err != nil {
 		return dto.QueryResponse{}, fmt.Errorf("generation failed: %w", err)
 	}
 
+	// The LLM is requested to return `{ "answer": "...", "next_actions": [] }`
+	var parsed struct {
+		Answer      string   `json:"answer"`
+		NextActions []string `json:"next_actions"`
+	}
+
+	cleanJSON := strings.TrimSpace(finalJSONAnswer)
+	if strings.HasPrefix(cleanJSON, "```json") {
+		cleanJSON = strings.TrimPrefix(cleanJSON, "```json")
+		cleanJSON = strings.TrimSuffix(cleanJSON, "```")
+	} else if strings.HasPrefix(cleanJSON, "```") {
+		cleanJSON = strings.TrimPrefix(cleanJSON, "```")
+		cleanJSON = strings.TrimSuffix(cleanJSON, "```")
+	}
+
+	if err := json.Unmarshal([]byte(cleanJSON), &parsed); err != nil {
+		// Fallback if the LLM output was not strictly JSON
+		parsed.Answer = finalJSONAnswer
+		parsed.NextActions = []string{"Please check the input query for better results"}
+	}
+
 	return dto.QueryResponse{
-		Answer:        answer,
-		Confidence:    conf,
+		Answer:        parsed.Answer,
 		ModelUsed:     s.model,
 		EntitiesFound: entities,
-		Citations:     citations,
-		NextActions: []string{
-			"Open cited records for verification",
-			"Refine query with intent_id or trace_id for higher precision",
-		},
+		NextActions:   parsed.NextActions,
 	}, nil
 }
 
-func buildContext(chunks []model.RetrievedChunk) string {
+func buildContext(citations []dto.Citation) string {
 	var b strings.Builder
-	for i, c := range chunks {
-		b.WriteString(fmt.Sprintf("[%d] source=%s record=%s score=%.4f\n%s\n\n", i+1, c.SourceType, c.RecordID, c.Score, c.Text))
+	for i, c := range citations {
+		b.WriteString(fmt.Sprintf("[%d] database_row:\n%s\n\n", i+1, c.Snippet))
 	}
 	return b.String()
-}
-
-func confidenceFromChunks(chunks []model.RetrievedChunk) string {
-	if len(chunks) >= 3 {
-		return "high"
-	}
-	if len(chunks) >= 1 {
-		return "medium"
-	}
-	return "low"
-}
-
-func toCitations(chunks []model.RetrievedChunk) []dto.Citation {
-	out := make([]dto.Citation, 0, len(chunks))
-	for _, c := range chunks {
-		out = append(out, dto.Citation{
-			SourceType: c.SourceType,
-			RecordID:   c.RecordID,
-			ChunkID:    c.ChunkID,
-			Snippet:    c.Text,
-			Score:      c.Score,
-		})
-	}
-	return out
 }

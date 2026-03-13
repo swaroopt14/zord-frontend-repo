@@ -12,6 +12,8 @@ services:
       - ONNXRUNTIME_SHARED_LIBRARY_PATH=/opt/onnxruntime/lib/libonnxruntime.so
       - LD_LIBRARY_PATH=/opt/onnxruntime/lib
       - CHROMA_URL=http://chroma:8000
+    networks:
+      - zord-network
     depends_on:
       - chroma
     restart: unless-stopped
@@ -21,4 +23,11 @@ services:
     container_name: chromadb
     ports:
       - "8000:8000"
+    networks:
+      - zord-network
     restart: unless-stopped
+
+networks:
+  zord-network:
+    external: true
+    name: arealis-zord_zord-network

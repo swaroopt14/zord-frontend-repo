@@ -18,13 +18,16 @@ import (
 )
 
 // InitTracing initializes OpenTelemetry tracing + metrics.
+// If OTEL_EXPORTER_OTLP_ENDPOINT is not set, tracing is disabled (no-op) to
+// avoid connection-refused log spam when no collector is running.
 func InitTracing(serviceName string) func() {
-	ctx := context.Background()
-
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 	if endpoint == "" {
-		endpoint = "localhost:4317"
+		log.Printf("OTEL_EXPORTER_OTLP_ENDPOINT not set — OpenTelemetry disabled for %s", serviceName)
+		return func() {}
 	}
+
+	ctx := context.Background()
 
 	insecure := true
 	if v := os.Getenv("OTEL_EXPORTER_OTLP_INSECURE"); v != "" {

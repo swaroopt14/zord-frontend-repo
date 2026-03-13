@@ -122,7 +122,7 @@ func (r *LiveSQLRetriever) fetchFromEdge(tenantID, traceID string, topK int) ([]
 	args := []any{}
 	q := `
 		SELECT envelope_id::text, trace_id::text, source, source_system,
-		       idempotency_key, parse_status, amount_value::text, amount_currency, received_at::text
+		       idempotency_key, status, content_type, payload_size::text, received_at::text
 		FROM ingress_envelopes
 		WHERE 1=1
 	`
@@ -144,8 +144,8 @@ func (r *LiveSQLRetriever) fetchFromEdge(tenantID, traceID string, topK int) ([]
 
 	out := make([]model.RetrievedChunk, 0, topK)
 	for rows.Next() {
-		var envelopeID, tr, source, sourceSystem, idemKey, parseStatus, amountValue, amountCurrency, receivedAt string
-		if err := rows.Scan(&envelopeID, &tr, &source, &sourceSystem, &idemKey, &parseStatus, &amountValue, &amountCurrency, &receivedAt); err != nil {
+		var envelopeID, tr, source, sourceSystem, idemKey, status, contentType, payloadSize, receivedAt string
+		if err := rows.Scan(&envelopeID, &tr, &source, &sourceSystem, &idemKey, &status, &contentType, &payloadSize, &receivedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, model.RetrievedChunk{
@@ -155,8 +155,8 @@ func (r *LiveSQLRetriever) fetchFromEdge(tenantID, traceID string, topK int) ([]
 			TraceID:    tr,
 			TenantID:   tenantID,
 			Score:      0.99,
-			Text: fmt.Sprintf("Edge ingress envelope %s: source=%s source_system=%s parse_status=%s amount=%s %s idempotency_key=%s received_at=%s trace_id=%s",
-				envelopeID, source, sourceSystem, parseStatus, amountValue, amountCurrency, idemKey, receivedAt, tr),
+			Text: fmt.Sprintf("Edge ingress envelope %s: source=%s source_system=%s status=%s content_type=%s size=%s idempotency_key=%s received_at=%s trace_id=%s",
+				envelopeID, source, sourceSystem, status, contentType, payloadSize, idemKey, receivedAt, tr),
 		})
 	}
 	return out, rows.Err()
