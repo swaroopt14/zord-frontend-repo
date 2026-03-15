@@ -11,6 +11,7 @@ type CanonicalIntent struct {
 	IntentID   string `json:"intent_id"`
 	EnvelopeID string `json:"envelope_id"`
 	TenantID   string `json:"tenant_id"`
+	ContractID string `json:"contract_id,omitempty" db:"contract_id"`
 
 	// ✅ ADD THESE
 	TraceID        string `json:"trace_id" db:"trace_id"`

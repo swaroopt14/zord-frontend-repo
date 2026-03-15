@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS payment_intents (
     trace_id UUID NOT NULL,
     envelope_id UUID NOT NULL,
     tenant_id UUID NOT NULL,
+    contract_id UUID NOT NULL,
     idempotency_key TEXT,
     salient_hash TEXT NOT NULL,
 
@@ -54,6 +55,7 @@ CREATE TABLE IF NOT EXISTS outbox (
     event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     tenant_id UUID NOT NULL,
+    contract_id UUID NOT NULL,
 
     -- intent-specific outbox
     aggregate_type TEXT NOT NULL DEFAULT 'intent',
