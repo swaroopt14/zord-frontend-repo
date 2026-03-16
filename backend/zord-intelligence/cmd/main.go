@@ -1,30 +1,5 @@
 package main
 
-// What is this file?
-// The entry point of zord-intelligence.
-// Go starts here when you run: go run ./cmd/main.go
-//
-// THIS FILE:
-//   1. Loads config from .env
-//   2. Connects to PostgreSQL
-//   3. Creates all repos, services, handlers in the right order
-//   4. Starts HTTP server
-//   5. Starts background workers (outbox, sla)
-//   6. Starts Kafka consumers
-//   7. Waits for shutdown signal (Ctrl+C or SIGTERM from Kubernetes)
-//   8. Gracefully shuts everything down
-//
-// THE WIRING ORDER:
-//   config
-//     └── db pool
-//           └── repos (need the pool)
-//                 └── services (need the repos)
-//                       ├── handlers (need the repos + services)
-//                       │     └── router (needs the handlers)
-//                       │           └── HTTP server (needs the router)
-//                       ├── kafka consumer (needs the services)
-//                       └── workers (need repos + services + producer)
-
 import (
 	"context"
 	"fmt"
@@ -70,6 +45,7 @@ func main() {
 	policyRepo := persistence.NewPolicyRepo(pool)
 	actionRepo := persistence.NewActionContractRepo(pool)
 	outboxRepo := persistence.NewOutboxRepo(pool)
+	slaRepo := persistence.NewSLATimerRepo(pool)
 
 	// ── Step 5: Create services ────────────────────────────────────────────
 	// Services need repos. But there is a circular dependency:
@@ -86,7 +62,7 @@ func main() {
 
 	policyService := services.NewPolicyService(policyRepo, projRepo, actionService)
 
-	projectionService := services.NewProjectionService(projRepo, policyService)
+	projectionService := services.NewProjectionService(projRepo, policyService, slaRepo)
 
 	// ── Step 6: Create Kafka producer ──────────────────────────────────────
 	// Producer is used by the outbox worker to send actuation events.
@@ -99,7 +75,7 @@ func main() {
 
 	// ── Step 7: Create background workers ─────────────────────────────────
 	outboxWorker := worker.NewOutboxWorker(outboxRepo, producer, cfg)
-	slaWorker := worker.NewSLAWorker(pool, actionService)
+	slaWorker := worker.NewSLAWorker(slaRepo, actionService)
 
 	// ── Step 8: Create HTTP handlers ──────────────────────────────────────
 	// Handlers need repos (not services — handlers only read data).
