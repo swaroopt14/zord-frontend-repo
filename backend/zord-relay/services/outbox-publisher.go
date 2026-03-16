@@ -6,16 +6,19 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"os"
 	"strings"
 	"time"
 	"zord-relay/kafka"
+	"zord-relay/model"
 	"zord-relay/utils"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
 type Publisher struct {
-	intentClient *IntentClient
+	outboxRepo   *OutboxRepo
 	producer     *kafka.Producer
 	cfg          *Config
 }
@@ -51,8 +54,8 @@ type dlqEnvelope struct {
 	AttemptsCount int        `json:"attempts_count"`
 }
 
-func NewPublisher(intentClient *IntentClient, producer *kafka.Producer, cfg *Config) *Publisher {
-	return &Publisher{intentClient: intentClient, producer: producer, cfg: cfg}
+func NewPublisher(outboxRepo *OutboxRepo, producer *kafka.Producer, cfg *Config) *Publisher {
+	return &Publisher{outboxRepo: outboxRepo, producer: producer, cfg: cfg}
 }
 
 func (p *Publisher) Start(ctx context.Context) {
@@ -69,139 +72,90 @@ func (p *Publisher) worker(ctx context.Context, id int) {
 		default:
 		}
 
-		lease, err := p.intentClient.Lease(ctx, p.cfg.BatchSize)
+		events, err := p.outboxRepo.ListPending(ctx, p.cfg.BatchSize)
 		if err != nil {
 			utils.Logger.Error("lease failed", zap.Int("worker_id", id), zap.Error(err))
 			time.Sleep(p.cfg.PollInterval)
 			continue
 		}
 
-		if lease == nil || len(lease.Events) == 0 {
+		if len(events) == 0 {
 			time.Sleep(p.cfg.PollInterval)
 			continue
 		}
 
-		var ackIDs []string
-		var nackIDs []string
+		var publishedIDs []string
 
-		for _, e := range lease.Events {
-			key := e.ID
-			if key == "" {
-				key = e.AggregateID
-			}
+		for _, e := range events {
+			key := e.EventID
 
 			hash := sha256.Sum256(e.Payload)
-			msg := relayEvent{
-				EventID:       e.ID,
-				EventType:     e.EventType,
-				TenantID:      e.TenantID,
-				IntentID:      e.AggregateID,
-				EnvelopeID:    e.EnvelopeID,
-				TraceID:       e.TraceID,
-				SchemaVersion: e.SchemaVersion,
-				PayloadInline: e.Payload,
-				PayloadHash:   "sha256:" + hex.EncodeToString(hash[:]),
+			_ = hex.EncodeToString(hash[:])
+
+			// No age gating or DLQ for simplified outbox
+
+			headers := map[string]string{
+				"trace_id":   e.TraceID,
+				"tenant_id":  e.TenantID,
+				"intent_id":  e.IntentID,
+				"event_id":   e.EventID,
+				"event_type": e.EventType,
 			}
 
-			if p.cfg.MaxAge > 0 && time.Since(e.CreatedAt) >= p.cfg.MaxAge {
+			err := p.producer.Publish("dispatch.events.v1", key, e.Payload, headers)
+			if err != nil {
+				reasonCode := classifyPublishError(err)
+				poison := isPoisonPublishError(err)
+
 				dlqMsg := dlqEnvelope{
-					Event:         msg,
-					Error:         "retry window exceeded",
-					ReasonCode:    "RETRY_WINDOW_EXCEEDED",
+					Event:         relayEvent{EventID: e.EventID, EventType: e.EventType, TenantID: e.TenantID, IntentID: e.IntentID, TraceID: e.TraceID, PayloadInline: e.Payload},
+					Error:         err.Error(),
+					ReasonCode:    reasonCode,
 					LastAttemptAt: time.Now().UTC(),
-					AttemptsCount: e.RetryCount,
+					AttemptsCount: 0,
+				}
+				if poison && isMessageTooLargeError(err) {
+					dlqMsg.Event.PayloadInline = nil
 				}
 				dlqHeaders := map[string]string{
 					"trace_id":     e.TraceID,
 					"tenant_id":    e.TenantID,
-					"event_id":     e.ID,
+					"event_id":     e.EventID,
 					"reason_code":  dlqMsg.ReasonCode,
-					"dlq_category": "publish_failure",
+					"dlq_category": func() string { if poison { return "poison_event" } ; return "publish_failure" }(),
 				}
-				if dlqErr := p.producer.Publish(p.cfg.PublishFailureDLQTopic, key, dlqMsg, dlqHeaders); dlqErr != nil {
-					utils.Logger.Error("publish failure dlq publish failed", zap.Int("worker_id", id), zap.String("event_id", e.ID), zap.Error(dlqErr))
+				topic := p.cfg.PublishFailureDLQTopic
+				if poison {
+					topic = p.cfg.PoisonEventDLQTopic
 				}
-				nackIDs = append(nackIDs, e.ID)
-				continue
-			}
-
-			headers := map[string]string{
-				"trace_id":  e.TraceID,
-				"tenant_id": e.TenantID,
-				"event_id":  e.ID,
-			}
-
-			err := p.producer.Publish(p.cfg.ReadyTopic, key, msg, headers)
-			if err != nil {
-				reasonCode := classifyPublishError(err)
-				shouldDLQ := isPoisonPublishError(err)
-
-				if shouldDLQ {
-					dlqTopic := p.cfg.PoisonEventDLQTopic
-					dlqMsg := dlqEnvelope{
-						Event:         msg,
-						Error:         err.Error(),
-						ReasonCode:    reasonCode,
-						LastAttemptAt: time.Now().UTC(),
-						AttemptsCount: e.RetryCount,
-					}
-
-					if isMessageTooLargeError(err) {
-						dlqMsg.Event.PayloadInline = nil
-					}
-
-					dlqHeaders := map[string]string{
-						"trace_id":     e.TraceID,
-						"tenant_id":    e.TenantID,
-						"event_id":     e.ID,
-						"reason_code":  dlqMsg.ReasonCode,
-						"dlq_category": "poison_event",
-					}
-
-					if dlqErr := p.producer.Publish(dlqTopic, key, dlqMsg, dlqHeaders); dlqErr != nil {
-						utils.Logger.Error("poison dlq publish failed", zap.Int("worker_id", id), zap.String("event_id", e.ID), zap.Error(dlqErr))
-						nackIDs = append(nackIDs, e.ID)
-					} else {
-						ackIDs = append(ackIDs, e.ID)
-					}
-				} else {
-					if p.cfg.MaxAttempts > 0 && e.RetryCount >= p.cfg.MaxAttempts {
-						dlqMsg := dlqEnvelope{
-							Event:         msg,
-							Error:         err.Error(),
-							ReasonCode:    "PUBLISH_FAILED_MAX_ATTEMPTS",
-							LastAttemptAt: time.Now().UTC(),
-							AttemptsCount: e.RetryCount,
-						}
-						dlqHeaders := map[string]string{
-							"trace_id":     e.TraceID,
-							"tenant_id":    e.TenantID,
-							"event_id":     e.ID,
-							"reason_code":  dlqMsg.ReasonCode,
-							"dlq_category": "publish_failure",
-						}
-						if dlqErr := p.producer.Publish(p.cfg.PublishFailureDLQTopic, key, dlqMsg, dlqHeaders); dlqErr != nil {
-							utils.Logger.Error("publish failure dlq publish failed", zap.Int("worker_id", id), zap.String("event_id", e.ID), zap.Error(dlqErr))
-						}
-					}
-					utils.Logger.Error("publish failed", zap.Int("worker_id", id), zap.String("event_id", e.ID), zap.String("reason_code", reasonCode), zap.Error(err))
-					nackIDs = append(nackIDs, e.ID)
+				dlqErr := p.producer.Publish(topic, key, dlqMsg, dlqHeaders)
+				if dlqErr != nil {
+					utils.Logger.Error("dlq publish failed", zap.Int("worker_id", id), zap.String("event_id", e.EventID), zap.Error(dlqErr))
+				} else if poison {
+					publishedIDs = append(publishedIDs, e.EventID)
 				}
+				utils.Logger.Error("publish failed", zap.Int("worker_id", id), zap.String("event_id", e.EventID), zap.String("reason_code", reasonCode), zap.Error(err))
 			} else {
-				ackIDs = append(ackIDs, e.ID)
-				utils.Logger.Info("published event", zap.Int("worker_id", id), zap.String("event_id", e.ID), zap.String("topic", p.cfg.ReadyTopic))
+				publishedIDs = append(publishedIDs, e.EventID)
+				utils.Logger.Info("published event", zap.Int("worker_id", id), zap.String("event_id", e.EventID), zap.String("topic", "dispatch.events.v1"))
+
+				// Optional: Emit provider-related events locally (disabled by default).
+				// Enable by setting RELAY_EMIT_PROVIDER_EVENTS=true
+				if os.Getenv("RELAY_EMIT_PROVIDER_EVENTS") == "true" {
+					env := relayEvent{EventID: e.EventID, EventType: e.EventType, TenantID: e.TenantID, IntentID: e.IntentID, TraceID: e.TraceID, PayloadInline: e.Payload}
+					if err := p.publishAttemptSentEvent(env); err != nil {
+						utils.Logger.Error("failed to publish AttemptSent event", zap.Error(err))
+					}
+					if err := p.publishProviderAckedEvent(env); err != nil {
+						utils.Logger.Error("failed to publish ProviderAcked event", zap.Error(err))
+					}
+				}
 			}
 		}
 
-		if len(ackIDs) > 0 {
-			if err := p.intentClient.Ack(ctx, lease.LeaseID, ackIDs); err != nil {
-				utils.Logger.Error("ack failed", zap.Int("worker_id", id), zap.String("lease_id", lease.LeaseID), zap.Error(err))
-			}
-		}
-
-		if len(nackIDs) > 0 {
-			if err := p.intentClient.Nack(ctx, lease.LeaseID, nackIDs); err != nil {
-				utils.Logger.Error("nack failed", zap.Int("worker_id", id), zap.String("lease_id", lease.LeaseID), zap.Error(err))
+		if len(publishedIDs) > 0 {
+			if err := p.outboxRepo.MarkPublished(ctx, publishedIDs); err != nil {
+				utils.Logger.Error("mark published failed", zap.Int("worker_id", id), zap.Error(err))
 			}
 		}
 	}
@@ -241,4 +195,57 @@ func isMessageTooLargeError(err error) bool {
 		strings.Contains(msg, "too large") ||
 		strings.Contains(msg, "record is too large") ||
 		strings.Contains(msg, "packet encoding")
+}
+
+func (p *Publisher) publishAttemptSentEvent(event relayEvent) error {
+	attemptSentEvent := model.AttemptSent{
+		EventID:    uuid.New().String(),
+		EventType:  "AttemptSent",
+		TenantID:   event.TenantID,
+		IntentID:   event.IntentID,
+		ContractID: event.IntentID,
+		TraceID:    event.TraceID,
+		CreatedAt:  time.Now(),
+	}
+	attemptSentEvent.Payload.DispatchID = uuid.New().String()
+	attemptSentEvent.Payload.ConnectorID = "razorpayx"
+	attemptSentEvent.Payload.CorridorID = "IMPS"
+	attemptSentEvent.Payload.AttemptCount = 1
+	attemptSentEvent.Payload.CorrelationCarriers = map[string]interface{}{
+		"reference_id": uuid.New().String(),
+		"narration":    "ZRD:" + event.IntentID,
+	}
+
+	headers := map[string]string{
+		"trace_id":   attemptSentEvent.TraceID,
+		"tenant_id":  attemptSentEvent.TenantID,
+		"intent_id":  attemptSentEvent.IntentID,
+		"event_id":   attemptSentEvent.EventID,
+		"event_type": attemptSentEvent.EventType,
+	}
+	return p.producer.Publish("dispatch.events.v1", attemptSentEvent.EventID, attemptSentEvent, headers)
+}
+
+func (p *Publisher) publishProviderAckedEvent(event relayEvent) error {
+	providerAckedEvent := model.ProviderAcked{
+		EventID:    uuid.New().String(),
+		EventType:  "ProviderAcked",
+		TenantID:   event.TenantID,
+		IntentID:   event.IntentID,
+		ContractID: event.IntentID,
+		TraceID:    event.TraceID,
+		CreatedAt:  time.Now(),
+	}
+	providerAckedEvent.Payload.DispatchID = uuid.New().String()
+	providerAckedEvent.Payload.ProviderAttemptID = "rp_" + uuid.New().String()
+	providerAckedEvent.Payload.Status = "pending"
+
+	headers := map[string]string{
+		"trace_id":   providerAckedEvent.TraceID,
+		"tenant_id":  providerAckedEvent.TenantID,
+		"intent_id":  providerAckedEvent.IntentID,
+		"event_id":   providerAckedEvent.EventID,
+		"event_type": providerAckedEvent.EventType,
+	}
+	return p.producer.Publish("dispatch.events.v1", providerAckedEvent.EventID, providerAckedEvent, headers)
 }

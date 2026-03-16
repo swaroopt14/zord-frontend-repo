@@ -12,7 +12,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"zord-relay/config"
 	"zord-relay/db"
-	"zord-relay/handler"
+	// "zord-relay/handler"
 	"zord-relay/kafka"
 	"zord-relay/services"
 	"zord-relay/tracing"
@@ -40,12 +40,12 @@ func main() {
 	defer dbConn.Close()
 
 	// Repositories
-	payoutContractsRepo := services.NewPayoutContractsRepo(dbConn)
+	dispatchRepo := services.NewDispatchRepo(dbConn)
+	outboxRepo := services.NewOutboxRepo(dbConn)
 
 	// HTTP Server
 	router := gin.Default()
-	contractsHandler := handler.NewContractsHandler(payoutContractsRepo)
-	router.GET("/contracts", contractsHandler.ListContracts)
+	// deprecated contracts endpoint disabled
 
 	server := &http.Server{
 		Addr:    WebPort,
@@ -92,17 +92,14 @@ func main() {
 	}()
 
 	// Kafka Consumer for intents
-	intentConsumer := kafka.NewConsumer(cfg.KafkaBrokers, "zord-relay-payout-contracts-consumer")
-	intentHandler := services.NewIntentHandler(payoutContractsRepo)
-	intentConsumer.Consume(context.Background(), []string{"z.intent.ready.v1"}, intentHandler)
-	defer intentConsumer.Close()
-
-	// Intent Engine API Client
-	intentClient := services.NewIntentClient(cfg.IntentEngineBaseURL)
-
 	// Kafka Producer
 	producer := kafka.NewProducer(cfg.KafkaBrokers)
 	defer producer.Close()
+
+	intentConsumer := kafka.NewConsumer(cfg.KafkaBrokers, "zord-relay-dispatch-consumer")
+	intentHandler := services.NewIntentHandler(dispatchRepo, outboxRepo)
+	intentConsumer.Consume(context.Background(), []string{cfg.ReadyTopic}, intentHandler)
+	defer intentConsumer.Close()
 
 	// Publisher Service (Relay logic)
 	pubCfg := &services.Config{
@@ -116,12 +113,17 @@ func main() {
 		MaxAge:                 cfg.MaxAge,
 	}
 
-	publisher := services.NewPublisher(intentClient, producer, pubCfg)
+	publisher := services.NewPublisher(outboxRepo, producer, pubCfg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	publisher.Start(ctx)
+
+	// Dispatch Loop: process leased events from Service 2 outbox
+	intentClient := services.NewIntentClient(cfg.IntentEngineBaseURL)
+	dispatchLoop := services.NewDispatchLoop(dbConn, intentClient, outboxRepo, dispatchRepo, cfg.PSPURL)
+	dispatchLoop.Start(ctx, cfg.BatchSize)
 
 	// Graceful shutdown
 	stop := make(chan os.Signal, 1)
