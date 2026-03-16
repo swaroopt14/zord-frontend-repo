@@ -9,12 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"zord-intent-engine/internal/models"
 	"zord-intent-engine/internal/services"
 	"zord-intent-engine/internal/validator"
 	"zord-intent-engine/internal/vault"
 	"zord-intent-engine/kafka"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"zord-intent-engine/config"
 	"zord-intent-engine/db"
@@ -153,6 +154,11 @@ func main() {
 					job.EnvelopeID,
 					dlq.ReasonCode,
 				)
+				// Persist DLQ entry
+				_, err := dlqRepo.Save(ctx, *dlq)
+				if err != nil {
+					log.Printf("Worker %d: Failed to save DLQ entry: %v", id, err)
+				}
 				continue
 			}
 

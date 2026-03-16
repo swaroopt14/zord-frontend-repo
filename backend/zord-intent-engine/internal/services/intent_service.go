@@ -19,6 +19,7 @@ import (
 	"zord-intent-engine/internal/models"
 
 	//"zord-intent-engine/internal/pii"
+	"zord-intent-engine/internal/guards"
 	"zord-intent-engine/internal/validator"
 	"zord-intent-engine/internal/vault"
 	"zord-intent-engine/storage"
@@ -242,6 +243,12 @@ func (s *IntentService) ProcessIncomingIntent(
 	// -------- STEP 7: CANONICALIZATION --------
 
 	canonicalInput := canonicalizer.CanonicalizeIntent(*intent)
+
+	// -------- STEP 7.5: PRE-GUARDS --------
+
+	if dlq := guards.RunPreGuards(in, canonicalInput); dlq != nil {
+		return nil, dlq, nil
+	}
 
 	// -------- STEP 8: TOKENIZATION --------
 
