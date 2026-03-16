@@ -17,6 +17,7 @@ type Config struct {
 	PoisonEventDLQTopic    string
 	PayoutTopic            string
 	IntentEngineBaseURL    string
+	PSPURL                 string
 	SinkDBURL              string
 	WorkerCount            int
 	BatchSize              int
@@ -78,6 +79,7 @@ func Load() *Config {
 		PoisonEventDLQTopic:    getEnv("KAFKA_POISON_EVENT_DLQ_TOPIC", dlqTopic),
 		PayoutTopic:            getEnv("KAFKA_PAYOUT_TOPIC", "payout_contract.v1"),
 		IntentEngineBaseURL:    getEnv("INTENT_ENGINE_BASE_URL", "http://zord-intent-engine:8083"),
+		PSPURL:                 getEnv("PSP_URL", "http://localhost:8099"),
 		SinkDBURL:              getEnv("SINK_DATABASE_URL", ""),
 		WorkerCount:            workerCount,
 		BatchSize:              batchSize,

@@ -2,23 +2,21 @@ package services
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 	"time"
-
 	"zord-relay/model"
-
 	"github.com/google/uuid"
 )
 
 // IntentHandler handles messages from the intent.ready.v1 topic
 
 type IntentHandler struct {
-	repo *PayoutContractsRepo
+	dispatches *DispatchRepo
+	outbox     *OutboxRepo
 }
 
 type readyTopicEvent struct {
@@ -45,8 +43,8 @@ type payoutContractV1 struct {
 }
 
 // NewIntentHandler creates a new IntentHandler
-func NewIntentHandler(repo *PayoutContractsRepo) *IntentHandler {
-	return &IntentHandler{repo: repo}
+func NewIntentHandler(dispatches *DispatchRepo, outbox *OutboxRepo) *IntentHandler {
+	return &IntentHandler{dispatches: dispatches, outbox: outbox}
 }
 
 // HandleMessage processes the intent message and generates a payout contract
@@ -59,79 +57,67 @@ func (h *IntentHandler) HandleMessage(ctx context.Context, topic string, key str
 		return err
 	}
 
-	payoutContract, err := h.generatePayoutContract(evt, key, headers)
+	dispatchID := "disp_" + uuid.New().String()
+	connectorID := "razorpayx"
+	corridorID := "IMPS"
+	contractID, err := h.computeContractID(evt)
 	if err != nil {
-		log.Printf("Error generating payout contract: %v", err)
 		return err
 	}
 
-	// Save the payout contract to the database
-	err = h.repo.Save(ctx, payoutContract)
-	if err != nil {
-		log.Printf("Error saving payout contract: %v", err)
+	d := &model.Dispatch{
+		DispatchID:   dispatchID,
+		ContractID:   contractID,
+		IntentID:     strings.TrimSpace(firstNonEmpty(evt.IntentID, key)),
+		TenantID:     strings.TrimSpace(firstNonEmpty(evt.TenantID, headers["tenant_id"])),
+		TraceID:      strings.TrimSpace(firstNonEmpty(evt.TraceID, headers["trace_id"])),
+		ConnectorID:  connectorID,
+		CorridorID:   corridorID,
+		AttemptCount: 1,
+		Status:       "PENDING",
+		CreatedAt:    time.Now(),
+	}
+	if err := h.dispatches.Create(ctx, d); err != nil {
 		return err
 	}
 
-	log.Printf("Successfully processed and saved payout contract for intent %s", payoutContract.IntentID)
+	evtMsg := model.DispatchCreated{
+		EventID:    uuid.New().String(),
+		EventType:  "DispatchCreated",
+		TenantID:   d.TenantID,
+		IntentID:   d.IntentID,
+		ContractID: d.ContractID,
+		TraceID:    d.TraceID,
+		CreatedAt:  time.Now(),
+	}
+	evtMsg.Payload.DispatchID = d.DispatchID
+	evtMsg.Payload.ConnectorID = d.ConnectorID
+	evtMsg.Payload.CorridorID = d.CorridorID
+	evtMsg.Payload.AttemptCount = d.AttemptCount
+
+	payloadBytes, _ := json.Marshal(evtMsg)
+	eventID := "evt_" + uuid.New().String()
+	if err := h.outbox.Enqueue(ctx, eventID, "DispatchCreated", d.DispatchID, d.ContractID, d.IntentID, d.TenantID, d.TraceID, payloadBytes); err != nil {
+		return err
+	}
+
+	log.Printf("Dispatch initialized and enqueued for intent %s", d.IntentID)
 	return nil
 }
 
+func (h *IntentHandler) computeContractID(evt readyTopicEvent) (string, error) {
+	eventID := strings.TrimSpace(evt.EventID)
+	intentID := strings.TrimSpace(evt.IntentID)
+	if eventID == "" || intentID == "" {
+		return "", fmt.Errorf("missing ids")
+	}
+	sum := sha1.Sum([]byte("payout_contract.v1|" + eventID + "|" + intentID))
+	u := uuid.NewSHA1(uuid.NameSpaceOID, sum[:]).String()
+	return u, nil
+}
+
 func (h *IntentHandler) generatePayoutContract(evt readyTopicEvent, fallbackKey string, headers map[string]string) (*model.PayoutContract, error) {
-	eventID := strings.TrimSpace(firstNonEmpty(evt.EventID, fallbackKey))
-	intentID := strings.TrimSpace(firstNonEmpty(evt.IntentID, fallbackKey))
-	tenantID := strings.TrimSpace(firstNonEmpty(evt.TenantID, headers["tenant_id"]))
-	envelopeID := strings.TrimSpace(firstNonEmpty(evt.EnvelopeID))
-
-	if _, err := uuid.Parse(eventID); err != nil {
-		return nil, fmt.Errorf("invalid event_id: %w", err)
-	}
-	if _, err := uuid.Parse(intentID); err != nil {
-		return nil, fmt.Errorf("invalid intent_id: %w", err)
-	}
-	if _, err := uuid.Parse(tenantID); err != nil {
-		return nil, fmt.Errorf("invalid tenant_id: %w", err)
-	}
-	if _, err := uuid.Parse(envelopeID); err != nil {
-		return nil, fmt.Errorf("invalid envelope_id: %w", err)
-	}
-
-	contractID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("payout_contract.v1|"+eventID+"|"+intentID)).String()
-
-	payload := payoutContractV1{
-		Schema:      "payout_contract.v1",
-		ContractID:  contractID,
-		EventID:     eventID,
-		IntentID:    intentID,
-		TenantID:    tenantID,
-		EnvelopeID:  envelopeID,
-		PayloadHash: evt.PayloadHash,
-		Payload:     evt.PayloadInline,
-	}
-
-	payloadBytes, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	hash := sha256.Sum256(payloadBytes)
-	contractHash := hex.EncodeToString(hash[:])
-
-	var tracePtr *string
-	traceID := strings.TrimSpace(firstNonEmpty(evt.TraceID, headers["trace_id"]))
-	if traceID != "" {
-		tracePtr = &traceID
-	}
-
-	return &model.PayoutContract{
-		ContractID:      contractID,
-		TenantID:        tenantID,
-		IntentID:        intentID,
-		EnvelopeID:      envelopeID,
-		ContractPayload: payloadBytes,
-		ContractHash:    contractHash,
-		Status:          "ISSUED",
-		TraceID:         tracePtr,
-	}, nil
+	return nil, fmt.Errorf("deprecated")
 }
 
 func firstNonEmpty(vals ...string) string {
