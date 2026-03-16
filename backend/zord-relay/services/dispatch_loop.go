@@ -48,10 +48,7 @@ func (l *DispatchLoop) Start(ctx context.Context, batch int) {
 				tenantID := e.TenantID
 				intentID := e.AggregateID
 				traceID := e.TraceID
-				contractID := getStringField(e.Payload, "contract_id", "")
-				if contractID == "" {
-					contractID = "ctr_demo_hardcoded"
-				}
+				contractID := e.ContractID
 
 				// STEP 1: DispatchCreated in single transaction
 				tx, err := l.db.BeginTx(ctx, nil)

@@ -12,6 +12,7 @@ type OutboxEvent struct {
 	TenantID      string          `json:"tenant_id"`
 	AggregateType string          `json:"aggregate_type,omitempty"`
 	AggregateID   string          `json:"aggregate_id"`
+	ContractID    string          `json:"contract_id,omitempty"`
 	EventType     string          `json:"event_type"`
 	SchemaVersion string          `json:"schema_version,omitempty"`
 	Amount        json.RawMessage `json:"amount,omitempty"`
