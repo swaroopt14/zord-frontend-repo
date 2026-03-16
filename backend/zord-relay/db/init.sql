@@ -1,4 +1,3 @@
-DROP TABLE IF EXISTS payout_contracts CASCADE;
 
 CREATE TABLE IF NOT EXISTS dispatches (
   dispatch_id          TEXT PRIMARY KEY,
