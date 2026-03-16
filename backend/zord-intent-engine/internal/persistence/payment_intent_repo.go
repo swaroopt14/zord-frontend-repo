@@ -6,6 +6,8 @@ import (
 	"log"
 
 	"zord-intent-engine/internal/models"
+
+	"github.com/google/uuid"
 )
 
 type PaymentIntentRepo struct {
@@ -22,6 +24,9 @@ func (r *PaymentIntentRepo) Save(
 ) (models.CanonicalIntent, error) {
 
 	// intent.IntentID = uuid.NewString()
+	if intent.ContractID == "" {
+		intent.ContractID = uuid.NewString()
+	}
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -36,7 +41,7 @@ func (r *PaymentIntentRepo) Save(
 
 	query := `
 	INSERT INTO payment_intents (
-    intent_id, envelope_id, tenant_id,
+    intent_id, envelope_id, tenant_id, contract_id,
     trace_id, idempotency_key, salient_hash,payload_hash,
     intent_type, canonical_version, schema_version,
     amount, currency, deadline_at,
@@ -46,14 +51,14 @@ func (r *PaymentIntentRepo) Save(
     created_at
 )
 VALUES (
-    $1,$2,$3,
-    $4,$5,$6,$7,
-    $8,$9,$10,
-    $11,$12,$13,
-    $14,$15,$16,$17,
-    $18,$19,
-    $20,$21,$22,
-    $23
+    $1,$2,$3,$4,
+    $5,$6,$7,$8,
+    $9,$10,$11,
+    $12,$13,$14,
+    $15,$16,$17,$18,
+    $19,$20,
+    $21,$22,$23,
+    $24
 )`
 
 	_, err = tx.ExecContext(
@@ -62,33 +67,34 @@ VALUES (
 		intent.IntentID,   // $1
 		intent.EnvelopeID, // $2
 		intent.TenantID,   // $3
+		intent.ContractID, // $4
 
-		intent.TraceID,        // $4  ✅ new
-		intent.IdempotencyKey, // $5  ✅ new
-		intent.SalientHash,    // $6  ✅ new
-		intent.PayloadHash,
+		intent.TraceID,        // $5
+		intent.IdempotencyKey, // $6
+		intent.SalientHash,    // $7
+		intent.PayloadHash,    // $8
 
-		intent.IntentType,       // $7
-		intent.CanonicalVersion, // $8
-		intent.SchemaVersion,    // $9
+		intent.IntentType,       // $9
+		intent.CanonicalVersion, // $10
+		intent.SchemaVersion,    // $11
 
-		intent.Amount,     // $10
-		intent.Currency,   // $11
-		intent.DeadlineAt, // $12
+		intent.Amount,     // $12
+		intent.Currency,   // $13
+		intent.DeadlineAt, // $14
 
-		intent.Constraints,     // $13
-		intent.BeneficiaryType, // $14
-		intent.PIITokens,       // $15
-		intent.Beneficiary,     // $16
+		intent.Constraints,     // $15
+		intent.BeneficiaryType, // $16
+		intent.PIITokens,       // $17
+		intent.Beneficiary,     // $18
 
-		intent.Status,          // $17
-		intent.ConfidenceScore, // $18
+		intent.Status,          // $19
+		intent.ConfidenceScore, // $20
 
-		intent.CanonicalRef,  // $19
-		intent.CanonicalHash, // $20
-		intent.PrevHash,      // $21
+		intent.CanonicalRef,  // $21
+		intent.CanonicalHash, // $22
+		intent.PrevHash,      // $23
 
-		intent.CreatedAt, // $22
+		intent.CreatedAt, // $24
 	)
 
 	if err != nil {
@@ -101,6 +107,7 @@ INSERT INTO outbox (
     trace_id,
     envelope_id,
     tenant_id,
+    contract_id,
     aggregate_type,
     aggregate_id,
     event_type,
@@ -114,8 +121,10 @@ INSERT INTO outbox (
     next_attempt_at,
     created_at
 ) VALUES (
-    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15
+    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16
 )`
+
+	outbox.ContractID = intent.ContractID
 
 	_, err = tx.ExecContext(
 		ctx,
@@ -123,6 +132,7 @@ INSERT INTO outbox (
 		outbox.TraceID,
 		outbox.EnvelopeID,
 		outbox.TenantID,
+		outbox.ContractID,
 		outbox.AggregateType,
 		outbox.AggregateID,
 		outbox.EventType,
@@ -160,6 +170,7 @@ func (r *PaymentIntentRepo) FindByEnvelope(
 		intent_id,
 		envelope_id,
 		tenant_id,
+		contract_id,
 		intent_type,
 		canonical_version,
 		schema_version,
@@ -190,6 +201,7 @@ func (r *PaymentIntentRepo) FindByEnvelope(
 		&intent.IntentID,
 		&intent.EnvelopeID,
 		&intent.TenantID,
+		&intent.ContractID,
 		&intent.IntentType,
 		&intent.CanonicalVersion,
 		&intent.SchemaVersion,

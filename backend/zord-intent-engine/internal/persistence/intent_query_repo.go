@@ -86,7 +86,7 @@ func (r *IntentQueryRepo) ListIntents(
 
 	dataQuery := fmt.Sprintf(`
 	SELECT 
-		intent_id, envelope_id, tenant_id,
+		intent_id, envelope_id, tenant_id, contract_id,
 		intent_type, canonical_version, 
 		COALESCE(schema_version, '') as schema_version,
 		amount, currency, deadline_at,
@@ -118,6 +118,7 @@ func (r *IntentQueryRepo) ListIntents(
 			&intent.IntentID,
 			&intent.EnvelopeID,
 			&intent.TenantID,
+			&intent.ContractID,
 			&intent.IntentType,
 			&intent.CanonicalVersion,
 			&intent.SchemaVersion,
@@ -155,7 +156,7 @@ func (r *IntentQueryRepo) GetIntentByID(
 
 	query := `
 	SELECT 
-		intent_id, envelope_id, tenant_id,
+		intent_id, envelope_id, tenant_id, contract_id,
 		intent_type, canonical_version,
 		COALESCE(schema_version, '') as schema_version,
 		amount, currency, deadline_at,
@@ -174,6 +175,7 @@ func (r *IntentQueryRepo) GetIntentByID(
 		&intent.IntentID,
 		&intent.EnvelopeID,
 		&intent.TenantID,
+		&intent.ContractID,
 		&intent.IntentType,
 		&intent.CanonicalVersion,
 		&intent.SchemaVersion,

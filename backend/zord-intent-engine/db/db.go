@@ -15,6 +15,7 @@ func CreateTables() error {
 		trace_id UUID NOT NULL,
 		envelope_id UUID NOT NULL,
 		tenant_id UUID NOT NULL,
+		contract_id UUID NOT NULL,
     idempotency_key TEXT,
     salient_hash TEXT NOT NULL,
 	payload_hash BYTEA NOT NULL, 
@@ -56,6 +57,7 @@ func CreateTables() error {
 	trace_id UUID NOT NULL,  
     envelope_id UUID NOT NULL, 
     tenant_id UUID NOT NULL,
+    contract_id UUID NOT NULL,
 	lease_id UUID, leased_by TEXT, lease_until TIMESTAMPTZ,
     -- intent-specific outbox
     aggregate_type TEXT NOT NULL DEFAULT 'intent',
