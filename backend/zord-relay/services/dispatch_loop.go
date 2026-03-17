@@ -42,8 +42,9 @@ func (l *DispatchLoop) Start(ctx context.Context, batch int) {
 			var nackIDs []string
 
 			for _, e := range lease.Events {
-				dispatchID := "disp_" + uuid.New().String()
-				connectorID := "razorpayx_prod"
+				// dispatchID := "disp_" + uuid.New().String()
+				dispatchID := uuid.New().String()
+				connectorID := "f6a9f6a5-9ca0-4eab-9564-3424c09265ca"
 				corridorID := "IMPS"
 				tenantID := e.TenantID
 				intentID := e.AggregateID
@@ -228,7 +229,8 @@ func (l *DispatchLoop) insertDispatchAndOutboxTx(ctx context.Context, tx *sql.Tx
 }
 
 func (l *DispatchLoop) enqueueOutboxTx(ctx context.Context, tx *sql.Tx, eventType, dispatchID, contractID, intentID, tenantID, traceID string, payload map[string]any) error {
-	eventID := "evt_" + uuid.New().String()
+	// eventID := "evt_" + uuid.New().String()
+	eventID := uuid.New().String()
 	bytes, _ := json.Marshal(payload)
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO relay_outbox (event_id, event_type, dispatch_id, contract_id, intent_id, tenant_id, trace_id, payload, status)
