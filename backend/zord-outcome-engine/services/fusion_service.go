@@ -5,11 +5,13 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"zord-outcome-engine/db"
 )
 
 func recomputeFusionAndFinality(ctx context.Context, contractID string) (string, error) {
+	log.Printf("fusion.recompute.start contract_id=%s", contractID)
 	q := `
 SELECT source_class, status_candidate
 FROM canonical_outcome_events
@@ -21,6 +23,7 @@ ORDER BY received_at DESC, created_at DESC
 		if err == sql.ErrNoRows {
 			// No events at all.
 		} else {
+			log.Printf("fusion.recompute.query_error contract_id=%s err=%v", contractID, err)
 			return "", err
 		}
 	}
@@ -34,6 +37,7 @@ ORDER BY received_at DESC, created_at DESC
 	for rows.Next() {
 		var r rowData
 		if err := rows.Scan(&r.source, &r.status); err != nil {
+			log.Printf("fusion.recompute.scan_error contract_id=%s err=%v", contractID, err)
 			return "", err
 		}
 		all = append(all, r)
@@ -97,10 +101,12 @@ ON CONFLICT (contract_id) DO UPDATE SET
 		contractID, state, finalState, confidence, basis, "v1",
 	)
 	if err != nil {
+		log.Printf("fusion.recompute.upsert_error contract_id=%s err=%v", contractID, err)
 		return "", err
 	}
 
 	if finalState != nil {
+		log.Printf("fusion.recompute.final_state contract_id=%s final_state=%s confidence=%d basis=%s", contractID, *finalState, confidence, basis)
 		inputHash := computeSimpleInputHash(contractID, *finalState, "v1")
 		_, _ = db.DB.ExecContext(ctx, `
 INSERT INTO finality_certificates(
@@ -111,7 +117,15 @@ ON CONFLICT (contract_id) DO NOTHING
 			contractID, *finalState, confidence, inputHash, "v1", inputHash,
 		)
 	}
+	log.Printf("fusion.recompute.done contract_id=%s current_state=%s final_state=%s confidence=%d basis=%s", contractID, state, safeStrPtr(finalState), confidence, basis)
 	return state, nil
+}
+
+func safeStrPtr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 func isTerminalState(state string) bool {

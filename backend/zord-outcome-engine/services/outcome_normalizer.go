@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 	"zord-outcome-engine/db"
 	"zord-outcome-engine/models"
@@ -37,8 +38,11 @@ func (n *OutcomeNormalizer) NormalizePayload(ctx context.Context, meta *RawEnvel
 		return nil, fmt.Errorf("envelope meta is nil")
 	}
 
+	log.Printf("normalize.start envelope_id=%s tenant_id=%s trace_id=%s connector_id=%s source_class=%s payload_bytes=%d", meta.RawOutcomeEnvelopeID.String(), meta.TenantID.String(), meta.TraceID.String(), meta.ConnectorID.String(), meta.SourceClass, len(payload))
+
 	ev, err := n.normalizeByConnector(ctx, meta, payload)
 	if err != nil {
+		log.Printf("normalize.error envelope_id=%s err=%v", meta.RawOutcomeEnvelopeID.String(), err)
 		return nil, err
 	}
 	if ev == nil {
@@ -60,6 +64,7 @@ func (n *OutcomeNormalizer) NormalizePayload(ctx context.Context, meta *RawEnvel
 	ev.RawOutcomeEnvelopeID = meta.RawOutcomeEnvelopeID
 	ev.SourceClass = meta.SourceClass
 
+	log.Printf("normalize.done envelope_id=%s event_id=%s status=%s provider_payout_id=%s provider_event_id=%s utr=%s dedupe_key=%s", meta.RawOutcomeEnvelopeID.String(), ev.EventID.String(), ev.StatusCandidate, safe(ev.ProviderPayoutID), safe(ev.ProviderEventID), safe(ev.UTR), ev.DedupeKey)
 	return ev, nil
 }
 
@@ -70,6 +75,7 @@ func normalizeAndInsertCanonical(ctx context.Context, meta *RawEnvelopeMeta, pay
 		return nil, err
 	}
 
+	log.Printf("canonical.insert.start event_id=%s dedupe_key=%s", ev.EventID.String(), ev.DedupeKey)
 	_, err = db.DB.ExecContext(ctx, `
 INSERT INTO canonical_outcome_events(
 	event_id,
@@ -83,15 +89,17 @@ INSERT INTO canonical_outcome_events(
 	corridor_id,
 	source_class,
 	status_candidate,
+	provider_payout_id,
 	provider_ref_hash,
 	provider_event_id,
+	utr,
 	amount,
 	currency,
 	observed_at,
 	received_at,
 	correlation_confidence,
 	dedupe_key
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
 ON CONFLICT (dedupe_key) DO NOTHING
 `,
 		ev.EventID,
@@ -105,8 +113,10 @@ ON CONFLICT (dedupe_key) DO NOTHING
 		ev.CorridorID,
 		ev.SourceClass,
 		ev.StatusCandidate,
+		ev.ProviderPayoutID,
 		ev.ProviderRefHash,
 		ev.ProviderEventID,
+		ev.UTR,
 		ev.Amount,
 		ev.Currency,
 		ev.ObservedAt,
@@ -115,8 +125,10 @@ ON CONFLICT (dedupe_key) DO NOTHING
 		ev.DedupeKey,
 	)
 	if err != nil {
+		log.Printf("canonical.insert.error event_id=%s err=%v", ev.EventID.String(), err)
 		return nil, err
 	}
+	log.Printf("canonical.insert.done event_id=%s", ev.EventID.String())
 	return ev, nil
 }
 
@@ -138,12 +150,21 @@ func (n *OutcomeNormalizer) normalizeByConnector(ctx context.Context, meta *RawE
 	if v, ok := obj["provider_event_id"].(string); ok && v != "" {
 		providerEventID = &v
 	}
+	providerPayoutID := parseStringPtr(obj["provider_payout_id"])
+	if providerPayoutID == nil {
+		providerPayoutID = parseStringPtr(obj["payout_id"])
+	}
+	if providerPayoutID == nil {
+		providerPayoutID = parseStringPtr(obj["provider_reference"])
+	}
 	var providerRefHash *string
 	if v, ok := obj["provider_ref"].(string); ok && v != "" {
 		h := sha256.Sum256([]byte(v))
 		s := hex.EncodeToString(h[:])
 		providerRefHash = &s
 	}
+
+	utr := parseStringPtr(obj["utr"])
 
 	observedAt := parseTimeMaybe(obj["observed_at"])
 
@@ -165,16 +186,33 @@ func (n *OutcomeNormalizer) normalizeByConnector(ctx context.Context, meta *RawE
 	}
 
 	ev := &models.CanonicalOutcomeEvent{
-		EventID:         uuid.New(),
-		StatusCandidate: status,
-		ProviderEventID: providerEventID,
-		ProviderRefHash: providerRefHash,
-		ObservedAt:      observedAt,
-		Amount:          amountStr,
-		Currency:        currency,
-		ReceivedAt:      meta.ReceivedAt,
+		EventID:          uuid.New(),
+		StatusCandidate:  status,
+		ProviderPayoutID: providerPayoutID,
+		ProviderEventID:  providerEventID,
+		ProviderRefHash:  providerRefHash,
+		UTR:              utr,
+		ObservedAt:       observedAt,
+		Amount:           amountStr,
+		Currency:         currency,
+		ReceivedAt:       meta.ReceivedAt,
 	}
 	return ev, nil
+}
+
+func parseStringPtr(v any) *string {
+	s, _ := v.(string)
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func safe(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 func normalizeStatusCandidate(v any) string {

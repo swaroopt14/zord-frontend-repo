@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 	"zord-outcome-engine/db"
@@ -23,16 +24,21 @@ func (s *RawOutcomeService) Ingest(ctx context.Context, req models.IngestRequest
 		ctx = context.Background()
 	}
 
+	log.Printf("raw_outcome.ingest.start source_class=%s connector_id=%s reference_id=%s payload_bytes=%d", req.SourceClass, req.ConnectorID, safeStr(req.ReferenceID), len(req.Payload))
+
 	connectorUUID, err := uuid.Parse(req.ConnectorID)
 	if err != nil {
+		log.Printf("raw_outcome.ingest.bad_connector_id source_class=%s connector_id=%s err=%v", req.SourceClass, req.ConnectorID, err)
 		return nil, err
 	}
 
 	if req.ReferenceID == nil || strings.TrimSpace(*req.ReferenceID) == "" {
+		log.Printf("raw_outcome.ingest.missing_reference_id source_class=%s connector_id=%s", req.SourceClass, req.ConnectorID)
 		return nil, fmt.Errorf("reference_id is required (expected dispatch_id)")
 	}
 	dispatchUUID, err := uuid.Parse(strings.TrimSpace(*req.ReferenceID))
 	if err != nil {
+		log.Printf("raw_outcome.ingest.bad_reference_id source_class=%s connector_id=%s reference_id=%s err=%v", req.SourceClass, req.ConnectorID, safeStr(req.ReferenceID), err)
 		return nil, fmt.Errorf("invalid reference_id (expected uuid dispatch_id): %w", err)
 	}
 
@@ -46,25 +52,31 @@ WHERE dispatch_id = $1::uuid AND connector_id = $2::uuid
 LIMIT 1
 `, dispatchUUID, connectorUUID).Scan(&tenantIDStr, &traceIDStr, &contractIDStr, &intentIDStr)
 	if err != nil {
+		log.Printf("raw_outcome.ingest.dispatch_index_lookup_failed source_class=%s connector_id=%s dispatch_id=%s err=%v", req.SourceClass, req.ConnectorID, dispatchUUID.String(), err)
 		return nil, err
 	}
 
 	tenantUUID, err := uuid.Parse(tenantIDStr)
 	if err != nil {
+		log.Printf("raw_outcome.ingest.bad_tenant_id source_class=%s tenant_id=%s err=%v", req.SourceClass, tenantIDStr, err)
 		return nil, err
 	}
 	traceUUID, err := uuid.Parse(traceIDStr)
 	if err != nil {
+		log.Printf("raw_outcome.ingest.bad_trace_id source_class=%s trace_id=%s err=%v", req.SourceClass, traceIDStr, err)
 		return nil, err
 	}
 	contractUUID := parseUUIDPtr(contractIDStr)
 	intentUUID := parseUUIDPtr(intentIDStr)
+	log.Printf("raw_outcome.ingest.dispatch_index_resolved source_class=%s connector_id=%s dispatch_id=%s tenant_id=%s trace_id=%s contract_id=%s intent_id=%s", req.SourceClass, req.ConnectorID, dispatchUUID.String(), tenantIDStr, traceIDStr, contractIDStr, intentIDStr)
 
 	// Store encrypted payload in S3 (encryption happens inside storage).
 	envelopeID, receivedAt, objRef, err := s.S3.StoreRawPayload(ctx, req.Payload, tenantIDStr)
 	if err != nil {
+		log.Printf("raw_outcome.ingest.s3_store_failed source_class=%s dispatch_id=%s tenant_id=%s err=%v", req.SourceClass, dispatchUUID.String(), tenantIDStr, err)
 		return nil, err
 	}
+	log.Printf("raw_outcome.ingest.s3_stored source_class=%s dispatch_id=%s tenant_id=%s envelope_id=%s received_at=%s obj_ref=%s", req.SourceClass, dispatchUUID.String(), tenantIDStr, envelopeID.String(), receivedAt.UTC().Format(time.RFC3339Nano), objRef)
 
 	sum := sha256.Sum256(req.Payload)
 
@@ -82,8 +94,10 @@ LIMIT 1
 	// Persist raw_outcome_envelopes row using db.DB directly.
 	// Use sha256 + tenant as idempotency key: on conflict, reuse existing row.
 	if err := insertOrGetRawEnvelope(ctx, rawEnv); err != nil {
+		log.Printf("raw_outcome.ingest.raw_envelope_persist_failed source_class=%s envelope_id=%s err=%v", req.SourceClass, envelopeID.String(), err)
 		return nil, err
 	}
+	log.Printf("raw_outcome.ingest.raw_envelope_persisted source_class=%s envelope_id=%s tenant_id=%s trace_id=%s", req.SourceClass, rawEnv.RawOutcomeEnvelopeID.String(), tenantIDStr, traceIDStr)
 
 	// Normalize using the in-memory payload (no S3 read).
 	meta := &RawEnvelopeMeta{
@@ -97,8 +111,10 @@ LIMIT 1
 	}
 	canonical, err := normalizeAndInsertCanonical(ctx, meta, req.Payload)
 	if err != nil {
+		log.Printf("raw_outcome.ingest.normalize_failed source_class=%s envelope_id=%s err=%v", req.SourceClass, envelopeID.String(), err)
 		return nil, err
 	}
+	log.Printf("raw_outcome.ingest.normalized source_class=%s envelope_id=%s canonical_event_id=%s status=%s provider_payout_id=%s utr=%s", req.SourceClass, envelopeID.String(), canonical.EventID.String(), canonical.StatusCandidate, safeStr(canonical.ProviderPayoutID), safeStr(canonical.UTR))
 
 	// Correlate: reference_id is the dispatch_id, so we can apply immediately with full confidence.
 	res := &correlationResult{
@@ -110,8 +126,10 @@ LIMIT 1
 		Reason:                "dispatch_id",
 	}
 	if err := applyCorrelationOrEnqueue(ctx, canonical.EventID, canonical.TenantID, canonical.ConnectorID, res); err != nil {
+		log.Printf("raw_outcome.ingest.correlation_apply_failed source_class=%s canonical_event_id=%s dispatch_id=%s err=%v", req.SourceClass, canonical.EventID.String(), dispatchUUID.String(), err)
 		return nil, err
 	}
+	log.Printf("raw_outcome.ingest.correlation_applied source_class=%s canonical_event_id=%s dispatch_id=%s confidence=%d reason=%s", req.SourceClass, canonical.EventID.String(), dispatchUUID.String(), res.CorrelationConfidence, res.Reason)
 
 	out := &models.IngestResponse{
 		RawOutcomeEnvelopeID: envelopeID.String(),
@@ -125,11 +143,20 @@ LIMIT 1
 
 	state, err := recomputeFusionAndFinality(ctx, contractStr)
 	if err != nil {
+		log.Printf("raw_outcome.ingest.fusion_failed source_class=%s contract_id=%s err=%v", req.SourceClass, contractStr, err)
 		return nil, err
 	}
 	out.FusedState = &state
+	log.Printf("raw_outcome.ingest.done source_class=%s envelope_id=%s canonical_event_id=%s contract_id=%s fused_state=%s", req.SourceClass, envelopeID.String(), canonical.EventID.String(), contractStr, state)
 
 	return out, nil
+}
+
+func safeStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // insertOrGetRawEnvelope enforces idempotency on (tenant_id, raw_bytes_sha256).
