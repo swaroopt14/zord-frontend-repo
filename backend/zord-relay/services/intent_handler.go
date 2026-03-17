@@ -57,8 +57,8 @@ func (h *IntentHandler) HandleMessage(ctx context.Context, topic string, key str
 		return err
 	}
 
-	dispatchID := "disp_" + uuid.New().String()
-	connectorID := "razorpayx"
+	dispatchID := uuid.New().String()
+	connectorID := "hardcoded-connector-id"
 	corridorID := "IMPS"
 	contractID, err := h.computeContractID(evt)
 	if err != nil {
@@ -96,7 +96,7 @@ func (h *IntentHandler) HandleMessage(ctx context.Context, topic string, key str
 	evtMsg.Payload.AttemptCount = d.AttemptCount
 
 	payloadBytes, _ := json.Marshal(evtMsg)
-	eventID := "evt_" + uuid.New().String()
+	eventID := uuid.New().String()
 	if err := h.outbox.Enqueue(ctx, eventID, "DispatchCreated", d.DispatchID, d.ContractID, d.IntentID, d.TenantID, d.TraceID, payloadBytes); err != nil {
 		return err
 	}
