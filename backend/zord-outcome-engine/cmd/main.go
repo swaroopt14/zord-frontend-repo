@@ -6,12 +6,15 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"zord-outcome-engine/config"
 	"zord-outcome-engine/db"
 	"zord-outcome-engine/handlers"
+	"zord-outcome-engine/kafka"
 	"zord-outcome-engine/routes"
+	"zord-outcome-engine/services"
 	"zord-outcome-engine/storage"
 
 	"github.com/gin-gonic/gin"
@@ -22,17 +25,33 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	server := gin.New()
 	server.Use(gin.Recovery())
-
+	ctx := context.Background()
 	config.InitDB()
 	if db.DB == nil {
 		log.Fatal("DB is nil after InitDB")
 	}
 
-	//db.CreateTable()
+	if err := db.EnsureTables(ctx); err != nil {
+		log.Fatal("Failed to ensure DB tables: ", err)
+	}
 	err := godotenv.Load()
 	if err != nil {
 		log.Println("No .env file found")
 	}
+	brokers := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
+	topic := os.Getenv("KAFKA_TOPIC")
+	groupID := "intent-engine-group"
+	err = kafka.StartConsumer(
+		ctx,
+		brokers,
+		groupID,
+		topic,
+		handlers.HandleDispatchEvent,
+	)
+	if err != nil {
+		log.Fatalf("Kafka consumer failed: %v", err)
+	}
+	log.Println("Kafka consumer started")
 	// brokers := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
 	// producer, err := kafka.NewProducer(brokers)
 	// if err != nil {
@@ -52,6 +71,15 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to init S3", err)
 	}
+	cfg := config.LoadConfig()
+	if err := storage.InitEncryptionKey(cfg.VaultKey); err != nil {
+		log.Fatal("Failed to init encryption key: ", err)
+	}
+
+	// Start background workers (correlation + backfill scheduler + poll worker).
+	services.StartPendingCorrelationWorker(ctx)
+	services.StartBackfillScheduler(ctx)
+	services.StartPollWorker(ctx)
 
 	h := &handlers.Handler{ //need to add h
 		S3store: s3store,

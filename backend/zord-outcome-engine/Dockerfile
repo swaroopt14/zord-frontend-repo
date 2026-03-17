@@ -30,14 +30,17 @@ WORKDIR /app
 COPY --from=builder /app/main /app/main
 
 # Create directory for logs if needed
-RUN mkdir -p /app/logs && chown -R app:app /app
+RUN addgroup -S app && adduser -S app -G app \
+    && mkdir -p /app/logs \
+    && chown -R app:app /app
 
 # Expose port
 EXPOSE 8081
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost:8081/health || exit 1
+    CMD wget --quiet --tries=1 --spider http://localhost:8081/v1/health || exit 1
 
 # Run application
+USER app
 CMD ["./main"]

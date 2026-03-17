@@ -30,7 +30,7 @@ services:
       - zord-network
     restart: unless-stopped 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/v1/health"] 
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/v1/health"] 
       interval: 30s 
       timeout: 10s 
       retries: 3 
@@ -47,7 +47,7 @@ services:
     volumes: 
       - postgres_outcome_data:/var/lib/postgresql/data 
     ports: 
-      - "5433:5432" 
+      - "5434:5432" 
     networks: 
       - zord-network
     restart: unless-stopped 
