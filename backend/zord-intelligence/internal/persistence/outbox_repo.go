@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/zord/zord-intelligence/internal/models"
 )
@@ -161,6 +162,38 @@ func (r *OutboxRepo) MarkFailed(ctx context.Context, eventID string) error {
 	_, err := r.pool.Exec(ctx, sql, eventID)
 	if err != nil {
 		return fmt.Errorf("outbox_repo.MarkFailed event=%s: %w", eventID, err)
+	}
+	return nil
+}
+
+
+// ── Transaction-aware method (Gap #3) ────────────────────────────────────────
+
+// InsertTx is identical to Insert but runs inside a pgx.Tx transaction.
+//
+// Uses pgx.Tx directly (not a custom interface) to avoid the compile error
+// that occurred when using interface{Exec(...)(interface{RowsAffected()},error)}.
+// pgx.Tx.Exec returns (pgconn.CommandTag, error) — the custom interface
+// did not match that signature.
+func (r *OutboxRepo) InsertTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	e models.ActuationOutbox,
+) error {
+	sql := `
+		INSERT INTO actuation_outbox
+			(event_id, action_id, event_type, payload,
+			 status, attempts, next_retry_at, created_at)
+		VALUES
+			($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (event_id) DO NOTHING
+	`
+	_, err := tx.Exec(ctx, sql,
+		e.EventID, e.ActionID, e.EventType, e.Payload,
+		string(e.Status), e.Attempts, e.NextRetryAt, e.CreatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("outbox_repo.InsertTx event=%s: %w", e.EventID, err)
 	}
 	return nil
 }
