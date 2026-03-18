@@ -22,6 +22,8 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
+var mu sync.Mutex
+
 type BulkResult struct {
 	Row        int    `json:"row"`
 	EnvelopeID string `json:"EnvelopeID,omitempty"`
@@ -112,10 +114,10 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 	results := make([]BulkResult, len(rows)-1)
 
 	// Pipeline queue
-	jobs := make(chan BulkJob, 100)
+	jobs := make(chan BulkJob, len(rows))
 
 	// CPU based worker scaling
-	workerCount := runtime.NumCPU() * 2
+	workerCount := runtime.NumCPU() * 4
 
 	var wg sync.WaitGroup
 
@@ -132,8 +134,8 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 
 			for job := range jobs {
 
-				traceID := uuid.New().String()
-				idempotencyKey := uuid.New().String()
+				traceID := uuid.NewString()
+				idempotencyKey := uuid.NewString()
 
 				data, duplicateID, err := h.processBulkIntentRow(
 					c.Request.Context(),
@@ -147,19 +149,20 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 				)
 
 				if err != nil {
-
+					mu.Lock()
 					results[job.Row-1] = BulkResult{
 						Row:     job.Row,
 						Status:  "FAILED",
 						TraceID: traceID,
 						Error:   err.Error(),
 					}
+					mu.Unlock()
 
 					continue
 				}
 
 				if duplicateID != uuid.Nil {
-
+					mu.Lock()
 					results[job.Row-1] = BulkResult{
 						Row:        job.Row,
 						Status:     "DUPLICATE",
@@ -167,10 +170,10 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 						EnvelopeID: duplicateID.String(),
 						Error:      "duplicate idempotency key",
 					}
-
+					mu.Unlock()
 					continue
 				}
-
+				mu.Lock()
 				results[job.Row-1] = BulkResult{
 					Row:        job.Row,
 					Status:     "Accepted",
@@ -178,6 +181,7 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 					EnvelopeID: data.EnvelopeId,
 					ReceivedAt: data.ReceivedAt.Format(time.RFC3339Nano),
 				}
+				mu.Unlock()
 			}
 
 		}()
@@ -240,6 +244,7 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 
 	close(jobs)
 
+	// Run workers in background
 	wg.Wait()
 
 	c.JSON(http.StatusAccepted, gin.H{
@@ -302,7 +307,7 @@ func (h *Handler) processBulkIntentRow(
 		return nil, uuid.Nil, err
 	}
 
-	services.SendToIntentEngine(msg, data, h.Kafka)
+	go services.SendToIntentEngine(msg, data, h.Kafka)
 
 	return data, uuid.Nil, nil
 }
