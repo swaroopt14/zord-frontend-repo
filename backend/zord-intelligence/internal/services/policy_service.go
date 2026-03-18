@@ -1,16 +1,27 @@
 package services
 
-// What is this file?
-// The policy service evaluates rules against current KPI projection values.
-// When a rule's conditions are met, it asks action_service to create an ActionContract.
+// ============================================================
+// policy_service.go
+// ============================================================
 //
-// HOW POLICY EVALUATION WORKS:
-//   1. An event arrives (e.g. finality.certificate.issued)
-//   2. projection_service calls EvaluateForEvent(tenantID, corridorID, topic, eventID)
-//   3. We fetch all enabled policies whose trigger_value = topic
-//   4. For each policy, we read the relevant projection from DB
-//   5. We evaluate the DSL condition against that projection value
-//   6. If condition is true → call action_service.CreateAction()
+// Evaluates policy rules against current KPI projection values.
+// When a rule's conditions are met, calls action_service.CreateAction().
+//
+// GAP #2 CHANGE — Structured logging:
+// ─────────────────────────────────────
+// BEFORE:
+//   fmt.Printf("policy_service: error evaluating policy %s: %v\n", ...)
+//   fmt.Printf("policy_service: cron error for policy %s: %v\n", ...)
+//
+// AFTER:
+//   logger.Error("policy evaluation failed",
+//       "policy_id", policy.PolicyID,
+//       "error", err,
+//   )
+//
+// The difference matters in production:
+//   fmt.Printf → plain text on stdout, invisible to monitoring
+//   logger.Error → JSON with level=ERROR, Datadog alerts trigger
 
 import (
 	"context"
@@ -18,6 +29,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/zord/zord-intelligence/internal/logger"
 	"github.com/zord/zord-intelligence/internal/models"
 	"github.com/zord/zord-intelligence/internal/persistence"
 )
@@ -30,8 +42,6 @@ type PolicyService struct {
 }
 
 // NewPolicyService creates a PolicyService.
-// Note: actionService is passed in — circular dependency avoided by
-// main.go creating all three services and wiring them after creation.
 func NewPolicyService(
 	policyRepo *persistence.PolicyRepo,
 	projRepo *persistence.ProjectionRepo,
@@ -45,48 +55,50 @@ func NewPolicyService(
 }
 
 // EvaluateForEvent is called by projection_service after every KPI update.
-// It finds all enabled policies for the given topic and evaluates each one.
-//
-// PARAMETERS:
-//
-//	tenantID   → which tenant's data to check
-//	corridorID → which corridor (e.g. "razorpay_UPI") — used to build projection keys
-//	topic      → Kafka topic that triggered this (used to look up matching policies)
-//	eventID    → original event ID — used in the idempotency key
+// Finds all enabled policies for the given topic and evaluates each one.
 func (s *PolicyService) EvaluateForEvent(
 	ctx context.Context,
 	tenantID, corridorID, topic, eventID string,
 ) error {
-	// Step 1: Get all enabled policies for this topic
 	policies, err := s.policyRepo.GetByTrigger(ctx, "event", topic)
 	if err != nil {
 		return fmt.Errorf("policy_service.EvaluateForEvent get policies: %w", err)
 	}
 
-	// No enabled policies for this topic — nothing to do
 	if len(policies) == 0 {
 		return nil
 	}
 
-	// Step 2: Evaluate each policy
 	for _, policy := range policies {
-		// Skip if this policy is locked to a different tenant
 		if policy.TenantID != "" && policy.TenantID != tenantID {
 			continue
 		}
 
 		if err := s.evaluateOne(ctx, policy, tenantID, corridorID, eventID); err != nil {
-			// Log the error but continue evaluating other policies
-			// One policy failing should not block the others
-			fmt.Printf("policy_service: error evaluating policy %s: %v\n",
-				policy.PolicyID, err)
+			// GAP #2 FIX: was fmt.Printf — now logger.Error with structured fields
+			//
+			// BEFORE: fmt.Printf("policy_service: error evaluating policy %s: %v\n", policy.PolicyID, err)
+			//   → stdout, no level, no timestamp, Datadog cannot find this
+			//
+			// AFTER: logger.Error with key-value pairs
+			//   → JSON: {"level":"ERROR","msg":"policy evaluation failed","policy_id":"P_SLA","error":"..."}
+			//   → Datadog alert fires when ERROR count exceeds threshold
+			//
+			// We log and continue — one policy failing must not block others.
+			// Example: P_FAILURE_BURST has a bad DSL but P_SLA_BREACH should still run.
+			logger.Error("policy evaluation failed",
+				"policy_id", policy.PolicyID,
+				"tenant_id", tenantID,
+				"corridor_id", corridorID,
+				"topic", topic,
+				"error", err,
+			)
 		}
 	}
 	return nil
 }
 
-// EvaluateForCron is called by the cron worker (future session) for time-based policies.
-// Works the same way as EvaluateForEvent but triggered by a timer, not an event.
+// EvaluateForCron is called by the cron worker for time-based policies.
 func (s *PolicyService) EvaluateForCron(
 	ctx context.Context,
 	tenantID, corridorID string,
@@ -97,44 +109,50 @@ func (s *PolicyService) EvaluateForCron(
 	}
 	for _, policy := range policies {
 		if err := s.evaluateOne(ctx, policy, tenantID, corridorID, "cron"); err != nil {
-			fmt.Printf("policy_service: cron error for policy %s: %v\n",
-				policy.PolicyID, err)
+			// GAP #2 FIX: was fmt.Printf — now logger.Error
+			logger.Error("cron policy evaluation failed",
+				"policy_id", policy.PolicyID,
+				"tenant_id", tenantID,
+				"corridor_id", corridorID,
+				"error", err,
+			)
 		}
 	}
 	return nil
 }
 
 // evaluateOne evaluates a single policy against current projection data.
-// This is where the actual rule checking happens.
 func (s *PolicyService) evaluateOne(
 	ctx context.Context,
 	policy models.Policy,
 	tenantID, corridorID, triggerEventID string,
 ) error {
-
-	// Step 1: Build the evaluation context
-	// Read all projection values this policy might need
 	evalCtx, err := s.buildEvalContext(ctx, tenantID, corridorID)
 	if err != nil {
 		return err
 	}
 
-	// Step 2: Parse and evaluate the DSL
-	// Returns: (should fire?, decision, confidence, payload)
 	fires, decision, confidence, payload := evaluateDSL(policy.DSL, evalCtx)
 
 	if !fires {
-		return nil // condition not met — no action needed
+		return nil
 	}
 
-	// Step 3: Policy fired! Create an ActionContract
+	// Policy fired — log it so ops can see which rules are triggering
+	logger.Info("policy fired",
+		"policy_id", policy.PolicyID,
+		"policy_version", policy.Version,
+		"decision", string(decision),
+		"confidence", confidence,
+		"tenant_id", tenantID,
+		"corridor_id", corridorID,
+	)
+
 	scopeRefs := models.ScopeRefs{
 		TenantID:   tenantID,
 		CorridorID: corridorID,
 	}
 
-	// inputRefsJSON records WHAT ZPI looked at when making this decision
-	// This is the "explainability" — ops can see exactly why ZPI acted
 	inputRefs, _ := json.Marshal(evalCtx)
 
 	return s.actionService.CreateAction(ctx, CreateActionRequest{
@@ -151,23 +169,13 @@ func (s *PolicyService) evaluateOne(
 }
 
 // buildEvalContext reads current projection values for a tenant+corridor.
-// Returns a map that the DSL evaluator can query by key.
-//
-// Example output:
-//
-//	{
-//	  "corridor.success_rate": 0.82,
-//	  "corridor.finality_p95_seconds": 25200,
-//	  "corridor.total_pending": 450,
-//	  "tenant.evidence_readiness_rate": 0.75
-//	}
+// Returns a map the DSL evaluator queries by key name.
 func (s *PolicyService) buildEvalContext(
 	ctx context.Context,
 	tenantID, corridorID string,
 ) (map[string]float64, error) {
 	ctx_map := make(map[string]float64)
 
-	// Read success rate
 	var successVal models.SuccessRateValue
 	if err := s.projRepo.GetValueAs(ctx, tenantID,
 		fmt.Sprintf("corridor.success_rate.%s", corridorID), &successVal); err != nil {
@@ -176,7 +184,6 @@ func (s *PolicyService) buildEvalContext(
 	ctx_map["corridor.success_rate"] = successVal.Rate
 	ctx_map["corridor.total_count"] = float64(successVal.TotalCount)
 
-	// Read finality latency
 	var latencyVal models.FinalityLatencyValue
 	if err := s.projRepo.GetValueAs(ctx, tenantID,
 		fmt.Sprintf("corridor.finality_latency.%s", corridorID), &latencyVal); err != nil {
@@ -185,7 +192,6 @@ func (s *PolicyService) buildEvalContext(
 	ctx_map["corridor.finality_p50_seconds"] = latencyVal.P50Seconds
 	ctx_map["corridor.finality_p95_seconds"] = latencyVal.P95Seconds
 
-	// Read pending backlog
 	var pendingVal models.PendingBacklogValue
 	if err := s.projRepo.GetValueAs(ctx, tenantID,
 		fmt.Sprintf("corridor.pending_backlog.%s", corridorID), &pendingVal); err != nil {
@@ -194,7 +200,6 @@ func (s *PolicyService) buildEvalContext(
 	ctx_map["corridor.total_pending"] = float64(pendingVal.TotalPending)
 	ctx_map["corridor.pending_6h_plus"] = float64(pendingVal.Bucket6hPlus)
 
-	// Read evidence readiness
 	var evidenceVal models.EvidenceReadinessValue
 	if err := s.projRepo.GetValueAs(ctx, tenantID,
 		"tenant.evidence_readiness", &evidenceVal); err != nil {
@@ -205,22 +210,11 @@ func (s *PolicyService) buildEvalContext(
 	return ctx_map, nil
 }
 
-// ── DSL Evaluator ─────────────────────────────────────────────────────────────
-// Parses and evaluates the policy DSL stored in policy_registry.dsl
+// evaluateDSL parses and evaluates the policy DSL.
+// DSL format:
 //
-// DSL FORMAT:
-//   WHEN <metric> <operator> <threshold>
-//   THEN ACTION <decision> severity=<level>
-//
-// EXAMPLE:
-//   WHEN corridor.success_rate < 0.90
-//   THEN ACTION ESCALATE severity=HIGH
-//
-// This is a simple evaluator — it handles one WHEN condition and one THEN action.
-// Production: would support AND/OR, multiple conditions, etc.
-
-// evaluateDSL parses the policy DSL and evaluates it against the eval context.
-// Returns: (fires bool, decision Decision, confidence float64, payloadJSON string)
+//	WHEN <metric> <operator> <threshold>
+//	THEN ACTION <decision> severity=<level>
 func evaluateDSL(
 	dsl string,
 	evalCtx map[string]float64,
@@ -240,31 +234,24 @@ func evaluateDSL(
 	}
 
 	if whenLine == "" || thenLine == "" {
-		// Malformed DSL — skip this policy
 		return false, "", 0, ""
 	}
 
-	// ── Parse WHEN clause ─────────────────────────────────────────────────
-	// Format: WHEN <metric> <operator> <threshold>
-	// Example: WHEN corridor.success_rate < 0.90
-	whenParts := strings.Fields(whenLine) // splits by whitespace
+	whenParts := strings.Fields(whenLine)
 	if len(whenParts) < 4 {
 		return false, "", 0, ""
 	}
 
-	metric := whenParts[1]   // e.g. "corridor.success_rate"
-	operator := whenParts[2] // e.g. "<"
+	metric := whenParts[1]
+	operator := whenParts[2]
 	var threshold float64
-	fmt.Sscanf(whenParts[3], "%f", &threshold) // parse "0.90" → 0.90
+	fmt.Sscanf(whenParts[3], "%f", &threshold)
 
-	// Get the current value from projection context
 	currentVal, exists := evalCtx[metric]
 	if !exists {
-		// No data for this metric yet — policy cannot fire
 		return false, "", 0, ""
 	}
 
-	// Evaluate the condition
 	conditionMet := false
 	switch operator {
 	case "<":
@@ -283,17 +270,13 @@ func evaluateDSL(
 		return false, "", 0, ""
 	}
 
-	// ── Parse THEN clause ─────────────────────────────────────────────────
-	// Format: THEN ACTION <decision> severity=<level>
-	// Example: THEN ACTION ESCALATE severity=HIGH
 	thenParts := strings.Fields(thenLine)
 	if len(thenParts) < 3 {
 		return false, "", 0, ""
 	}
 
-	decision := models.Decision(thenParts[2]) // e.g. "ESCALATE"
+	decision := models.Decision(thenParts[2])
 
-	// Extract severity if present (severity=HIGH)
 	severity := "MEDIUM"
 	for _, part := range thenParts[3:] {
 		if strings.HasPrefix(part, "severity=") {
@@ -301,7 +284,6 @@ func evaluateDSL(
 		}
 	}
 
-	// Build the payload JSON for the actuator
 	payload, _ := json.Marshal(map[string]any{
 		"metric":    metric,
 		"value":     currentVal,
@@ -311,20 +293,16 @@ func evaluateDSL(
 		"message":   fmt.Sprintf("%s is %.4f (threshold %s %.4f)", metric, currentVal, operator, threshold),
 	})
 
-	// Confidence: how far past the threshold are we?
-	// Far past threshold → high confidence this is real, not noise
 	confidence := computeConfidence(currentVal, threshold, operator)
 
 	return true, decision, confidence, string(payload)
 }
 
-// computeConfidence returns a 0.0-1.0 confidence score.
-// The further the current value is from the threshold, the higher the confidence.
+// computeConfidence returns 0.5–1.0 based on how far past the threshold we are.
 func computeConfidence(current, threshold float64, operator string) float64 {
 	if threshold == 0 {
-		return 0.75 // default
+		return 0.75
 	}
-	// How far past the threshold as a percentage of the threshold value
 	var deviation float64
 	switch operator {
 	case "<", "<=":
@@ -335,9 +313,6 @@ func computeConfidence(current, threshold float64, operator string) float64 {
 		return 0.75
 	}
 
-	// Scale to 0.5 - 1.0 range
-	// Small deviation (just crossed threshold) → 0.5 confidence
-	// Large deviation (way past threshold) → 1.0 confidence
 	confidence := 0.5 + (deviation * 0.5)
 	if confidence > 1.0 {
 		confidence = 1.0

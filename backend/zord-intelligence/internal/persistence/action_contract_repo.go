@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/zord/zord-intelligence/internal/models"
 )
@@ -225,4 +226,59 @@ func scanActionContract(scan func(...any) error) (*models.ActionContract, error)
 	}
 
 	return &ac, nil
+}
+
+// ── Transaction-aware method (Gap #3) ────────────────────────────────────────
+
+// InsertIfNewTx is identical to InsertIfNew but runs inside a pgx.Tx transaction.
+//
+// WHY pgx.Tx INSTEAD OF A CUSTOM INTERFACE?
+// ───────────────────────────────────────────
+// A previous version defined a custom interface for the tx parameter:
+//
+//   interface{ Exec(...) (interface{RowsAffected() int64}, error) }
+//
+// This caused a compile error because pgx.Tx.Exec actually returns:
+//
+//   (pgconn.CommandTag, error)
+//
+// NOT (interface{RowsAffected() int64}, error).
+// So pgx.Tx did NOT satisfy that custom interface → compile error.
+//
+// THE FIX: accept pgx.Tx directly.
+// pgx.Tx is the real transaction type. No interface gymnastics needed.
+// We import "github.com/jackc/pgx/v5" to get it.
+//
+// HOW TO CALL THIS:
+//   tx, _ := pool.Begin(ctx)             // pool returns a pgx.Tx
+//   actionRepo.InsertIfNewTx(ctx, tx, contract)
+//   tx.Commit(ctx)
+func (r *ActionContractRepo) InsertIfNewTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	ac models.ActionContract,
+) error {
+	scopeJSON, err := json.Marshal(ac.ScopeRefs)
+	if err != nil {
+		return fmt.Errorf("action_repo.InsertIfNewTx marshal scope_refs: %w", err)
+	}
+
+	sql := `
+		INSERT INTO action_contracts
+			(action_id, tenant_id, policy_id, policy_version,
+			 scope_refs, input_refs_json, decision, confidence,
+			 payload_json, signature, idempotency_key, created_at)
+		VALUES
+			($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		ON CONFLICT (idempotency_key) DO NOTHING
+	`
+	_, err = tx.Exec(ctx, sql,
+		ac.ActionID, ac.TenantID, ac.PolicyID, ac.PolicyVersion,
+		string(scopeJSON), ac.InputRefsJSON, string(ac.Decision), ac.Confidence,
+		ac.PayloadJSON, ac.Signature, ac.IdempotencyKey, ac.CreatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("action_repo.InsertIfNewTx id=%s: %w", ac.ActionID, err)
+	}
+	return nil
 }

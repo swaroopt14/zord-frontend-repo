@@ -1,19 +1,30 @@
 package services
 
-// What is this file?
+// ============================================================
+// action_service.go
+// ============================================================
+//
 // Creates ActionContracts and their matching outbox entries.
 // Called by policy_service when a rule fires.
 //
-// RESPONSIBILITIES:
-//   1. Generate a unique action_id
-//   2. Build the idempotency_key (prevents duplicates)
-//   3. Sign the contract (proves it was not tampered with)
-//   4. Save ActionContract to DB
-//   5. Save ActuationOutbox entry to DB
+// GAP #2 — Structured logging:
+//   fmt.Printf replaced with logger.Info / logger.Error
+//   Output is now JSON, parseable by Datadog/Grafana/CloudWatch
 //
-// NOTE: Steps 4 and 5 should ideally be in one DB transaction.
-// We use a simple approach here — the ON CONFLICT DO NOTHING on both
-// tables provides safety even without a transaction.
+// GAP #3 — Database transaction:
+//   ActionContract insert + outbox insert now happen in ONE transaction.
+//   If anything fails mid-way, both writes are rolled back atomically.
+//
+// BUG FIX (from compile error):
+//   The previous version defined a custom interface for the tx parameter:
+//     interface{ Exec(...) (interface{RowsAffected() int64}, error) }
+//   This was WRONG. pgx.Tx.Exec returns (pgconn.CommandTag, error),
+//   not (interface{RowsAffected() int64}, error).
+//   So pgx.Tx did not satisfy that interface → compile error.
+//
+//   THE FIX: use pgx.Tx directly as the type.
+//   pgx.Tx is the actual transaction type from the pgx library.
+//   No custom interface needed. No mismatch possible.
 
 import (
 	"context"
@@ -23,6 +34,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/zord/zord-intelligence/internal/logger"
 	"github.com/zord/zord-intelligence/internal/models"
 	"github.com/zord/zord-intelligence/internal/persistence"
 )
@@ -31,21 +44,24 @@ import (
 type ActionService struct {
 	actionRepo *persistence.ActionContractRepo
 	outboxRepo *persistence.OutboxRepo
+	pool       *pgxpool.Pool // needed to open transactions (Gap #3)
 }
 
 // NewActionService creates an ActionService.
+// pool is required for transaction support added in Gap #3.
 func NewActionService(
 	actionRepo *persistence.ActionContractRepo,
 	outboxRepo *persistence.OutboxRepo,
+	pool *pgxpool.Pool,
 ) *ActionService {
 	return &ActionService{
 		actionRepo: actionRepo,
 		outboxRepo: outboxRepo,
+		pool:       pool,
 	}
 }
 
 // CreateActionRequest holds everything needed to create an ActionContract.
-// policy_service.go fills this and passes it to CreateAction().
 type CreateActionRequest struct {
 	TenantID       string
 	PolicyID       string
@@ -55,44 +71,44 @@ type CreateActionRequest struct {
 	Decision       models.Decision
 	Confidence     float64
 	PayloadJSON    string
-	TriggerEventID string // original Kafka event ID — used for idempotency
+	TriggerEventID string
 }
 
-// CreateAction creates an ActionContract and its outbox entry.
+// CreateAction creates an ActionContract and its outbox entry atomically.
 //
-// IDEMPOTENCY KEY:
-// Built from: SHA-256(policy_id + scope_refs_json + trigger_event_id)
-// This means: for the same policy firing on the same event → same key.
-// The UNIQUE constraint on idempotency_key silently ignores duplicates.
-// Safe to call multiple times with the same inputs.
+// WHY "ATOMICALLY"?
+// ──────────────────
+// Before Gap #3, the code did:
+//
+//	s.actionRepo.InsertIfNew(ctx, contract)   ← DB write 1
+//	s.outboxRepo.Insert(ctx, outboxEntry)     ← DB write 2
+//
+// If the service crashed between write 1 and write 2:
+//   - ActionContract exists in DB  ✓  (decision was recorded)
+//   - Outbox entry MISSING         ✗  (Kafka message never sent)
+//   - Ops never gets the ESCALATE alert
+//   - SLA breach goes unnoticed
+//
+// With a transaction, either BOTH writes succeed, or NEITHER does.
+// The Kafka consumer will redeliver the event, and we try again from scratch.
 func (s *ActionService) CreateAction(
 	ctx context.Context,
 	req CreateActionRequest,
 ) error {
 
-	// Step 1: Marshal scope_refs to JSON for signing and idempotency
+	// ── Build idempotency key ─────────────────────────────────────────────
+	// SHA-256(policy_id + scope_refs + trigger_event_id)
+	// Same inputs → same key → DB UNIQUE constraint silently ignores duplicate
 	scopeJSON, err := json.Marshal(req.ScopeRefs)
 	if err != nil {
-		return fmt.Errorf("action_service: marshal scope_refs: %w", err)
+		return fmt.Errorf("action_service.CreateAction marshal scope_refs: %w", err)
 	}
+	idempotencyKey := buildIdempotencyKey(req.PolicyID, string(scopeJSON), req.TriggerEventID)
 
-	// Step 2: Build idempotency key
-	// Hash of (policy_id + scope_refs_json + trigger_event_id)
-	// Same inputs → same hash → duplicate silently ignored by DB
-	idempotencyKey := buildIdempotencyKey(
-		req.PolicyID,
-		string(scopeJSON),
-		req.TriggerEventID,
-	)
-
-	// Step 3: Generate unique action ID
-	// uuid.New() generates a random UUID like "550e8400-e29b-41d4-a716-446655440000"
-	// We prefix with "act_" to make logs readable: "act_550e8400..."
+	// ── Generate IDs and build the contract ──────────────────────────────
 	actionID := "act_" + uuid.New().String()
-
 	now := time.Now().UTC()
 
-	// Step 4: Build the contract
 	contract := models.ActionContract{
 		ActionID:       actionID,
 		TenantID:       req.TenantID,
@@ -106,21 +122,42 @@ func (s *ActionService) CreateAction(
 		IdempotencyKey: idempotencyKey,
 		CreatedAt:      now,
 	}
-
-	// Step 5: Sign the contract
-	// Development: SHA-256 hash of key fields
-	// Production: replace this with ed25519 KMS signing (like zord-edge uses)
 	contract.Signature = signContract(contract, string(scopeJSON))
 
-	// Step 6: Save the ActionContract to DB
-	// ON CONFLICT DO NOTHING means: if idempotency_key already exists → skip silently
-	if err := s.actionRepo.InsertIfNew(ctx, contract); err != nil {
-		return fmt.Errorf("action_service: insert contract: %w", err)
+	// Decide whether this decision needs Kafka delivery
+	needsOutbox := !req.Decision.IsSafe() || needsActuation(req.Decision)
+
+	// ── Open a database transaction ───────────────────────────────────────
+	//
+	// pool.Begin(ctx) returns a pgx.Tx — an open transaction on ONE connection.
+	//
+	// WHAT IS A TRANSACTION?
+	// Think of it like a shopping cart:
+	//   - You add items to the cart (DB writes inside the transaction)
+	//   - You press "Confirm Order" (tx.Commit) → all items are saved
+	//   - OR you press "Cancel" (tx.Rollback) → cart is emptied, nothing saved
+	//
+	// If the service crashes mid-way, Postgres automatically rolls back
+	// any uncommitted transaction — just like cancelling the cart.
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("action_service.CreateAction begin tx: %w", err)
 	}
 
-	// Step 7: Create an outbox entry (only for decisions that need actuation)
-	// Safe decisions (ALLOW, ADVISORY) don't need Kafka delivery
-	if !req.Decision.IsSafe() || needsActuation(req.Decision) {
+	// defer runs when the function exits, no matter what path it takes.
+	// Rollback is safe to call even after a successful Commit — it becomes a no-op.
+	// This pattern ensures the transaction is NEVER left hanging open.
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	// ── Write 1: Insert ActionContract (inside transaction) ───────────────
+	if err := s.actionRepo.InsertIfNewTx(ctx, tx, contract); err != nil {
+		return fmt.Errorf("action_service.CreateAction insert contract: %w", err)
+	}
+
+	// ── Write 2: Insert outbox entry (inside SAME transaction) ───────────
+	if needsOutbox {
 		outboxEntry := models.ActuationOutbox{
 			EventID:     "evt_" + uuid.New().String(),
 			ActionID:    actionID,
@@ -128,56 +165,55 @@ func (s *ActionService) CreateAction(
 			Payload:     buildOutboxPayload(req, actionID),
 			Status:      models.OutboxStatusPending,
 			Attempts:    0,
-			NextRetryAt: now, // try immediately
+			NextRetryAt: now,
 			CreatedAt:   now,
 		}
-
-		if err := s.outboxRepo.Insert(ctx, outboxEntry); err != nil {
-			// Log but don't fail — the ActionContract was saved
-			// The outbox entry can be recreated manually if needed
-			fmt.Printf("action_service: WARNING outbox insert failed for action %s: %v\n",
-				actionID, err)
+		if err := s.outboxRepo.InsertTx(ctx, tx, outboxEntry); err != nil {
+			// defer tx.Rollback will also undo the action_contracts insert above
+			return fmt.Errorf("action_service.CreateAction insert outbox: %w", err)
 		}
 	}
 
-	fmt.Printf("action_service: created action %s policy=%s decision=%s tenant=%s\n",
-		actionID, req.PolicyID, req.Decision, req.TenantID)
+	// ── Commit: make both writes permanent ────────────────────────────────
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("action_service.CreateAction commit: %w", err)
+	}
+
+	// ── Structured log (Gap #2) ───────────────────────────────────────────
+	// BEFORE: fmt.Printf("action_service: created action %s...\n", ...)
+	//   → plain text, no timestamp, no level, invisible to monitoring
+	//
+	// AFTER: logger.Info with named fields
+	//   → JSON with level=INFO, all fields searchable in Datadog
+	logger.Info("action created",
+		"action_id", actionID,
+		"policy_id", req.PolicyID,
+		"decision", string(req.Decision),
+		"confidence", req.Confidence,
+		"tenant_id", req.TenantID,
+		"needs_outbox", needsOutbox,
+	)
 
 	return nil
 }
 
-// ── Helper functions ──────────────────────────────────────────────────────────
+// ── Private helpers ───────────────────────────────────────────────────────────
 
-// buildIdempotencyKey creates a SHA-256 hash from the key inputs.
-// Same policy + same scope + same event → same hash → no duplicate action.
 func buildIdempotencyKey(policyID, scopeRefsJSON, triggerEventID string) string {
-	// Concatenate all inputs with a separator
 	raw := fmt.Sprintf("%s|%s|%s", policyID, scopeRefsJSON, triggerEventID)
-
-	// SHA-256 produces a 32-byte hash → encode as hex string (64 chars)
 	hash := sha256.Sum256([]byte(raw))
 	return fmt.Sprintf("%x", hash)
 }
 
-// signContract creates a simple signature for development.
-// In production: replace with ed25519 signing via AWS KMS or Vault.
-// (Your team already has this pattern in zord-edge/vault/signing.go)
 func signContract(ac models.ActionContract, scopeJSON string) string {
-	// Build a canonical string of the key fields
 	canonical := fmt.Sprintf("%s|%s|%s|%s|%.3f|%s",
-		ac.ActionID,
-		ac.TenantID,
-		ac.PolicyID,
-		string(ac.Decision),
-		ac.Confidence,
-		scopeJSON,
+		ac.ActionID, ac.TenantID, ac.PolicyID,
+		string(ac.Decision), ac.Confidence, scopeJSON,
 	)
 	hash := sha256.Sum256([]byte(canonical))
 	return fmt.Sprintf("sha256:%x", hash)
 }
 
-// needsActuation returns true for decisions that require Kafka delivery.
-// Safe decisions like ALLOW and ADVISORY_RECOMMENDATION don't need Kafka.
 func needsActuation(d models.Decision) bool {
 	switch d {
 	case models.DecisionEscalate,
@@ -191,8 +227,6 @@ func needsActuation(d models.Decision) bool {
 	return false
 }
 
-// buildOutboxPayload constructs the JSON payload for the outbox entry.
-// This is what gets published to Kafka when the outbox worker runs.
 func buildOutboxPayload(req CreateActionRequest, actionID string) string {
 	payload := map[string]any{
 		"action_id":  actionID,

@@ -58,7 +58,7 @@ func main() {
 	// policyService second (needs actionService)
 	// projectionService last (needs policyService)
 
-	actionService := services.NewActionService(actionRepo, outboxRepo)
+	actionService := services.NewActionService(actionRepo, outboxRepo, pool)
 
 	policyService := services.NewPolicyService(policyRepo, projRepo, actionService)
 
