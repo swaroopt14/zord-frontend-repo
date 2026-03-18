@@ -6,6 +6,13 @@ import (
 	"zord-intent-engine/internal/models"
 )
 
+const (
+	MaxBatchSize     = 20000
+	TenantDailyLimit = 6000000000 // ₹60 Cr
+	RemainingLimit   = 1000000000 // example ₹10 Cr
+	NEFTCutoffHour   = 18
+)
+
 type Constraints struct {
 	Deadline string `json:"deadline"`
 }
@@ -53,5 +60,24 @@ func RunPreGuards(
 		}
 	}
 
+	//NEFT cutoff window guard
+
+	now := time.Now()
+
+	if intent.IntentType == "NEFT" {
+
+		if now.Hour() >= NEFTCutoffHour {
+
+			return &models.DLQEntry{
+				TenantID:    in.TenantID.String(),
+				EnvelopeID:  in.EnvelopeID.String(),
+				Stage:       "PREGUARD",
+				ReasonCode:  "PAYMENT_WINDOW_CLOSED",
+				ErrorDetail: "NEFT cutoff window passed",
+				Replayable:  true,
+				CreatedAt:   time.Now().UTC(),
+			}
+		}
+	}
 	return nil
 }
