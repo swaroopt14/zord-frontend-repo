@@ -114,7 +114,7 @@ LIMIT 1
 		log.Printf("raw_outcome.ingest.normalize_failed source_class=%s envelope_id=%s err=%v", req.SourceClass, envelopeID.String(), err)
 		return nil, err
 	}
-	log.Printf("raw_outcome.ingest.normalized source_class=%s envelope_id=%s canonical_event_id=%s status=%s provider_payout_id=%s utr=%s", req.SourceClass, envelopeID.String(), canonical.EventID.String(), canonical.StatusCandidate, safeStr(canonical.ProviderPayoutID), safeStr(canonical.UTR))
+	log.Printf("raw_outcome.ingest.normalized source_class=%s envelope_id=%s canonical_event_id=%s status=%s provider_event_id=%s utr=%s", req.SourceClass, envelopeID.String(), canonical.EventID.String(), canonical.StatusCandidate, safeStr(canonical.ProviderEventID), safeStr(canonical.UTR))
 
 	// Correlate: reference_id is the dispatch_id, so we can apply immediately with full confidence.
 	res := &correlationResult{

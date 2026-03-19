@@ -53,12 +53,27 @@ ORDER BY received_at DESC, created_at DESC
 	bestSource := ""
 	bestStatus := ""
 	bestRank := -1
+	bestIsTerminal := false
+
 	for _, r := range all {
 		rank := authority[r.source]
-		if rank > bestRank {
+		status := strings.ToUpper(r.status)
+		isTerminal := isTerminalState(status)
+
+		// Rule 1: terminal beats non-terminal
+		if isTerminal && !bestIsTerminal {
+			bestIsTerminal = true
 			bestRank = rank
 			bestSource = r.source
-			bestStatus = r.status
+			bestStatus = status
+			continue
+		}
+
+		// Rule 2: if both terminal or both non-terminal → use authority
+		if isTerminal == bestIsTerminal && rank > bestRank {
+			bestRank = rank
+			bestSource = r.source
+			bestStatus = status
 		}
 	}
 

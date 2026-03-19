@@ -18,7 +18,6 @@ type CanonicalOutcomeEvent struct {
 	CorridorID            *string    `json:"corridor_id"`
 	SourceClass           string     `json:"source_class"`
 	StatusCandidate       string     `json:"status_candidate"`
-	ProviderPayoutID      *string    `json:"provider_payout_id"`
 	ProviderRefHash       *string    `json:"provider_ref_hash"`
 	ProviderEventID       *string    `json:"provider_event_id"`
 	UTR                   *string    `json:"utr"`

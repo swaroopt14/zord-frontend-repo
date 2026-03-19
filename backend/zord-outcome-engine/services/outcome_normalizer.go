@@ -64,7 +64,7 @@ func (n *OutcomeNormalizer) NormalizePayload(ctx context.Context, meta *RawEnvel
 	ev.RawOutcomeEnvelopeID = meta.RawOutcomeEnvelopeID
 	ev.SourceClass = meta.SourceClass
 
-	log.Printf("normalize.done envelope_id=%s event_id=%s status=%s provider_payout_id=%s provider_event_id=%s utr=%s dedupe_key=%s", meta.RawOutcomeEnvelopeID.String(), ev.EventID.String(), ev.StatusCandidate, safe(ev.ProviderPayoutID), safe(ev.ProviderEventID), safe(ev.UTR), ev.DedupeKey)
+	log.Printf("normalize.done envelope_id=%s event_id=%s status=%s provider_event_id=%s utr=%s dedupe_key=%s", meta.RawOutcomeEnvelopeID.String(), ev.EventID.String(), ev.StatusCandidate, safe(ev.ProviderEventID), safe(ev.UTR), ev.DedupeKey)
 	return ev, nil
 }
 
@@ -89,7 +89,6 @@ INSERT INTO canonical_outcome_events(
 	corridor_id,
 	source_class,
 	status_candidate,
-	provider_payout_id,
 	provider_ref_hash,
 	provider_event_id,
 	utr,
@@ -99,7 +98,7 @@ INSERT INTO canonical_outcome_events(
 	received_at,
 	correlation_confidence,
 	dedupe_key
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
 ON CONFLICT (dedupe_key) DO NOTHING
 `,
 		ev.EventID,
@@ -113,7 +112,6 @@ ON CONFLICT (dedupe_key) DO NOTHING
 		ev.CorridorID,
 		ev.SourceClass,
 		ev.StatusCandidate,
-		ev.ProviderPayoutID,
 		ev.ProviderRefHash,
 		ev.ProviderEventID,
 		ev.UTR,
@@ -146,16 +144,16 @@ func (n *OutcomeNormalizer) normalizeByConnector(ctx context.Context, meta *RawE
 		status = "PENDING"
 	}
 
+	// provider_event_id: fallback priority: provider_event_id > payout_id > provider_payout_id > provider_reference
 	var providerEventID *string
-	if v, ok := obj["provider_event_id"].(string); ok && v != "" {
-		providerEventID = &v
-	}
-	providerPayoutID := parseStringPtr(obj["provider_payout_id"])
-	if providerPayoutID == nil {
-		providerPayoutID = parseStringPtr(obj["payout_id"])
-	}
-	if providerPayoutID == nil {
-		providerPayoutID = parseStringPtr(obj["provider_reference"])
+	if v := parseStringPtr(obj["provider_event_id"]); v != nil {
+		providerEventID = v
+	} else if v := parseStringPtr(obj["payout_id"]); v != nil {
+		providerEventID = v
+	} else if v := parseStringPtr(obj["provider_payout_id"]); v != nil {
+		providerEventID = v
+	} else if v := parseStringPtr(obj["provider_reference"]); v != nil {
+		providerEventID = v
 	}
 	var providerRefHash *string
 	if v, ok := obj["provider_ref"].(string); ok && v != "" {
@@ -186,16 +184,15 @@ func (n *OutcomeNormalizer) normalizeByConnector(ctx context.Context, meta *RawE
 	}
 
 	ev := &models.CanonicalOutcomeEvent{
-		EventID:          uuid.New(),
-		StatusCandidate:  status,
-		ProviderPayoutID: providerPayoutID,
-		ProviderEventID:  providerEventID,
-		ProviderRefHash:  providerRefHash,
-		UTR:              utr,
-		ObservedAt:       observedAt,
-		Amount:           amountStr,
-		Currency:         currency,
-		ReceivedAt:       meta.ReceivedAt,
+		EventID:         uuid.New(),
+		StatusCandidate: status,
+		ProviderEventID: providerEventID,
+		ProviderRefHash: providerRefHash,
+		UTR:             utr,
+		ObservedAt:      observedAt,
+		Amount:          amountStr,
+		Currency:        currency,
+		ReceivedAt:      meta.ReceivedAt,
 	}
 	return ev, nil
 }
@@ -220,7 +217,7 @@ func normalizeStatusCandidate(v any) string {
 	switch s {
 	case "SUCCESS", "FAILED", "PENDING", "REVERSED", "RECEIVED", "UNKNOWN_DIVERGENT":
 		return s
-	case "success", "succeeded", "paid":
+	case "success", "succeeded", "paid", "processed":
 		return "SUCCESS"
 	case "failed", "rejected":
 		return "FAILED"
@@ -252,7 +249,11 @@ func parseTimeMaybe(v any) *time.Time {
 // Need to check dedupe key logic here
 func computeDedupeKey(meta *RawEnvelopeMeta, ev *models.CanonicalOutcomeEvent) string {
 	if ev.ProviderEventID != nil && *ev.ProviderEventID != "" {
-		return fmt.Sprintf("prov_evt:%s:%s", meta.ConnectorID.String(), *ev.ProviderEventID)
+		return fmt.Sprintf("prov_evt:%s:%s:%s",
+			meta.ConnectorID.String(),
+			*ev.ProviderEventID,
+			ev.StatusCandidate,
+		)
 	}
 	if len(meta.RawBytesSHA256) > 0 {
 		return fmt.Sprintf("rawsha:%s", hex.EncodeToString(meta.RawBytesSHA256))

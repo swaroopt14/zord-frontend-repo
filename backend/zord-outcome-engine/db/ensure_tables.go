@@ -57,7 +57,6 @@ CREATE TABLE IF NOT EXISTS canonical_outcome_events(
 	corridor_id TEXT,
 	source_class TEXT NOT NULL,
 	status_candidate TEXT NOT NULL,
-	provider_payout_id TEXT,
 	provider_ref_hash TEXT,
 	provider_event_id TEXT,
 	utr TEXT,

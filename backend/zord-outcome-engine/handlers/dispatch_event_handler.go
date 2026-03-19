@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log"
 	"zord-outcome-engine/db"
 	"zord-outcome-engine/models"
 )
@@ -21,16 +22,19 @@ func HandleDispatchEvent(msg []byte) error {
 	case "DispatchCreated":
 		var payload models.DispatchCreatedPayload
 		json.Unmarshal(event.Payload, &payload)
+		log.Println("Received Dispatch Event")
 		return handleDispatchCreated(ctx, payload, event)
 
 	case "AttemptSent":
 		var payload models.AttemptSentPayload
 		json.Unmarshal(event.Payload, &payload)
+		log.Println("Received Attempt Sent Event")
 		return handleAttemptSent(ctx, payload)
 
 	case "ProviderAcked":
 		var payload models.ProviderAckedPayload
 		json.Unmarshal(event.Payload, &payload)
+		log.Println("Received Provider Ack Event")
 		return handleProviderAcked(ctx, payload)
 
 	}
@@ -38,6 +42,7 @@ func HandleDispatchEvent(msg []byte) error {
 }
 
 func handleDispatchCreated(ctx context.Context, payload models.DispatchCreatedPayload, data models.DispatchEvent) error {
+	log.Println("DispatchCreated Event Processing started")
 	if payload.DispatchID == "" {
 		return errors.New("dispatch_id missing in DispatchCreated Event")
 	}
@@ -81,10 +86,13 @@ func handleDispatchCreated(ctx context.Context, payload models.DispatchCreatedPa
 		carriersJSON,
 		providerRefHashes,
 	)
+	log.Println("Dispatch index inserted")
 	return err
+
 }
 
 func handleAttemptSent(ctx context.Context, payload models.AttemptSentPayload) error {
+	log.Println("AttemptSent Event Processing started")
 	if payload.DispatchID == "" {
 		return errors.New("dispatch_id missing in AttemptSent Event")
 	}
@@ -106,6 +114,7 @@ func handleAttemptSent(ctx context.Context, payload models.AttemptSentPayload) e
 }
 
 func handleProviderAcked(ctx context.Context, payload models.ProviderAckedPayload) error {
+	log.Println("ProviderAcked Event Processing started")
 	if payload.DispatchID == "" {
 		return errors.New("dispatch_id missing in ProviderAcked Event")
 	}
