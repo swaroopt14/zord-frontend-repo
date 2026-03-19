@@ -545,6 +545,151 @@ func (r *ProjectionRepo) UpsertWithValue(
 // PRIVATE HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SLA BREACH RATE OPERATIONS (atomic SQL, race-condition free)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// AtomicIncrementSLABreached atomically increments breach counter AND updates average.
+// Called when an SLA timer is marked BREACHED.
+//
+// Parameters:
+//
+//	tenantID: owner of this SLA ("tnt_A")
+//	breachDurationSeconds: how many seconds past the deadline?
+//	  (if deadline was 10:00 and breach detected at 10:20, this is 1200 seconds)
+//	windowStart, windowEnd: the 24h window
+//
+// Atomic operation:
+//  1. Read current breached count, total_breach_seconds from DB
+//  2. Increment breached by 1
+//  3. Add breach_duration_seconds to total_breach_seconds
+//  4. Compute new average = total_breach_seconds / breached
+//  5. Write all back to DB
+//  6. Recompute breach_rate = breached / total_processed
+func (r *ProjectionRepo) AtomicIncrementSLABreached(
+	ctx context.Context,
+	tenantID string,
+	breachDurationSeconds float64,
+	windowStart, windowEnd time.Time,
+) error {
+	key := "tenant.sla_breach_rate"
+
+	// JSONB arithmetic all happens in SQL, not in Go.
+	// This is the secret to being race-condition free.
+	upsertSQL := `
+		INSERT INTO projection_state
+			(tenant_id, projection_key, window_start, window_end,
+			 value_json, computed_at, projection_version)
+		VALUES ($1, $2, $3, $4,
+			'{"total_processed":0,"breached":1,"on_time":0,"breach_rate":0.0,"avg_breach_seconds":'||$5||',"total_breach_seconds":'||CAST(CAST($5 AS INTEGER) AS TEXT)||'}'::jsonb,
+			now(), 1)
+		ON CONFLICT (tenant_id, projection_key, window_start, projection_version)
+		DO UPDATE SET
+			value_json = jsonb_set(
+				jsonb_set(
+					jsonb_set(
+						projection_state.value_json,
+						'{breached}',
+						to_jsonb(COALESCE((projection_state.value_json->>'breached')::int, 0) + 1)
+					),
+					'{total_breach_seconds}',
+					to_jsonb(COALESCE((projection_state.value_json->>'total_breach_seconds')::int64, 0) + CAST($5 AS INTEGER))
+				),
+				'{avg_breach_seconds}',
+				to_jsonb(
+					CASE 
+						WHEN (COALESCE((projection_state.value_json->>'breached')::int, 0) + 1) > 0
+						THEN (COALESCE((projection_state.value_json->>'total_breach_seconds')::int64, 0) + CAST($5 AS INTEGER))::float8 / 
+						     (COALESCE((projection_state.value_json->>'breached')::int, 0) + 1)
+						ELSE 0.0
+					END
+				)
+			),
+			computed_at = now()
+	`
+	if _, err := r.pool.Exec(ctx, upsertSQL, tenantID, key, windowStart, windowEnd, int64(breachDurationSeconds)); err != nil {
+		return fmt.Errorf("projection_repo.AtomicIncrementSLABreached: %w", err)
+	}
+
+	// Step 2: Recompute the breach_rate = breached / total_processed
+	return r.recomputeSLABreachRate(ctx, tenantID, key, windowStart)
+}
+
+// AtomicIncrementSLAOnTime atomically increments on_time counter and total_processed.
+// Called when an SLA timer is marked RESOLVED (resolved before deadline).
+//
+// Atomic operation: increment on_time by 1, total_processed by 1, recompute rate
+func (r *ProjectionRepo) AtomicIncrementSLAOnTime(
+	ctx context.Context,
+	tenantID string,
+	windowStart, windowEnd time.Time,
+) error {
+	key := "tenant.sla_breach_rate"
+
+	upsertSQL := `
+		INSERT INTO projection_state
+			(tenant_id, projection_key, window_start, window_end,
+			 value_json, computed_at, projection_version)
+		VALUES ($1, $2, $3, $4,
+			'{"total_processed":1,"breached":0,"on_time":1,"breach_rate":0.0,"avg_breach_seconds":0,"total_breach_seconds":0}'::jsonb,
+			now(), 1)
+		ON CONFLICT (tenant_id, projection_key, window_start, projection_version)
+		DO UPDATE SET
+			value_json = jsonb_set(
+				jsonb_set(
+					jsonb_set(
+						projection_state.value_json,
+						'{on_time}',
+						to_jsonb(COALESCE((projection_state.value_json->>'on_time')::int, 0) + 1)
+					),
+					'{total_processed}',
+					to_jsonb(COALESCE((projection_state.value_json->>'total_processed')::int, 0) + 1)
+				),
+				'{breached}',
+				to_jsonb(COALESCE((projection_state.value_json->>'breached')::int, 0))  -- unchanged
+			),
+			computed_at = now()
+	`
+	if _, err := r.pool.Exec(ctx, upsertSQL, tenantID, key, windowStart, windowEnd); err != nil {
+		return fmt.Errorf("projection_repo.AtomicIncrementSLAOnTime: %w", err)
+	}
+
+	// Recompute the breach_rate
+	return r.recomputeSLABreachRate(ctx, tenantID, key, windowStart)
+}
+
+// recomputeSLABreachRate recalculates the rate = breached / total_processed
+// Called after every breach/on_time increment so the rate is always fresh.
+func (r *ProjectionRepo) recomputeSLABreachRate(
+	ctx context.Context,
+	tenantID, key string,
+	windowStart time.Time,
+) error {
+	sql := `
+		UPDATE projection_state
+		SET value_json = jsonb_set(
+			value_json,
+			'{breach_rate}',
+			to_jsonb(
+				COALESCE(
+					(value_json->>'breached')::numeric /
+					NULLIF((value_json->>'total_processed')::numeric, 0),
+					0
+				)
+			)
+		),
+		computed_at = now()
+		WHERE tenant_id          = $1
+		  AND projection_key     = $2
+		  AND window_start       = $3
+		  AND projection_version = 1
+	`
+	if _, err := r.pool.Exec(ctx, sql, tenantID, key, windowStart); err != nil {
+		return fmt.Errorf("projection_repo.recomputeSLABreachRate: %w", err)
+	}
+	return nil
+}
+
 // recomputeRate recalculates settled/total and stores as the rate field.
 // Called after every success/failure increment so the rate is always fresh.
 func (r *ProjectionRepo) recomputeRate(

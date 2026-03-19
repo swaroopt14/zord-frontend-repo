@@ -79,6 +79,10 @@ func NewRouter(
 		// Returns SLA timer status
 		r.Get("/sla", kpiH.GetSLAStatus)
 
+		// GET /v1/intelligence/sla-breach?tenant_id=X
+		// Returns SLA breach rate metrics
+		r.Get("/sla-breach", kpiH.GetSLABreachRate)
+
 		// ── Policy endpoints ───────────────────────────────────────────
 		// Used by ops team to manage rules
 
