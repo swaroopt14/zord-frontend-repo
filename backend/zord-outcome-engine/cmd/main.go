@@ -40,6 +40,11 @@ func main() {
 	}
 	brokers := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
 	topic := os.Getenv("KAFKA_TOPIC")
+	if strings.TrimSpace(topic) == "" {
+		// Default to the relay's dispatch event stream topic so that
+		// dispatch_index is populated even if KAFKA_TOPIC is not set.
+		topic = "dispatch.events.v1"
+	}
 	groupID := "intent-engine-group"
 	err = kafka.StartConsumer(
 		ctx,

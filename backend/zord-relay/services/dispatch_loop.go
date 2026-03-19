@@ -43,7 +43,11 @@ func (l *DispatchLoop) Start(ctx context.Context, batch int) {
 
 			for _, e := range lease.Events {
 				dispatchID := uuid.New().String()
-				connectorID := "hardcoded-connector-id"
+				// Use a stable, valid UUID string for connector_id so downstream
+				// services (e.g. outcome-engine) can safely store and query it as UUID.
+				// In production this should be configured per-connector, but for now
+				// we use a fixed demo UUID.
+				connectorID := "00000000-0000-0000-0000-000000000001"
 				corridorID := "IMPS"
 				tenantID := e.TenantID
 				intentID := e.AggregateID
@@ -57,19 +61,24 @@ func (l *DispatchLoop) Start(ctx context.Context, batch int) {
 					continue
 				}
 				dCreated := map[string]any{
-					"dispatch_id":   dispatchID,
-					"contract_id":   contractID,
-					"intent_id":     intentID,
-					"tenant_id":     tenantID,
-					"trace_id":      traceID,
-					"connector_id":  connectorID,
-					"corridor_id":   corridorID,
-					"attempt_count": 1,
-					"correlation_carriers": map[string]any{
-						"reference_id": dispatchID,
-						"narration":    "ZRD:" + contractID,
+					"event_id":     e.ID,
+					"event_type":   "DispatchCreated",
+					"tenant_id":    tenantID,
+					"intent_id":    intentID,
+					"contract_id":  contractID,
+					"trace_id":     traceID,
+					"schema_version": "v1",
+					"created_at":   time.Now().UTC(),
+					"payload": map[string]any{
+						"dispatch_id":   dispatchID,
+						"connector_id":  connectorID,
+						"corridor_id":   corridorID,
+						"attempt_count": 1,
+						"correlation_carriers": map[string]any{
+							"reference_id": dispatchID,
+							"narration":    "ZRD:" + contractID,
+						},
 					},
-					"created_at": time.Now().UTC(),
 				}
 				d := &model.Dispatch{
 					DispatchID:   dispatchID,
