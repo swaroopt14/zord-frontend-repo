@@ -17,11 +17,11 @@ import (
 	"github.com/google/uuid"
 )
 
-var errProviderPayoutIDMissing = errors.New("provider_payout_id missing")
+var errProviderEventIDMissing = errors.New("provider_event_id missing")
 
 // PSPBaseURL is the hardcoded PSP base URL.
 // Replace this with your PSP base URL (example: https://api.razorpay.com/v1).
-const PSPBaseURL = "http://CHANGE_ME_PSP_BASE_URL"
+const PSPBaseURL = "http://host.docker.internal:8099"
 
 // InternalOutcomeEngineBaseURL is used by the poll worker to feed PSP poll responses back into the
 // existing ingest pipeline (so normalization + canonical insert happen in one place).
@@ -162,10 +162,10 @@ LIMIT 1
 		// Call PSP GET poll and feed the response back into /v1/outcomes/poll/:connector.
 		log.Printf("poll.tick contract_id=%s dispatch_id=%s connector_id=%s corridor_id=%s stage=%d failures=%d", contractID.String(), dispatchID.String(), connectorID.String(), corridorID, stage, failures)
 		if err := pollPSP(ctx, client, contractID, dispatchID, connectorID, corridorID); err != nil {
-			if errors.Is(err, errProviderPayoutIDMissing) {
-				// No provider payout id to poll yet (e.g. webhook didn't include it).
+			if errors.Is(err, errProviderEventIDMissing) {
+				// No provider_event_id to poll yet (e.g. webhook didn't include it).
 				// Don't count as a poll failure; just try again later.
-				log.Printf("poll.skip.missing_provider_payout_id contract_id=%s dispatch_id=%s", contractID.String(), dispatchID.String())
+				log.Printf("poll.skip.missing_provider_event_id contract_id=%s dispatch_id=%s", contractID.String(), dispatchID.String())
 				_, _ = db.DB.ExecContext(ctx, `
 UPDATE poll_schedule
 SET next_poll_at = $1, last_poll_at = $2
@@ -210,20 +210,20 @@ func pollPSP(
 		return fmt.Errorf("PSPBaseURL is not configured; set services.PSPBaseURL")
 	}
 
-	// We must poll by provider payout identifier (not contract_id).
-	var providerPayoutID string
+	// We must poll by provider_event_id (the PSP payout identifier).
+	var providerEventID string
 	if err := db.DB.QueryRowContext(ctx, `
-SELECT provider_payout_id
+SELECT provider_event_id
 FROM canonical_outcome_events
-WHERE contract_id = $1 AND provider_payout_id IS NOT NULL AND provider_payout_id <> ''
+WHERE contract_id = $1 AND provider_event_id IS NOT NULL AND provider_event_id <> ''
 ORDER BY received_at DESC, created_at DESC
 LIMIT 1
-`, contractID).Scan(&providerPayoutID); err != nil || providerPayoutID == "" {
-		return fmt.Errorf("%w for contract_id=%s", errProviderPayoutIDMissing, contractID.String())
+`, contractID).Scan(&providerEventID); err != nil || providerEventID == "" {
+		return fmt.Errorf("%w for contract_id=%s", errProviderEventIDMissing, contractID.String())
 	}
 
-	pspURL := strings.TrimRight(PSPBaseURL, "/") + "/payouts/" + url.PathEscape(providerPayoutID)
-	log.Printf("psp.get.start contract_id=%s payout_id=%s url=%s", contractID.String(), providerPayoutID, pspURL)
+	pspURL := strings.TrimRight(PSPBaseURL, "/") + "/payouts/" + url.PathEscape(providerEventID)
+	log.Printf("psp.get.start contract_id=%s provider_event_id=%s url=%s", contractID.String(), providerEventID, pspURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pspURL, nil)
 	if err != nil {
 		return err
@@ -238,7 +238,7 @@ LIMIT 1
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("psp poll http status %d", resp.StatusCode)
 	}
-	log.Printf("psp.get.done contract_id=%s payout_id=%s status=%d", contractID.String(), providerPayoutID, resp.StatusCode)
+	log.Printf("psp.get.done contract_id=%s provider_event_id=%s status=%d", contractID.String(), providerEventID, resp.StatusCode)
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -256,7 +256,7 @@ LIMIT 1
 	}
 	obj["reference_id"] = dispatchID.String()
 	obj["corridor_id"] = corridorID
-	obj["provider_payout_id"] = providerPayoutID
+	obj["provider_event_id"] = providerEventID
 
 	ingestBytes, err := json.Marshal(obj)
 	if err != nil {

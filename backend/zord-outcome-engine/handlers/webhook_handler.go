@@ -11,6 +11,7 @@ import (
 )
 
 func (h *Handler) WebhookHandler(c *gin.Context) {
+	log.Print("Webhook Handler Started")
 	connectorID := c.Param("connector")
 
 	payload, err := c.GetRawData()

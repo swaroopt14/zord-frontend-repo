@@ -78,7 +78,7 @@ func main() {
 
 	// Start background workers (correlation + backfill scheduler + poll worker).
 	services.StartPendingCorrelationWorker(ctx)
-	services.StartBackfillScheduler(ctx)
+	//services.StartBackfillScheduler(ctx)
 	services.StartPollWorker(ctx)
 
 	h := &handlers.Handler{ //need to add h
