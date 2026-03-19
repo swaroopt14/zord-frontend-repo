@@ -273,5 +273,68 @@ func splitKey(key string) []string {
 	return parts
 }
 
+// GetSLABreachRate handles GET /v1/intelligence/sla-breach?tenant_id=X
+//
+// Returns SLA breach metrics for a tenant.
+// Example response:
+// {
+//   "tenant_id": "tnt_A",
+//   "total_processed": 1000,
+//   "breached": 45,
+//   "on_time": 955,
+//   "breach_rate": 0.045,
+//   "avg_breach_seconds": 1200,
+//   "window_start": "2024-01-15T00:00:00Z",
+//   "window_end": "2024-01-16T00:00:00Z"
+// }
+func (h *KPIHandler) GetSLABreachRate(w http.ResponseWriter, r *http.Request) {
+	tenantID := r.URL.Query().Get("tenant_id")
+	if tenantID == "" {
+		writeError(w, http.StatusBadRequest, "tenant_id query parameter is required")
+		return
+	}
+
+	key := "tenant.sla_breach_rate"
+	
+	p, err := h.projRepo.GetLatest(r.Context(), tenantID, key)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch SLA breach rate")
+		return
+	}
+
+	if p == nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"tenant_id":       tenantID,
+			"message":         "no data available yet",
+			"total_processed": 0,
+			"breached":        0,
+			"breach_rate":     0.0,
+		})
+		return
+	}
+
+	// Parse the JSONB value_json into our SLABreachRateValue struct
+	var breachData models.SLABreachRateValue
+	if err := json.Unmarshal([]byte(p.ValueJSON), &breachData); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to parse SLA data")
+		return
+	}
+
+	// Format response for the dashboard
+	response := map[string]interface{}{
+		"tenant_id":          tenantID,
+		"total_processed":    breachData.TotalProcessed,
+		"breached":           breachData.Breached,
+		"on_time":            breachData.OnTime,
+		"breach_rate":        breachData.BreachRate,
+		"avg_breach_seconds": breachData.AvgBreachSeconds,
+		"window_start":       p.WindowStart.Format("2006-01-02T15:04:05Z"),
+		"window_end":         p.WindowEnd.Format("2006-01-02T15:04:05Z"),
+		"computed_at":        p.ComputedAt.Format("2006-01-02T15:04:05Z"),
+	}
+
+	writeJSON(w, http.StatusOK, response)
+}
+
 // chi is imported for URL params in other handlers — keep it used
 var _ = chi.URLParam

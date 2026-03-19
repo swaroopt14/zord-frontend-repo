@@ -81,3 +81,29 @@ type PendingBacklogValue struct {
 	Bucket6hPlus  int       `json:"bucket_6h_plus"` // pending 6+ hours (critical)
 	UpdatedAt     time.Time `json:"updated_at"`
 }
+
+// SLABreachRateValue is stored in ProjectionState.ValueJSON
+// for projection_key "tenant.sla_breach_rate"
+//
+// Tracks SLA compliance per tenant per day.
+// An SLA timer is "breached" when:
+//   1. Timer reaches its deadline (created_at + SLA_DURATION)
+//   2. But payout is still PENDING (not SETTLED/FAILED/REVERSED)
+//   3. We say "the SLA was breached"
+//
+// Example:
+//   tenant_id "tnt_A" on 2024-01-15:
+//   - total_processed: 1000 intents that reached finality
+//   - breached: 45 (exceeded their SLA deadline)
+//   - on_time: 955 (settled before deadline)
+//   - breach_rate: 0.045 (45/1000)
+//   - avg_breach_seconds: 1200 (average 20 minutes late)
+type SLABreachRateValue struct {
+	TotalProcessed     int       `json:"total_processed"`      // intents finalized in window
+	Breached           int       `json:"breached"`             // exceeded SLA
+	OnTime             int       `json:"on_time"`              // met SLA
+	BreachRate         float64   `json:"breach_rate"`          // breached / total_processed
+	AvgBreachSeconds   float64   `json:"avg_breach_seconds"`   // average late time
+	TotalBreachSeconds int64     `json:"total_breach_seconds"` // running sum (for incremental avg)
+	UpdatedAt          time.Time `json:"updated_at"`
+}

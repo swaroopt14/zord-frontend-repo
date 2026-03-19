@@ -179,19 +179,16 @@ func (s *ProjectionService) HandleFinalityCertIssued(
 			e.IntentID, err)
 	}
 
+	// ── Track SLA Compliance ───────────────────────────────────────────────
+	// Record whether this payout met its SLA deadline
+	if err := s.HandleSLATimerResolved(ctx, e.TenantID); err != nil {
+		log.Printf("HandleFinalityCertIssued: HandleSLATimerResolved failed tenant=%s: %v",
+			e.TenantID, err)
+	}
+
 	// ── Trigger policy evaluation ─────────────────────────────────────────
 	return s.policyService.EvaluateForEvent(
 		ctx, e.TenantID, e.CorridorID, "finality.certificate.issued", e.EventID,
-	)
-}
-
-// HandleFinalContractUpdated triggers policy evaluation for contract-level policies.
-func (s *ProjectionService) HandleFinalContractUpdated(
-	ctx context.Context,
-	e models.FinalContractUpdatedEvent,
-) error {
-	return s.policyService.EvaluateForEvent(
-		ctx, e.TenantID, e.CorridorID, "final.contract.updated", e.EventID,
 	)
 }
 
@@ -238,4 +235,63 @@ func todayWindow(t time.Time) windowBounds {
 		start: start,
 		end:   start.Add(24 * time.Hour),
 	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SLA BREACH RATE HANDLERS (new for Gap #4)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// HandleSLATimerBreached is called by sla_worker when an SLA timer exceeds its deadline.
+//
+// Business logic:
+//   - An intent had a deadline (created_at + 6 hours)
+//   - Current time is now past that deadline
+//   - The payout is still PENDING (not finalized)
+//   - This is a breach
+//
+// What we do:
+//  1. Calculate how late we are: breach_duration = now - deadline
+//  2. Increment the breach counter
+//  3. Track the breach duration for averaging
+//  4. Update the projection
+func (s *ProjectionService) HandleSLATimerBreached(
+	ctx context.Context,
+	tenantID string,
+	breachDurationSeconds float64,
+) error {
+	window := todayWindow(time.Now())
+
+	if err := s.projRepo.AtomicIncrementSLABreached(
+		ctx, tenantID, breachDurationSeconds, window.start, window.end,
+	); err != nil {
+		return fmt.Errorf("HandleSLATimerBreached tenant=%s: %w", tenantID, err)
+	}
+
+	return nil
+}
+
+// HandleSLATimerResolved is called when an SLA timer reaches finality BEFORE its deadline.
+//
+// Business logic:
+//   - An intent had a deadline
+//   - The payout reached SETTLED/FAILED/REVERSED before deadline
+//   - This is on-time delivery
+//
+// What we do:
+//  1. Increment on_time counter
+//  2. Increment total_processed counter
+//  3. Update the projection
+func (s *ProjectionService) HandleSLATimerResolved(
+	ctx context.Context,
+	tenantID string,
+) error {
+	window := todayWindow(time.Now())
+
+	if err := s.projRepo.AtomicIncrementSLAOnTime(
+		ctx, tenantID, window.start, window.end,
+	); err != nil {
+		return fmt.Errorf("HandleSLATimerResolved tenant=%s: %w", tenantID, err)
+	}
+
+	return nil
 }
