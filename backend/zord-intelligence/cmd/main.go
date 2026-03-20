@@ -75,7 +75,10 @@ func main() {
 
 	// ── Step 7: Create background workers ─────────────────────────────────
 	outboxWorker := worker.NewOutboxWorker(outboxRepo, producer, cfg)
-	slaWorker := worker.NewSLAWorker(slaRepo, actionService)
+	// projectionService is passed so sla_worker can call HandleSLATimerBreached
+	// when a deadline is missed — this updates the tenant.sla_breach_rate projection.
+	// Without this, the /sla-breach endpoint always shows 0 even during real breaches.
+	slaWorker := worker.NewSLAWorker(slaRepo, actionService, projectionService)
 
 	// ── Step 8: Create HTTP handlers ──────────────────────────────────────
 	// Handlers need repos (not services — handlers only read data).
@@ -113,7 +116,7 @@ func main() {
 	log.Println("main: background workers started")
 
 	// ── Step 13: Start Kafka consumers ────────────────────────────────────
-	// Starts 7 goroutines, one per input topic.
+	// Starts 8 goroutines, one per input topic.
 	// projectionService implements the EventHandler interface — receives all events.
 	kafkapkg.StartConsumers(ctx, cfg, projectionService)
 	log.Println("main: kafka consumers started")

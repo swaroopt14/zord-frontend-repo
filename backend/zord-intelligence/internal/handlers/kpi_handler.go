@@ -239,38 +239,481 @@ func (h *KPIHandler) GetSLAStatus(w http.ResponseWriter, r *http.Request) {
 // ── Private helpers used only in this file ────────────────────────────────────
 
 // extractCorridorID pulls the corridor ID from a projection key.
-// "corridor.success_rate.razorpay_UPI" → "razorpay_UPI"
-// "tenant.evidence_readiness"          → "" (not a corridor key)
+//
+// Projection keys follow the format: "corridor.{metric_type}.{corridor_id}"
+// where corridor_id itself may contain dots (e.g. "razorpay.UPI").
+//
+// Examples:
+//   "corridor.success_rate.razorpay.UPI"       → "razorpay.UPI"
+//   "corridor.retry_recovery_rate.cashfree.IMPS" → "cashfree.IMPS"
+//   "tenant.evidence_readiness"                → "" (not a corridor key)
+//
+// Strategy: the first part is always "corridor", the second is the metric type,
+// and everything after the second dot is the corridor_id (may itself contain dots).
 func extractCorridorID(key string) string {
-	// chi provides URL params via chi.URLParam(r, "id")
-	// Here we parse the projection key string manually
-	parts := splitKey(key)
-	// corridor keys have 3 parts: ["corridor", "metric_type", "corridor_id"]
-	if len(parts) == 3 && parts[0] == "corridor" {
-		return parts[2]
+	// Must start with "corridor."
+	if len(key) < 9 || key[:9] != "corridor." {
+		return ""
 	}
-	return ""
-}
+	rest := key[9:] // strip "corridor."
 
-// isKeyType checks if a projection key contains a specific metric type.
-// "corridor.success_rate.razorpay_UPI" with "success_rate" → true
-func isKeyType(key, metricType string) bool {
-	parts := splitKey(key)
-	return len(parts) >= 2 && parts[1] == metricType
-}
-
-// splitKey splits a projection key by "."
-func splitKey(key string) []string {
-	var parts []string
-	start := 0
-	for i, c := range key {
+	// Find the next dot — that separates metric_type from corridor_id
+	dotIdx := -1
+	for i, c := range rest {
 		if c == '.' {
-			parts = append(parts, key[start:i])
-			start = i + 1
+			dotIdx = i
+			break
 		}
 	}
-	parts = append(parts, key[start:])
-	return parts
+	if dotIdx == -1 {
+		return "" // no corridor_id segment (e.g. "corridor.somekey" with no third part)
+	}
+	corridorID := rest[dotIdx+1:]
+	if corridorID == "" {
+		return ""
+	}
+	return corridorID
+}
+
+// isKeyType checks if a projection key has a specific metric type as its second segment.
+//
+// "corridor.success_rate.razorpay.UPI" with "success_rate" → true
+// "corridor.retry_recovery_rate.cashfree.IMPS" with "retry_recovery_rate" → true
+// "tenant.evidence_readiness" with "evidence_readiness" → true
+func isKeyType(key, metricType string) bool {
+	// Find first dot
+	first := -1
+	for i, c := range key {
+		if c == '.' {
+			first = i
+			break
+		}
+	}
+	if first == -1 {
+		return false
+	}
+	rest := key[first+1:] // e.g. "success_rate.razorpay.UPI"
+
+	// Find second dot (or end of string)
+	second := -1
+	for i, c := range rest {
+		if c == '.' {
+			second = i
+			break
+		}
+	}
+	var segment string
+	if second == -1 {
+		segment = rest // e.g. "evidence_readiness" (no third part)
+	} else {
+		segment = rest[:second] // e.g. "success_rate"
+	}
+	return segment == metricType
+}
+
+// GetRetryRecoveryRate handles GET /v1/intelligence/retry-recovery?tenant_id=X&corridor_id=Y
+//
+// Returns retry efficiency for a corridor: how many retried payouts were
+// ultimately recovered (reached SETTLED) vs total retries attempted.
+//
+// Business value: "Are our retries actually working, or are we wasting attempts?"
+//
+// Example response:
+//
+//	{
+//	  "tenant_id": "tnt_A",
+//	  "corridor_id": "razorpay_UPI",
+//	  "total_attempts": 1200,
+//	  "retry_attempts": 80,
+//	  "recovered": 55,
+//	  "recovery_rate": 0.6875,
+//	  "window_start": "2024-01-15T00:00:00Z"
+//	}
+func (h *KPIHandler) GetRetryRecoveryRate(w http.ResponseWriter, r *http.Request) {
+	tenantID := r.URL.Query().Get("tenant_id")
+	corridorID := r.URL.Query().Get("corridor_id")
+	if tenantID == "" {
+		writeError(w, http.StatusBadRequest, "tenant_id is required")
+		return
+	}
+
+	// If no corridor specified, list all corridor retry projections
+	if corridorID == "" {
+		projections, err := h.projRepo.ListByTenant(r.Context(), tenantID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to fetch retry recovery data")
+			return
+		}
+
+		type corridorRetry struct {
+			CorridorID    string  `json:"corridor_id"`
+			TotalAttempts int     `json:"total_attempts"`
+			RetryAttempts int     `json:"retry_attempts"`
+			Recovered     int     `json:"recovered"`
+			RecoveryRate  float64 `json:"recovery_rate"`
+		}
+
+		var results []corridorRetry
+		for _, p := range projections {
+			if !isKeyType(p.ProjectionKey, "retry_recovery_rate") {
+				continue
+			}
+			cid := extractCorridorID(p.ProjectionKey)
+			var v models.RetryRecoveryRateValue
+			if err := json.Unmarshal([]byte(p.ValueJSON), &v); err != nil {
+				continue
+			}
+			results = append(results, corridorRetry{
+				CorridorID:    cid,
+				TotalAttempts: v.TotalAttempts,
+				RetryAttempts: v.RetryAttempts,
+				Recovered:     v.Recovered,
+				RecoveryRate:  v.RecoveryRate,
+			})
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"tenant_id": tenantID,
+			"corridors": results,
+			"count":     len(results),
+		})
+		return
+	}
+
+	key := "corridor.retry_recovery_rate." + corridorID
+	p, err := h.projRepo.GetLatest(r.Context(), tenantID, key)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch retry recovery rate")
+		return
+	}
+	if p == nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"tenant_id":   tenantID,
+			"corridor_id": corridorID,
+			"message":     "no data yet",
+		})
+		return
+	}
+
+	var v models.RetryRecoveryRateValue
+	if err := json.Unmarshal([]byte(p.ValueJSON), &v); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to parse retry recovery data")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"tenant_id":      tenantID,
+		"corridor_id":    corridorID,
+		"total_attempts": v.TotalAttempts,
+		"retry_attempts": v.RetryAttempts,
+		"recovered":      v.Recovered,
+		"recovery_rate":  v.RecoveryRate,
+		"window_start":   p.WindowStart.Format("2006-01-02T15:04:05Z"),
+		"window_end":     p.WindowEnd.Format("2006-01-02T15:04:05Z"),
+		"computed_at":    p.ComputedAt.Format("2006-01-02T15:04:05Z"),
+	})
+}
+
+// GetStatementMatchRate handles GET /v1/intelligence/statement-match?tenant_id=X&corridor_id=Y
+//
+// Returns what % of settled payouts appear in the bank statement.
+// A falling match rate is a finance alarm — leakage or PSP settlement delay.
+//
+// Requires Service 5 to emit StatementMatchEvent (new topic: statement.match.event).
+//
+// Example response:
+//
+//	{
+//	  "tenant_id": "tnt_A",
+//	  "corridor_id": "razorpay_UPI",
+//	  "total_settled": 1000,
+//	  "matched": 970,
+//	  "unmatched": 30,
+//	  "match_rate": 0.97,
+//	  "avg_match_age_seconds": 1200
+//	}
+func (h *KPIHandler) GetStatementMatchRate(w http.ResponseWriter, r *http.Request) {
+	tenantID := r.URL.Query().Get("tenant_id")
+	corridorID := r.URL.Query().Get("corridor_id")
+	if tenantID == "" {
+		writeError(w, http.StatusBadRequest, "tenant_id is required")
+		return
+	}
+
+	if corridorID == "" {
+		// Return all corridors
+		projections, err := h.projRepo.ListByTenant(r.Context(), tenantID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to fetch statement match data")
+			return
+		}
+		type corridorMatch struct {
+			CorridorID          string  `json:"corridor_id"`
+			TotalSettled        int     `json:"total_settled"`
+			Matched             int     `json:"matched"`
+			Unmatched           int     `json:"unmatched"`
+			MatchRate           float64 `json:"match_rate"`
+			AvgMatchAgeSeconds  float64 `json:"avg_match_age_seconds"`
+		}
+		var results []corridorMatch
+		for _, p := range projections {
+			if !isKeyType(p.ProjectionKey, "statement_match_rate") {
+				continue
+			}
+			cid := extractCorridorID(p.ProjectionKey)
+			var v models.StatementMatchRateValue
+			if err := json.Unmarshal([]byte(p.ValueJSON), &v); err != nil {
+				continue
+			}
+			results = append(results, corridorMatch{
+				CorridorID:         cid,
+				TotalSettled:       v.TotalSettled,
+				Matched:            v.Matched,
+				Unmatched:          v.Unmatched,
+				MatchRate:          v.MatchRate,
+				AvgMatchAgeSeconds: v.AvgMatchAgeSecs,
+			})
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"tenant_id": tenantID,
+			"corridors": results,
+			"count":     len(results),
+		})
+		return
+	}
+
+	key := "corridor.statement_match_rate." + corridorID
+	p, err := h.projRepo.GetLatest(r.Context(), tenantID, key)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch statement match rate")
+		return
+	}
+	if p == nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"tenant_id":   tenantID,
+			"corridor_id": corridorID,
+			"message":     "no data yet — ensure Service 5 is emitting statement.match.event",
+		})
+		return
+	}
+
+	var v models.StatementMatchRateValue
+	if err := json.Unmarshal([]byte(p.ValueJSON), &v); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to parse statement match data")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"tenant_id":            tenantID,
+		"corridor_id":          corridorID,
+		"total_settled":        v.TotalSettled,
+		"matched":              v.Matched,
+		"unmatched":            v.Unmatched,
+		"match_rate":           v.MatchRate,
+		"avg_match_age_seconds": v.AvgMatchAgeSecs,
+		"window_start":         p.WindowStart.Format("2006-01-02T15:04:05Z"),
+		"window_end":           p.WindowEnd.Format("2006-01-02T15:04:05Z"),
+		"computed_at":          p.ComputedAt.Format("2006-01-02T15:04:05Z"),
+	})
+}
+
+// GetProviderRefMissingRate handles GET /v1/intelligence/provider-ref-missing?tenant_id=X&corridor_id=Y
+//
+// Returns what % of finalized payouts are missing a provider reference
+// (UTR / RRN / BankRef). Missing refs mean weaker evidence packs and
+// harder dispute resolution.
+//
+// Requires Service 5's FinalityCertIssuedEvent to include has_provider_ref field.
+//
+// Example response:
+//
+//	{
+//	  "tenant_id": "tnt_A",
+//	  "corridor_id": "cashfree_IMPS",
+//	  "total_finalized": 500,
+//	  "missing_ref": 45,
+//	  "with_ref": 455,
+//	  "missing_rate": 0.09
+//	}
+func (h *KPIHandler) GetProviderRefMissingRate(w http.ResponseWriter, r *http.Request) {
+	tenantID := r.URL.Query().Get("tenant_id")
+	corridorID := r.URL.Query().Get("corridor_id")
+	if tenantID == "" {
+		writeError(w, http.StatusBadRequest, "tenant_id is required")
+		return
+	}
+
+	if corridorID == "" {
+		projections, err := h.projRepo.ListByTenant(r.Context(), tenantID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to fetch provider ref data")
+			return
+		}
+		type corridorRef struct {
+			CorridorID     string  `json:"corridor_id"`
+			TotalFinalized int     `json:"total_finalized"`
+			MissingRef     int     `json:"missing_ref"`
+			WithRef        int     `json:"with_ref"`
+			MissingRate    float64 `json:"missing_rate"`
+		}
+		var results []corridorRef
+		for _, p := range projections {
+			if !isKeyType(p.ProjectionKey, "provider_ref_missing_rate") {
+				continue
+			}
+			cid := extractCorridorID(p.ProjectionKey)
+			var v models.ProviderRefMissingRateValue
+			if err := json.Unmarshal([]byte(p.ValueJSON), &v); err != nil {
+				continue
+			}
+			results = append(results, corridorRef{
+				CorridorID:     cid,
+				TotalFinalized: v.TotalFinalized,
+				MissingRef:     v.MissingRef,
+				WithRef:        v.WithRef,
+				MissingRate:    v.MissingRate,
+			})
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"tenant_id": tenantID,
+			"corridors": results,
+			"count":     len(results),
+		})
+		return
+	}
+
+	key := "corridor.provider_ref_missing_rate." + corridorID
+	p, err := h.projRepo.GetLatest(r.Context(), tenantID, key)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch provider ref missing rate")
+		return
+	}
+	if p == nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"tenant_id":   tenantID,
+			"corridor_id": corridorID,
+			"message":     "no data yet",
+		})
+		return
+	}
+
+	var v models.ProviderRefMissingRateValue
+	if err := json.Unmarshal([]byte(p.ValueJSON), &v); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to parse provider ref data")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"tenant_id":       tenantID,
+		"corridor_id":     corridorID,
+		"total_finalized": v.TotalFinalized,
+		"missing_ref":     v.MissingRef,
+		"with_ref":        v.WithRef,
+		"missing_rate":    v.MissingRate,
+		"window_start":    p.WindowStart.Format("2006-01-02T15:04:05Z"),
+		"window_end":      p.WindowEnd.Format("2006-01-02T15:04:05Z"),
+		"computed_at":     p.ComputedAt.Format("2006-01-02T15:04:05Z"),
+	})
+}
+
+// GetConflictRateInFusion handles GET /v1/intelligence/fusion-conflicts?tenant_id=X&corridor_id=Y
+//
+// Returns how often Outcome Fusion encounters conflicting signals for this corridor.
+// High conflict rate = unreliable PSP signals = higher ops cost + risk.
+//
+// Requires Service 5's FinalityCertIssuedEvent to include conflict_count + conflict_types.
+//
+// Example response:
+//
+//	{
+//	  "tenant_id": "tnt_A",
+//	  "corridor_id": "razorpay_UPI",
+//	  "total_finalized": 1000,
+//	  "with_conflicts": 87,
+//	  "conflict_rate": 0.087,
+//	  "total_conflicts": 95,
+//	  "conflict_type_breakdown": {
+//	    "webhook_vs_poll_mismatch": 50,
+//	    "amount_mismatch": 37
+//	  }
+//	}
+func (h *KPIHandler) GetConflictRateInFusion(w http.ResponseWriter, r *http.Request) {
+	tenantID := r.URL.Query().Get("tenant_id")
+	corridorID := r.URL.Query().Get("corridor_id")
+	if tenantID == "" {
+		writeError(w, http.StatusBadRequest, "tenant_id is required")
+		return
+	}
+
+	if corridorID == "" {
+		projections, err := h.projRepo.ListByTenant(r.Context(), tenantID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to fetch fusion conflict data")
+			return
+		}
+		type corridorConflict struct {
+			CorridorID            string         `json:"corridor_id"`
+			TotalFinalized        int            `json:"total_finalized"`
+			WithConflicts         int            `json:"with_conflicts"`
+			ConflictRate          float64        `json:"conflict_rate"`
+			TotalConflicts        int            `json:"total_conflicts"`
+			ConflictTypeBreakdown map[string]int `json:"conflict_type_breakdown"`
+		}
+		var results []corridorConflict
+		for _, p := range projections {
+			if !isKeyType(p.ProjectionKey, "conflict_rate_in_fusion") {
+				continue
+			}
+			cid := extractCorridorID(p.ProjectionKey)
+			var v models.ConflictRateInFusionValue
+			if err := json.Unmarshal([]byte(p.ValueJSON), &v); err != nil {
+				continue
+			}
+			results = append(results, corridorConflict{
+				CorridorID:            cid,
+				TotalFinalized:        v.TotalFinalized,
+				WithConflicts:         v.WithConflicts,
+				ConflictRate:          v.ConflictRate,
+				TotalConflicts:        v.TotalConflicts,
+				ConflictTypeBreakdown: v.ConflictTypeBreakdown,
+			})
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"tenant_id": tenantID,
+			"corridors": results,
+			"count":     len(results),
+		})
+		return
+	}
+
+	key := "corridor.conflict_rate_in_fusion." + corridorID
+	p, err := h.projRepo.GetLatest(r.Context(), tenantID, key)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch conflict rate")
+		return
+	}
+	if p == nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"tenant_id":   tenantID,
+			"corridor_id": corridorID,
+			"message":     "no data yet",
+		})
+		return
+	}
+
+	var v models.ConflictRateInFusionValue
+	if err := json.Unmarshal([]byte(p.ValueJSON), &v); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to parse conflict rate data")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"tenant_id":               tenantID,
+		"corridor_id":             corridorID,
+		"total_finalized":         v.TotalFinalized,
+		"with_conflicts":          v.WithConflicts,
+		"conflict_rate":           v.ConflictRate,
+		"total_conflicts":         v.TotalConflicts,
+		"conflict_type_breakdown": v.ConflictTypeBreakdown,
+		"window_start":            p.WindowStart.Format("2006-01-02T15:04:05Z"),
+		"window_end":              p.WindowEnd.Format("2006-01-02T15:04:05Z"),
+		"computed_at":             p.ComputedAt.Format("2006-01-02T15:04:05Z"),
+	})
 }
 
 // GetSLABreachRate handles GET /v1/intelligence/sla-breach?tenant_id=X

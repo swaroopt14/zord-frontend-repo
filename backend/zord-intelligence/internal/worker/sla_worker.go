@@ -33,18 +33,21 @@ import (
 
 // SLAWorker checks SLA timers and fires ESCALATE actions for breaches.
 type SLAWorker struct {
-	slaRepo       *persistence.SLATimerRepo
-	actionService *services.ActionService
+	slaRepo           *persistence.SLATimerRepo
+	actionService     *services.ActionService
+	projectionService *services.ProjectionService // needed to update sla_breach_rate projection
 }
 
 // NewSLAWorker creates an SLAWorker.
 func NewSLAWorker(
 	slaRepo *persistence.SLATimerRepo,
 	actionService *services.ActionService,
+	projectionService *services.ProjectionService,
 ) *SLAWorker {
 	return &SLAWorker{
-		slaRepo:       slaRepo,
-		actionService: actionService,
+		slaRepo:           slaRepo,
+		actionService:     actionService,
+		projectionService: projectionService,
 	}
 }
 
@@ -103,6 +106,7 @@ func (w *SLAWorker) runOnce(ctx context.Context) {
 // This gives us at-least-once semantics with no duplicate alerts.
 func (w *SLAWorker) handleBreach(ctx context.Context, timer persistence.SLATimerRow) error {
 	overdueBy := time.Since(timer.SLADeadline).Round(time.Minute)
+	breachSeconds := time.Since(timer.SLADeadline).Seconds()
 
 	payload, _ := json.Marshal(map[string]any{
 		"intent_id":    timer.IntentID,
@@ -138,6 +142,17 @@ func (w *SLAWorker) handleBreach(ctx context.Context, timer persistence.SLATimer
 	}); err != nil {
 		return fmt.Errorf("sla_worker.handleBreach CreateAction intent=%s: %w",
 			timer.IntentID, err)
+	}
+
+	// ── Update the sla_breach_rate projection ─────────────────────────────
+	// This is what feeds GET /v1/intelligence/sla-breach.
+	// Without this call, the breach counter in projection_state stays at zero
+	// even when real breaches happen — ops would never see accurate breach rates.
+	// We log failures here rather than returning an error, because the
+	// ActionContract (the authoritative record) already succeeded above.
+	if err := w.projectionService.HandleSLATimerBreached(ctx, timer.TenantID, breachSeconds); err != nil {
+		log.Printf("sla_worker.handleBreach: HandleSLATimerBreached failed intent=%s tenant=%s: %v",
+			timer.IntentID, timer.TenantID, err)
 	}
 
 	if err := w.slaRepo.MarkBreached(ctx, timer.ID); err != nil {

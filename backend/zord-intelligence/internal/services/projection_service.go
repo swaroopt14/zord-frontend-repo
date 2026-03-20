@@ -76,15 +76,26 @@ func (s *ProjectionService) HandleIntentCreated(
 }
 
 // HandleDispatchCreated tracks payout dispatch attempts.
-// Retry-rate projection will be added in Gap #5 (missing projections sprint).
+// Computes retry_recovery_rate: separates first attempts from retries.
 func (s *ProjectionService) HandleDispatchCreated(
 	ctx context.Context,
 	e models.DispatchAttemptCreatedEvent,
 ) error {
-	// Not a silent no-op — we log so the event appears in traces
 	log.Printf("HandleDispatchCreated: attempt=%s intent=%s corridor=%s attempt_no=%d",
 		e.AttemptID, e.IntentID, e.CorridorID, e.AttemptNo)
-	return nil
+
+	window := todayWindow(e.DispatchAt)
+
+	if e.AttemptNo > 1 {
+		// This is a retry — count both total_attempts AND retry_attempts
+		return s.projRepo.AtomicIncrementRetryAttempt(
+			ctx, e.TenantID, e.CorridorID, window.start, window.end,
+		)
+	}
+	// First attempt — count only total_attempts
+	return s.projRepo.AtomicIncrementFirstAttempt(
+		ctx, e.TenantID, e.CorridorID, window.start, window.end,
+	)
 }
 
 // HandleOutcomeNormalized updates the failure taxonomy when a FAILED outcome arrives.
@@ -171,6 +182,47 @@ func (s *ProjectionService) HandleFinalityCertIssued(
 			e.CorridorID, err)
 	}
 
+	// ── Update 4: provider_ref_missing_rate (new — Service 5 field) ───────
+	// HasProviderRef tells us whether Service 5 found a UTR/RRN/BankRef.
+	// Default true if field absent (zero-value bool = false, but old events
+	// from before the Service 5 upgrade won't have this field at all —
+	// treat missing field as "unknown" by using true to avoid inflating miss rate).
+	if err := s.projRepo.AtomicRecordProviderRef(
+		ctx, e.TenantID, e.CorridorID, e.HasProviderRef, window.start, window.end,
+	); err != nil {
+		// Log but don't fail — this is a new projection; don't break existing flow
+		log.Printf("HandleFinalityCertIssued: AtomicRecordProviderRef failed cert=%s: %v",
+			e.CertificateID, err)
+	}
+
+	// ── Update 5: conflict_rate_in_fusion (new — Service 5 fields) ────────
+	// ConflictCount and ConflictTypes are populated by Outcome Fusion.
+	// ConflictCount == 0 on events from before the Service 5 upgrade —
+	// that's fine, it just registers as a clean (no-conflict) cert.
+	if err := s.projRepo.AtomicRecordFusionConflict(
+		ctx, e.TenantID, e.CorridorID,
+		e.ConflictCount, e.ConflictTypes,
+		window.start, window.end,
+	); err != nil {
+		log.Printf("HandleFinalityCertIssued: AtomicRecordFusionConflict failed cert=%s: %v",
+			e.CertificateID, err)
+	}
+
+	// ── Update 6: retry_recovery_rate (increment recovered if SETTLED) ────
+	// When a corridor's SETTLED cert arrives, we check whether the corridor
+	// already has retry_attempts > 0 in this window. If so, this settlement
+	// counts as a "recovery" — a retry that ultimately succeeded.
+	// This is a corridor-level heuristic (not per-intent), which keeps the
+	// handler stateless. Per-intent tracking would require a join table.
+	if e.FinalState == "SETTLED" {
+		if err := s.projRepo.AtomicIncrementRetryRecovered(
+			ctx, e.TenantID, e.CorridorID, window.start, window.end,
+		); err != nil {
+			log.Printf("HandleFinalityCertIssued: AtomicIncrementRetryRecovered failed cert=%s: %v",
+				e.CertificateID, err)
+		}
+	}
+
 	// ── Resolve the SLA timer ─────────────────────────────────────────────
 	// Mark as RESOLVED so sla_worker doesn't fire a breach alert for a payout
 	// that already finished. Log failures — don't let them fail the event.
@@ -192,7 +244,49 @@ func (s *ProjectionService) HandleFinalityCertIssued(
 	)
 }
 
-// HandleEvidencePackReady updates the evidence readiness rate for the tenant.
+// HandleFinalContractUpdated is called when the final contract read model updates.
+// Primary use: trigger event-based policy evaluation.
+func (s *ProjectionService) HandleFinalContractUpdated(
+	ctx context.Context,
+	e models.FinalContractUpdatedEvent,
+) error {
+	return s.policyService.EvaluateForEvent(
+		ctx, e.TenantID, e.CorridorID, "final.contract.updated", e.EventID,
+	)
+}
+
+// HandleStatementMatch updates the statement_match_rate projection.
+//
+// Called when Service 5 emits a StatementMatchEvent on the
+// "statement.match.event" Kafka topic (new topic, added per Service 5 spec).
+//
+// MATCHED events:   payout was found in the bank/PSP settlement statement.
+// UNMATCHED events: payout settled per signals but NOT in statement after 24h.
+//
+// A rising UNMATCHED rate is a finance alarm:
+//   - Signals say SETTLED but money not confirmed in statement
+//   - Could indicate settlement delay, PSP error, or leakage
+//   - Finance team can't close books cleanly
+func (s *ProjectionService) HandleStatementMatch(
+	ctx context.Context,
+	e models.StatementMatchEvent,
+) error {
+	window := todayWindow(e.CreatedAt)
+	matched := e.MatchStatus == "MATCHED"
+
+	if err := s.projRepo.AtomicRecordStatementMatch(
+		ctx, e.TenantID, e.CorridorID, matched, e.AgedSeconds, window.start, window.end,
+	); err != nil {
+		return fmt.Errorf("HandleStatementMatch corridor=%s status=%s: %w",
+			e.CorridorID, e.MatchStatus, err)
+	}
+
+	// Trigger policy evaluation — a spike in UNMATCHED events should fire
+	// the reconciliation policy (P_STATEMENT_MISMATCH_SPIKE)
+	return s.policyService.EvaluateForEvent(
+		ctx, e.TenantID, e.CorridorID, "statement.match.event", e.EventID,
+	)
+}
 func (s *ProjectionService) HandleEvidencePackReady(
 	ctx context.Context,
 	e models.EvidencePackReadyEvent,

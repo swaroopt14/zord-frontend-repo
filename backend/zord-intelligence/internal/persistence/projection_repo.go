@@ -593,13 +593,13 @@ func (r *ProjectionRepo) AtomicIncrementSLABreached(
 						to_jsonb(COALESCE((projection_state.value_json->>'breached')::int, 0) + 1)
 					),
 					'{total_breach_seconds}',
-					to_jsonb(COALESCE((projection_state.value_json->>'total_breach_seconds')::int64, 0) + CAST($5 AS INTEGER))
+					to_jsonb(COALESCE((projection_state.value_json->>'total_breach_seconds')::bigint, 0) + CAST($5 AS BIGINT))
 				),
 				'{avg_breach_seconds}',
 				to_jsonb(
 					CASE 
 						WHEN (COALESCE((projection_state.value_json->>'breached')::int, 0) + 1) > 0
-						THEN (COALESCE((projection_state.value_json->>'total_breach_seconds')::int64, 0) + CAST($5 AS INTEGER))::float8 / 
+						THEN (COALESCE((projection_state.value_json->>'total_breach_seconds')::bigint, 0) + CAST($5 AS BIGINT))::float8 / 
 						     (COALESCE((projection_state.value_json->>'breached')::int, 0) + 1)
 						ELSE 0.0
 					END
@@ -690,7 +690,488 @@ func (r *ProjectionRepo) recomputeSLABreachRate(
 	return nil
 }
 
-// recomputeRate recalculates settled/total and stores as the rate field.
+// ─────────────────────────────────────────────────────────────────────────────
+// RETRY RECOVERY RATE OPERATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// AtomicIncrementRetryAttempt records a retry dispatch (attempt_no > 1).
+// Called by HandleDispatchCreated when attempt_no > 1.
+func (r *ProjectionRepo) AtomicIncrementRetryAttempt(
+	ctx context.Context,
+	tenantID, corridorID string,
+	windowStart, windowEnd time.Time,
+) error {
+	key := fmt.Sprintf("corridor.retry_recovery_rate.%s", corridorID)
+
+	upsertSQL := `
+		INSERT INTO projection_state
+			(tenant_id, projection_key, window_start, window_end,
+			 value_json, computed_at, projection_version)
+		VALUES ($1, $2, $3, $4,
+			'{"total_attempts":1,"retry_attempts":1,"recovered":0,"recovery_rate":0.0}'::jsonb,
+			now(), 1)
+		ON CONFLICT (tenant_id, projection_key, window_start, projection_version)
+		DO UPDATE SET
+			value_json = jsonb_set(
+				jsonb_set(
+					projection_state.value_json,
+					'{retry_attempts}',
+					to_jsonb(COALESCE((projection_state.value_json->>'retry_attempts')::int, 0) + 1)
+				),
+				'{total_attempts}',
+				to_jsonb(COALESCE((projection_state.value_json->>'total_attempts')::int, 0) + 1)
+			),
+			computed_at = now()
+	`
+	if _, err := r.pool.Exec(ctx, upsertSQL, tenantID, key, windowStart, windowEnd); err != nil {
+		return fmt.Errorf("projection_repo.AtomicIncrementRetryAttempt corridor=%s: %w", corridorID, err)
+	}
+	return nil
+}
+
+// AtomicIncrementFirstAttempt records a first-time dispatch (attempt_no == 1).
+// Only increments total_attempts — retry_attempts stays the same.
+func (r *ProjectionRepo) AtomicIncrementFirstAttempt(
+	ctx context.Context,
+	tenantID, corridorID string,
+	windowStart, windowEnd time.Time,
+) error {
+	key := fmt.Sprintf("corridor.retry_recovery_rate.%s", corridorID)
+
+	upsertSQL := `
+		INSERT INTO projection_state
+			(tenant_id, projection_key, window_start, window_end,
+			 value_json, computed_at, projection_version)
+		VALUES ($1, $2, $3, $4,
+			'{"total_attempts":1,"retry_attempts":0,"recovered":0,"recovery_rate":0.0}'::jsonb,
+			now(), 1)
+		ON CONFLICT (tenant_id, projection_key, window_start, projection_version)
+		DO UPDATE SET
+			value_json = jsonb_set(
+				projection_state.value_json,
+				'{total_attempts}',
+				to_jsonb(COALESCE((projection_state.value_json->>'total_attempts')::int, 0) + 1)
+			),
+			computed_at = now()
+	`
+	if _, err := r.pool.Exec(ctx, upsertSQL, tenantID, key, windowStart, windowEnd); err != nil {
+		return fmt.Errorf("projection_repo.AtomicIncrementFirstAttempt corridor=%s: %w", corridorID, err)
+	}
+	return nil
+}
+
+// AtomicIncrementRetryRecovered records a successful SETTLED outcome for an intent
+// that had at least one retry. Called when HandleFinalityCertIssued sees SETTLED
+// and the intent previously had retry_attempts > 0 on this corridor.
+//
+// NOTE: We track "recovered" conservatively — we increment when a SETTLED cert
+// arrives on a corridor that has retry_attempts > 0 in the window. This is a
+// corridor-level aggregate, not per-intent tracking, which keeps it stateless.
+func (r *ProjectionRepo) AtomicIncrementRetryRecovered(
+	ctx context.Context,
+	tenantID, corridorID string,
+	windowStart, windowEnd time.Time,
+) error {
+	key := fmt.Sprintf("corridor.retry_recovery_rate.%s", corridorID)
+
+	upsertSQL := `
+		INSERT INTO projection_state
+			(tenant_id, projection_key, window_start, window_end,
+			 value_json, computed_at, projection_version)
+		VALUES ($1, $2, $3, $4,
+			'{"total_attempts":0,"retry_attempts":0,"recovered":1,"recovery_rate":0.0}'::jsonb,
+			now(), 1)
+		ON CONFLICT (tenant_id, projection_key, window_start, projection_version)
+		DO UPDATE SET
+			value_json = jsonb_set(
+				projection_state.value_json,
+				'{recovered}',
+				to_jsonb(COALESCE((projection_state.value_json->>'recovered')::int, 0) + 1)
+			),
+			computed_at = now()
+	`
+	if _, err := r.pool.Exec(ctx, upsertSQL, tenantID, key, windowStart, windowEnd); err != nil {
+		return fmt.Errorf("projection_repo.AtomicIncrementRetryRecovered corridor=%s: %w", corridorID, err)
+	}
+	return r.recomputeRetryRecoveryRate(ctx, tenantID, key, windowStart)
+}
+
+// recomputeRetryRecoveryRate recalculates recovery_rate = recovered / retry_attempts.
+func (r *ProjectionRepo) recomputeRetryRecoveryRate(
+	ctx context.Context,
+	tenantID, key string,
+	windowStart time.Time,
+) error {
+	sql := `
+		UPDATE projection_state
+		SET value_json = jsonb_set(
+			value_json,
+			'{recovery_rate}',
+			to_jsonb(
+				COALESCE(
+					(value_json->>'recovered')::numeric /
+					NULLIF((value_json->>'retry_attempts')::numeric, 0),
+					0
+				)
+			)
+		),
+		computed_at = now()
+		WHERE tenant_id          = $1
+		  AND projection_key     = $2
+		  AND window_start       = $3
+		  AND projection_version = 1
+	`
+	if _, err := r.pool.Exec(ctx, sql, tenantID, key, windowStart); err != nil {
+		return fmt.Errorf("projection_repo.recomputeRetryRecoveryRate: %w", err)
+	}
+	return nil
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATEMENT MATCH RATE OPERATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// AtomicRecordStatementMatch records one StatementMatchEvent (MATCHED or UNMATCHED).
+// Called by HandleStatementMatch in projection_service.
+//
+// For MATCHED events: increments matched + total_settled + accumulates aged_seconds.
+// For UNMATCHED events: increments unmatched + total_settled only.
+func (r *ProjectionRepo) AtomicRecordStatementMatch(
+	ctx context.Context,
+	tenantID, corridorID string,
+	matched bool,
+	agedSeconds int64,
+	windowStart, windowEnd time.Time,
+) error {
+	key := fmt.Sprintf("corridor.statement_match_rate.%s", corridorID)
+
+	if matched {
+		// MATCHED: increment matched + total_settled + accumulate aged_seconds
+		upsertSQL := `
+			INSERT INTO projection_state
+				(tenant_id, projection_key, window_start, window_end,
+				 value_json, computed_at, projection_version)
+			VALUES ($1, $2, $3, $4,
+				jsonb_build_object(
+					'total_settled', 1,
+					'matched', 1,
+					'unmatched', 0,
+					'match_rate', 1.0,
+					'avg_match_age_secs', $5::float8,
+					'total_match_age_secs', $5::bigint
+				),
+				now(), 1)
+			ON CONFLICT (tenant_id, projection_key, window_start, projection_version)
+			DO UPDATE SET
+				value_json = jsonb_set(
+					jsonb_set(
+						jsonb_set(
+							projection_state.value_json,
+							'{matched}',
+							to_jsonb(COALESCE((projection_state.value_json->>'matched')::int, 0) + 1)
+						),
+						'{total_settled}',
+						to_jsonb(COALESCE((projection_state.value_json->>'total_settled')::int, 0) + 1)
+					),
+					'{total_match_age_secs}',
+					to_jsonb(COALESCE((projection_state.value_json->>'total_match_age_secs')::bigint, 0) + $5::bigint)
+				),
+				computed_at = now()
+		`
+		if _, err := r.pool.Exec(ctx, upsertSQL, tenantID, key, windowStart, windowEnd, agedSeconds); err != nil {
+			return fmt.Errorf("projection_repo.AtomicRecordStatementMatch(matched) corridor=%s: %w", corridorID, err)
+		}
+	} else {
+		// UNMATCHED: increment unmatched + total_settled only
+		upsertSQL := `
+			INSERT INTO projection_state
+				(tenant_id, projection_key, window_start, window_end,
+				 value_json, computed_at, projection_version)
+			VALUES ($1, $2, $3, $4,
+				'{"total_settled":1,"matched":0,"unmatched":1,"match_rate":0.0,"avg_match_age_secs":0,"total_match_age_secs":0}'::jsonb,
+				now(), 1)
+			ON CONFLICT (tenant_id, projection_key, window_start, projection_version)
+			DO UPDATE SET
+				value_json = jsonb_set(
+					jsonb_set(
+						projection_state.value_json,
+						'{unmatched}',
+						to_jsonb(COALESCE((projection_state.value_json->>'unmatched')::int, 0) + 1)
+					),
+					'{total_settled}',
+					to_jsonb(COALESCE((projection_state.value_json->>'total_settled')::int, 0) + 1)
+				),
+				computed_at = now()
+		`
+		if _, err := r.pool.Exec(ctx, upsertSQL, tenantID, key, windowStart, windowEnd); err != nil {
+			return fmt.Errorf("projection_repo.AtomicRecordStatementMatch(unmatched) corridor=%s: %w", corridorID, err)
+		}
+	}
+
+	// Recompute derived fields (match_rate + avg_match_age_secs) in one SQL pass
+	return r.recomputeStatementMatchRate(ctx, tenantID, key, windowStart)
+}
+
+// recomputeStatementMatchRate recalculates match_rate and avg_match_age_secs.
+func (r *ProjectionRepo) recomputeStatementMatchRate(
+	ctx context.Context,
+	tenantID, key string,
+	windowStart time.Time,
+) error {
+	sql := `
+		UPDATE projection_state
+		SET value_json = jsonb_set(
+			jsonb_set(
+				value_json,
+				'{match_rate}',
+				to_jsonb(
+					COALESCE(
+						(value_json->>'matched')::numeric /
+						NULLIF((value_json->>'total_settled')::numeric, 0),
+						0
+					)
+				)
+			),
+			'{avg_match_age_secs}',
+			to_jsonb(
+				COALESCE(
+					(value_json->>'total_match_age_secs')::numeric /
+					NULLIF((value_json->>'matched')::numeric, 0),
+					0
+				)
+			)
+		),
+		computed_at = now()
+		WHERE tenant_id          = $1
+		  AND projection_key     = $2
+		  AND window_start       = $3
+		  AND projection_version = 1
+	`
+	if _, err := r.pool.Exec(ctx, sql, tenantID, key, windowStart); err != nil {
+		return fmt.Errorf("projection_repo.recomputeStatementMatchRate: %w", err)
+	}
+	return nil
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROVIDER REF MISSING RATE OPERATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// AtomicRecordProviderRef records whether a finality cert had a provider reference.
+// Called by HandleFinalityCertIssued using the new HasProviderRef field.
+//
+// hasRef = true  → found UTR/RRN/BankRef → good traceability
+// hasRef = false → missing provider ref   → audit gap
+func (r *ProjectionRepo) AtomicRecordProviderRef(
+	ctx context.Context,
+	tenantID, corridorID string,
+	hasRef bool,
+	windowStart, windowEnd time.Time,
+) error {
+	key := fmt.Sprintf("corridor.provider_ref_missing_rate.%s", corridorID)
+
+	// Both branches increment total_finalized; only hasRef=false increments missing_ref.
+	var upsertSQL string
+	if hasRef {
+		upsertSQL = `
+			INSERT INTO projection_state
+				(tenant_id, projection_key, window_start, window_end,
+				 value_json, computed_at, projection_version)
+			VALUES ($1, $2, $3, $4,
+				'{"total_finalized":1,"missing_ref":0,"with_ref":1,"missing_rate":0.0}'::jsonb,
+				now(), 1)
+			ON CONFLICT (tenant_id, projection_key, window_start, projection_version)
+			DO UPDATE SET
+				value_json = jsonb_set(
+					jsonb_set(
+						projection_state.value_json,
+						'{with_ref}',
+						to_jsonb(COALESCE((projection_state.value_json->>'with_ref')::int, 0) + 1)
+					),
+					'{total_finalized}',
+					to_jsonb(COALESCE((projection_state.value_json->>'total_finalized')::int, 0) + 1)
+				),
+				computed_at = now()
+		`
+	} else {
+		upsertSQL = `
+			INSERT INTO projection_state
+				(tenant_id, projection_key, window_start, window_end,
+				 value_json, computed_at, projection_version)
+			VALUES ($1, $2, $3, $4,
+				'{"total_finalized":1,"missing_ref":1,"with_ref":0,"missing_rate":1.0}'::jsonb,
+				now(), 1)
+			ON CONFLICT (tenant_id, projection_key, window_start, projection_version)
+			DO UPDATE SET
+				value_json = jsonb_set(
+					jsonb_set(
+						projection_state.value_json,
+						'{missing_ref}',
+						to_jsonb(COALESCE((projection_state.value_json->>'missing_ref')::int, 0) + 1)
+					),
+					'{total_finalized}',
+					to_jsonb(COALESCE((projection_state.value_json->>'total_finalized')::int, 0) + 1)
+				),
+				computed_at = now()
+		`
+	}
+	if _, err := r.pool.Exec(ctx, upsertSQL, tenantID, key, windowStart, windowEnd); err != nil {
+		return fmt.Errorf("projection_repo.AtomicRecordProviderRef corridor=%s hasRef=%v: %w", corridorID, hasRef, err)
+	}
+	return r.recomputeProviderRefMissingRate(ctx, tenantID, key, windowStart)
+}
+
+// recomputeProviderRefMissingRate recalculates missing_rate = missing_ref / total_finalized.
+func (r *ProjectionRepo) recomputeProviderRefMissingRate(
+	ctx context.Context,
+	tenantID, key string,
+	windowStart time.Time,
+) error {
+	sql := `
+		UPDATE projection_state
+		SET value_json = jsonb_set(
+			value_json,
+			'{missing_rate}',
+			to_jsonb(
+				COALESCE(
+					(value_json->>'missing_ref')::numeric /
+					NULLIF((value_json->>'total_finalized')::numeric, 0),
+					0
+				)
+			)
+		),
+		computed_at = now()
+		WHERE tenant_id          = $1
+		  AND projection_key     = $2
+		  AND window_start       = $3
+		  AND projection_version = 1
+	`
+	if _, err := r.pool.Exec(ctx, sql, tenantID, key, windowStart); err != nil {
+		return fmt.Errorf("projection_repo.recomputeProviderRefMissingRate: %w", err)
+	}
+	return nil
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFLICT RATE IN FUSION OPERATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// AtomicRecordFusionConflict records the conflict data from one FinalityCertIssuedEvent.
+// Called by HandleFinalityCertIssued using the new ConflictCount + ConflictTypes fields.
+//
+// conflictCount  = 0 → clean finality, no signal disagreement
+// conflictCount  > 0 → at least one pair of signals disagreed
+// conflictTypes  = specific type tags e.g. ["webhook_vs_poll_mismatch"]
+func (r *ProjectionRepo) AtomicRecordFusionConflict(
+	ctx context.Context,
+	tenantID, corridorID string,
+	conflictCount int,
+	conflictTypes []string,
+	windowStart, windowEnd time.Time,
+) error {
+	key := fmt.Sprintf("corridor.conflict_rate_in_fusion.%s", corridorID)
+
+	hadConflict := 0
+	if conflictCount > 0 {
+		hadConflict = 1
+	}
+
+	// Step 1: increment the scalar counters atomically
+	upsertSQL := `
+		INSERT INTO projection_state
+			(tenant_id, projection_key, window_start, window_end,
+			 value_json, computed_at, projection_version)
+		VALUES ($1, $2, $3, $4,
+			jsonb_build_object(
+				'total_finalized', 1,
+				'with_conflicts', $5::int,
+				'conflict_rate', $5::float8,
+				'total_conflicts', $6::int,
+				'conflict_type_breakdown', '{}'::jsonb
+			),
+			now(), 1)
+		ON CONFLICT (tenant_id, projection_key, window_start, projection_version)
+		DO UPDATE SET
+			value_json = jsonb_set(
+				jsonb_set(
+					jsonb_set(
+						projection_state.value_json,
+						'{total_finalized}',
+						to_jsonb(COALESCE((projection_state.value_json->>'total_finalized')::int, 0) + 1)
+					),
+					'{with_conflicts}',
+					to_jsonb(COALESCE((projection_state.value_json->>'with_conflicts')::int, 0) + $5::int)
+				),
+				'{total_conflicts}',
+				to_jsonb(COALESCE((projection_state.value_json->>'total_conflicts')::int, 0) + $6::int)
+			),
+			computed_at = now()
+	`
+	if _, err := r.pool.Exec(ctx, upsertSQL, tenantID, key, windowStart, windowEnd, hadConflict, conflictCount); err != nil {
+		return fmt.Errorf("projection_repo.AtomicRecordFusionConflict corridor=%s: %w", corridorID, err)
+	}
+
+	// Step 2: increment each conflict type in the breakdown map (one SQL per type)
+	// This is safe — conflict_types is typically 0–3 entries per event.
+	for _, ct := range conflictTypes {
+		typeSQL := `
+			UPDATE projection_state
+			SET value_json = jsonb_set(
+				value_json,
+				ARRAY['conflict_type_breakdown', $4::text],
+				to_jsonb(
+					COALESCE(
+						(value_json->'conflict_type_breakdown'->>$4::text)::int,
+						0
+					) + 1
+				)
+			),
+			computed_at = now()
+			WHERE tenant_id          = $1
+			  AND projection_key     = $2
+			  AND window_start       = $3
+			  AND projection_version = 1
+		`
+		if _, err := r.pool.Exec(ctx, typeSQL, tenantID, key, windowStart, ct); err != nil {
+			return fmt.Errorf("projection_repo.AtomicRecordFusionConflict type=%s corridor=%s: %w", ct, corridorID, err)
+		}
+	}
+
+	// Step 3: recompute conflict_rate
+	return r.recomputeConflictRate(ctx, tenantID, key, windowStart)
+}
+
+// recomputeConflictRate recalculates conflict_rate = with_conflicts / total_finalized.
+func (r *ProjectionRepo) recomputeConflictRate(
+	ctx context.Context,
+	tenantID, key string,
+	windowStart time.Time,
+) error {
+	sql := `
+		UPDATE projection_state
+		SET value_json = jsonb_set(
+			value_json,
+			'{conflict_rate}',
+			to_jsonb(
+				COALESCE(
+					(value_json->>'with_conflicts')::numeric /
+					NULLIF((value_json->>'total_finalized')::numeric, 0),
+					0
+				)
+			)
+		),
+		computed_at = now()
+		WHERE tenant_id          = $1
+		  AND projection_key     = $2
+		  AND window_start       = $3
+		  AND projection_version = 1
+	`
+	if _, err := r.pool.Exec(ctx, sql, tenantID, key, windowStart); err != nil {
+		return fmt.Errorf("projection_repo.recomputeConflictRate: %w", err)
+	}
+	return nil
+}
+
 // Called after every success/failure increment so the rate is always fresh.
 func (r *ProjectionRepo) recomputeRate(
 	ctx context.Context,

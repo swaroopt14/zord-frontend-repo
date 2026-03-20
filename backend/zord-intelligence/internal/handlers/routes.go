@@ -83,6 +83,22 @@ func NewRouter(
 		// Returns SLA breach rate metrics
 		r.Get("/sla-breach", kpiH.GetSLABreachRate)
 
+		// GET /v1/intelligence/retry-recovery?tenant_id=X&corridor_id=Y
+		// Returns retry efficiency per corridor — recovered / retry_attempts
+		r.Get("/retry-recovery", kpiH.GetRetryRecoveryRate)
+
+		// GET /v1/intelligence/statement-match?tenant_id=X&corridor_id=Y
+		// Returns statement reconciliation match rate (requires Service 5 upgrade)
+		r.Get("/statement-match", kpiH.GetStatementMatchRate)
+
+		// GET /v1/intelligence/provider-ref-missing?tenant_id=X&corridor_id=Y
+		// Returns % of finalized payouts missing UTR/RRN/BankRef
+		r.Get("/provider-ref-missing", kpiH.GetProviderRefMissingRate)
+
+		// GET /v1/intelligence/fusion-conflicts?tenant_id=X&corridor_id=Y
+		// Returns Outcome Fusion signal conflict rate per corridor
+		r.Get("/fusion-conflicts", kpiH.GetConflictRateInFusion)
+
 		// ── Policy endpoints ───────────────────────────────────────────
 		// Used by ops team to manage rules
 
