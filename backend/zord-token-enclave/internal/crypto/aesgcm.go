@@ -4,7 +4,10 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/base64"
+	"errors"
 	"io"
+	"strings"
 )
 
 type Crypto struct {
@@ -35,7 +38,26 @@ func (c *Crypto) Encrypt(plaintext []byte) (ciphertext, nonce []byte, err error)
 	return ciphertext, nonce, nil
 }
 
-func (c *Crypto) Decrypt(ciphertext, nonce []byte) ([]byte, error) {
+func (c *Crypto) EncryptToToken(plaintext []byte) (string, error) {
+	ciphertext, nonce, err := c.Encrypt(plaintext)
+	if err != nil {
+		return "", err
+	}
+
+	final := append(nonce, ciphertext...)
+	return "tok_" + base64.StdEncoding.EncodeToString(final), nil
+}
+
+func (c *Crypto) DecryptFromToken(token string) ([]byte, error) {
+
+	// 🔥 remove prefix
+	token = strings.TrimPrefix(token, "tok_")
+
+	data, err := base64.StdEncoding.DecodeString(token)
+	if err != nil {
+		return nil, err
+	}
+
 	block, err := aes.NewCipher(c.key)
 	if err != nil {
 		return nil, err
@@ -45,6 +67,15 @@ func (c *Crypto) Decrypt(ciphertext, nonce []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	nonceSize := gcm.NonceSize()
+
+	if len(data) < nonceSize {
+		return nil, errors.New("invalid token")
+	}
+
+	nonce := data[:nonceSize]
+	ciphertext := data[nonceSize:]
 
 	return gcm.Open(nil, nonce, ciphertext, nil)
 }

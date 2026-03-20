@@ -138,7 +138,7 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 				idempotencyKey := uuid.NewString()
 
 				data, duplicateID, err := h.processBulkIntentRow(
-					c.Request.Context(),
+					context.Background(),
 					job.Payload,
 					tenantID,
 					traceID,

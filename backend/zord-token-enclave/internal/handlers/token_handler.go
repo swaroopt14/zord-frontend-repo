@@ -12,6 +12,15 @@ type TokenHandler struct {
 	svc *services.TokenService
 }
 
+type DetokenizeRequest struct {
+	AccountNumber string `json:"account_number"`
+	IFSC          string `json:"ifsc"`
+	VPA           string `json:"vpa"`
+	Name          string `json:"name"`
+	Phone         string `json:"phone"`
+	Email         string `json:"email"`
+}
+
 func NewTokenHandler(s *services.TokenService) *TokenHandler {
 	return &TokenHandler{svc: s}
 }
@@ -47,16 +56,4 @@ func (h *TokenHandler) Tokenize(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"tokens": tokens,
 	})
-}
-
-func (h *TokenHandler) Detokenize(c *gin.Context) {
-	tokenID := c.Param("token")
-
-	value, err := h.svc.Detokenize(c, tokenID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "token not found"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"value": string(value)})
 }
