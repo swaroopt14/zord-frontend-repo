@@ -95,6 +95,50 @@ type FinalityCertIssuedEvent struct {
 	DecisionAt      time.Time `json:"decision_at"`       // when did finality happen?
 	CertificateID   string    `json:"certificate_id"`
 	TraceID         string    `json:"trace_id"`
+
+	// ── NEW FIELDS from Service 5 (added per gap spec) ───────────────────
+	//
+	// HasProviderRef: did Service 5 find a UTR/RRN/BankRef in the Trace Graph?
+	//   true  → provider gave us a traceable reference (good traceability)
+	//   false → no provider reference found (reduces audit-grade confidence)
+	//
+	// ConflictCount: how many signal pairs disagreed during Outcome Fusion?
+	//   0 → all signals agreed — cleanest possible finality
+	//   1+ → signals conflicted; Service 5 used truth hierarchy to resolve
+	//
+	// ConflictTypes: which specific conflicts occurred?
+	//   e.g. ["webhook_vs_poll_mismatch", "amount_mismatch"]
+	//   Empty slice when ConflictCount == 0.
+	HasProviderRef bool     `json:"has_provider_ref"` // true if UTR/RRN/BankRef found
+	ConflictCount  int      `json:"conflict_count"`   // number of signal conflicts (0 = clean)
+	ConflictTypes  []string `json:"conflict_types"`   // e.g. ["webhook_vs_poll_mismatch"]
+}
+
+// ── Event 8: from Service 5 (NEW — statement reconciliation) ─────────────────
+//
+// Arrives when Service 5 reconciles a settled payout against bank statements.
+// ZPI uses this to compute statement_match_rate:
+//   - MATCHED events → payout found in settlement statement
+//   - UNMATCHED events → payout settled per signals but NOT in statement after 24h
+//
+// Kafka topic: statement.match.event
+// Emitted by:  Service 5 Statement Adapter after each reconciliation pass
+
+type StatementMatchEvent struct {
+	EventID          string    `json:"event_id"`
+	TenantID         string    `json:"tenant_id"`
+	IntentID         string    `json:"intent_id"`
+	CorridorID       string    `json:"corridor_id"` // e.g. "razorpay.UPI"
+	Provider         string    `json:"provider"`
+	MatchStatus      string    `json:"match_status"`      // "MATCHED" or "UNMATCHED"
+	SettlementAmount string    `json:"settlement_amount"` // stored as string (money rule)
+	SettlementDate   time.Time `json:"settlement_date"`   // when statement shows settlement
+	SettledAt        time.Time `json:"settled_at"`        // when ZPI declared finality
+	SourceStatement  string    `json:"source_statement"`  // e.g. "razorpay_settlement_2024-01-15"
+	UTRMatched       string    `json:"utr_matched"`       // blank if UNMATCHED
+	AgedSeconds      int64     `json:"aged_seconds"`      // time between settled_at and settlement_date
+	CreatedAt        time.Time `json:"created_at"`
+	TraceID          string    `json:"trace_id"`
 }
 
 // ── Event 5: from Service 5 / 6 ──────────────────────────────────────────────

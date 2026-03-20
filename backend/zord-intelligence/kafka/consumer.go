@@ -42,6 +42,9 @@ type EventHandler interface {
 	HandleFinalContractUpdated(ctx context.Context, e models.FinalContractUpdatedEvent) error
 	HandleEvidencePackReady(ctx context.Context, e models.EvidencePackReadyEvent) error
 	HandleDLQEvent(ctx context.Context, e models.DLQEvent) error
+	// HandleStatementMatch handles Service 5's new StatementMatchEvent.
+	// Topic: statement.match.event (new topic — requires Service 5 upgrade)
+	HandleStatementMatch(ctx context.Context, e models.StatementMatchEvent) error
 }
 
 // StartConsumers launches one goroutine per Kafka topic.
@@ -120,7 +123,16 @@ func StartConsumers(ctx context.Context, cfg *config.Config, handler EventHandle
 			return handler.HandleDLQEvent(ctx, e)
 		})
 
-	log.Println("kafka: all 7 consumers started")
+	go consume(ctx, brokers, cfg.TopicStatementMatch, cfg.KafkaGroupID,
+		func(msg kafka.Message) error {
+			var e models.StatementMatchEvent
+			if err := json.Unmarshal(msg.Value, &e); err != nil {
+				return err
+			}
+			return handler.HandleStatementMatch(ctx, e)
+		})
+
+	log.Println("kafka: all 8 consumers started")
 }
 
 // consume is the shared loop used by every topic above.

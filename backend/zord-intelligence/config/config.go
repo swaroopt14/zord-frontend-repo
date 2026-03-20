@@ -39,6 +39,9 @@ type Config struct {
 	TopicFinalContract     string // final.contract.updated          ← Service 5/6
 	TopicEvidenceReady     string // evidence.pack.ready             ← Service 6
 	TopicDLQ               string // dlq.event                       ← any service
+	// TopicStatementMatch is the new topic emitted by Service 5 after each
+	// statement reconciliation pass. Requires Service 5 upgrade.
+	TopicStatementMatch    string // statement.match.event            ← Service 5 (NEW)
 
 	// ── Kafka Output Topics (ZPI publishes TO these) ──────────────
 	// ONLY for actuation — triggering other services
@@ -78,6 +81,7 @@ func Load() *Config {
 		TopicFinalContract:     getWithDefault("TOPIC_FINAL_CONTRACT", "final.contract.updated"),
 		TopicEvidenceReady:     getWithDefault("TOPIC_EVIDENCE_READY", "evidence.pack.ready"),
 		TopicDLQ:               getWithDefault("TOPIC_DLQ", "dlq.event"),
+		TopicStatementMatch:    getWithDefault("TOPIC_STATEMENT_MATCH", "statement.match.event"),
 
 		// ── Kafka Output Topics ──────────────────────────────────
 		TopicActuationRetry:    getWithDefault("TOPIC_ACTUATION_RETRY", "zpi.actuation.retry"),

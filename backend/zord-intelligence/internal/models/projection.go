@@ -82,6 +82,109 @@ type PendingBacklogValue struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+// RetryRecoveryRateValue is stored in ProjectionState.ValueJSON
+// for projection_key like "corridor.retry_recovery_rate.razorpay_UPI"
+//
+// Tracks how well retries rescue failed payouts per corridor.
+// Data source: DispatchAttemptCreatedEvent (attempt_no > 1 = retry)
+//              FinalityCertIssuedEvent (final_state = SETTLED after retry = recovered)
+//
+// Example:
+//   corridor razorpay.UPI today:
+//   - total_attempts: 1200 dispatches
+//   - retry_attempts: 80 (attempt_no > 1)
+//   - recovered:      55 (retried AND reached SETTLED)
+//   - recovery_rate:  0.6875 (55/80)
+type RetryRecoveryRateValue struct {
+	TotalAttempts  int       `json:"total_attempts"`  // all dispatch attempts (including first)
+	RetryAttempts  int       `json:"retry_attempts"`  // dispatches with attempt_no > 1
+	Recovered      int       `json:"recovered"`       // retried intents that reached SETTLED
+	RecoveryRate   float64   `json:"recovery_rate"`   // recovered / retry_attempts (0 if no retries)
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+// StatementMatchRateValue is stored in ProjectionState.ValueJSON
+// for projection_key like "corridor.statement_match_rate.razorpay_UPI"
+//
+// Tracks what % of settled payouts appear in the bank/PSP settlement statement.
+// Requires Service 5 to emit StatementMatchEvent (new Kafka topic).
+//
+// A low match rate is a finance alarm: payouts are "settled" per signals
+// but the money isn't confirmed in the statement → potential leakage or
+// delay in settlement → reconciliation exceptions pile up.
+//
+// Example:
+//   corridor razorpay.UPI today:
+//   - total_settled:      1000 payouts reached SETTLED state
+//   - matched:             970 found in statement
+//   - unmatched:            30 NOT in statement after 24h
+//   - match_rate:          0.97
+//   - avg_match_age_secs: 1200 (avg delay between finality and statement appearance)
+type StatementMatchRateValue struct {
+	TotalSettled      int       `json:"total_settled"`       // payouts that reached SETTLED
+	Matched           int       `json:"matched"`             // found in settlement statement
+	Unmatched         int       `json:"unmatched"`           // NOT found after 24h
+	MatchRate         float64   `json:"match_rate"`          // matched / total_settled
+	AvgMatchAgeSecs   float64   `json:"avg_match_age_secs"`  // avg aged_seconds across MATCHED events
+	TotalMatchAgeSecs int64     `json:"total_match_age_secs"` // running sum for incremental avg
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+// ProviderRefMissingRateValue is stored in ProjectionState.ValueJSON
+// for projection_key like "corridor.provider_ref_missing_rate.razorpay_UPI"
+//
+// Tracks what % of finalized payouts are missing a provider reference
+// (UTR / RRN / BankRef). A missing ref means:
+//   - Cannot trace the money end-to-end
+//   - Disputes become very hard to resolve
+//   - Evidence packs are weaker
+//
+// Data source: FinalityCertIssuedEvent.HasProviderRef (new field from Service 5)
+//
+// Example:
+//   corridor cashfree.IMPS today:
+//   - total_finalized:   500
+//   - missing_ref:        45 (has_provider_ref = false)
+//   - with_ref:          455
+//   - missing_rate:      0.09  ← 9% of payouts have no traceable bank reference
+type ProviderRefMissingRateValue struct {
+	TotalFinalized int       `json:"total_finalized"` // all finalized (any final_state)
+	MissingRef     int       `json:"missing_ref"`     // has_provider_ref = false
+	WithRef        int       `json:"with_ref"`        // has_provider_ref = true
+	MissingRate    float64   `json:"missing_rate"`    // missing_ref / total_finalized
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+// ConflictRateInFusionValue is stored in ProjectionState.ValueJSON
+// for projection_key like "corridor.conflict_rate_in_fusion.razorpay_UPI"
+//
+// Tracks how often Outcome Fusion encounters conflicting signals when
+// building finality for this corridor. High conflict rate means:
+//   - PSP signals are unreliable / inconsistent
+//   - More ops investigation needed per payout
+//   - Higher risk of wrong finality decision
+//
+// Data source: FinalityCertIssuedEvent.ConflictCount + ConflictTypes (new fields)
+//
+// ConflictTypeBreakdown lets ops see WHICH conflict types dominate,
+// e.g. "webhook_vs_poll_mismatch" vs "amount_mismatch"
+//
+// Example:
+//   corridor razorpay.UPI today:
+//   - total_finalized:   1000
+//   - with_conflicts:      87 (conflict_count > 0)
+//   - conflict_rate:      0.087
+//   - total_conflicts:    95  (sum of all conflict_count values — can be > with_conflicts)
+//   - conflict_type_breakdown: {"webhook_vs_poll_mismatch": 50, "amount_mismatch": 37}
+type ConflictRateInFusionValue struct {
+	TotalFinalized        int            `json:"total_finalized"`         // all finalized certs
+	WithConflicts         int            `json:"with_conflicts"`          // certs that had conflict_count > 0
+	ConflictRate          float64        `json:"conflict_rate"`           // with_conflicts / total_finalized
+	TotalConflicts        int            `json:"total_conflicts"`         // sum of all conflict_count values
+	ConflictTypeBreakdown map[string]int `json:"conflict_type_breakdown"` // per-type counts
+	UpdatedAt             time.Time      `json:"updated_at"`
+}
+
 // SLABreachRateValue is stored in ProjectionState.ValueJSON
 // for projection_key "tenant.sla_breach_rate"
 //
