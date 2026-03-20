@@ -59,7 +59,7 @@ leased AS (
 	UPDATE outbox o
 	SET lease_id = $2::uuid,
 	    leased_by = $3,
-	    lease_until = NOW() + ($4::int * INTERVAL '1 second'),
+	    lease_until = NOW() + ($4::int * INTERVAL '1 second')
 	FROM picked p
 	WHERE o.event_id = p.event_id
 	RETURNING
