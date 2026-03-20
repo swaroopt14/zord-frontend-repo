@@ -31,8 +31,13 @@ func NewOutboxPullRepo(db *sql.DB) *OutboxPullRepo {
 }
 
 func (r *OutboxPullRepo) LeaseOutboxBatch(ctx context.Context, limit int, leaseTTLSeconds int, leasedBy string) (string, *time.Time, []models.OutboxEvent, error) {
+	const maxLeaseLimit = 1000
+
 	if limit <= 0 {
 		limit = 500
+	}
+	if limit > maxLeaseLimit {
+		limit = maxLeaseLimit
 	}
 
 	leaseUUID := uuid.New()
@@ -54,8 +59,7 @@ leased AS (
 	UPDATE outbox o
 	SET lease_id = $2::uuid,
 	    leased_by = $3,
-	    lease_until = NOW() + ($4::int * INTERVAL '1 second'),
-	    retry_count = o.retry_count + 1
+	    lease_until = NOW() + ($4::int * INTERVAL '1 second')
 	FROM picked p
 	WHERE o.event_id = p.event_id
 	RETURNING
@@ -136,6 +140,9 @@ ORDER BY created_at ASC;
 			t := nextRetry.Time
 			evt.NextRetryAt = &t
 		}
+		// All rows in this batch share the same lease_until value because it is
+		// computed once in the SQL statement (NOW() + interval).
+		// We capture it from the first row only to avoid redundant assignments.
 		if lu.Valid {
 			t := lu.Time
 			evt.LeaseUntil = &t
@@ -180,14 +187,15 @@ WHERE lease_id = $1::uuid
 func (r *OutboxPullRepo) NackOutboxBatch(ctx context.Context, leaseID string, eventIDs []string) (int64, error) {
 	query := `
 UPDATE outbox
-SET status = CASE
-        WHEN retry_count >= $3 OR created_at < NOW() - ($4::int * INTERVAL '1 hour') THEN 'FAILED'
+SET retry_count = retry_count + 1,
+	status = CASE
+        WHEN retry_count + 1>= $3 OR created_at < NOW() - ($4::int * INTERVAL '1 hour') THEN 'FAILED'
         ELSE 'PENDING'
     END,
     next_attempt_at = CASE
-        WHEN retry_count >= $3 OR created_at < NOW() - ($4::int * INTERVAL '1 hour') THEN NULL
+        WHEN retry_count + 1>= $3 OR created_at < NOW() - ($4::int * INTERVAL '1 hour') THEN NULL
         ELSE NOW() + (
-			LEAST(3600, GREATEST(1, POWER(2, retry_count - 1))) * (0.8 + random() * 0.4)
+			LEAST(3600, GREATEST(1, POWER(2, retry_count))) * (0.8 + random() * 0.4)
 		) * INTERVAL '1 second'
     END,
     lease_id = NULL,

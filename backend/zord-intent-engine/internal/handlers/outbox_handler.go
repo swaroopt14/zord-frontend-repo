@@ -1,12 +1,12 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-
 	"zord-intent-engine/internal/persistence"
 
 	"github.com/google/uuid"
@@ -41,6 +41,8 @@ func (h *OutboxHandler) Lease(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	const maxLeaseLimit = 1000
+
 	limit := 500
 	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
 		n, err := strconv.Atoi(raw)
@@ -48,10 +50,36 @@ func (h *OutboxHandler) Lease(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid limit", http.StatusBadRequest)
 			return
 		}
+
+		if n > maxLeaseLimit {
+			n = maxLeaseLimit
+		}
+
 		limit = n
 	}
 
-	leaseID, leaseUntil, events, err := h.repo.LeaseOutboxBatch(r.Context(), limit, 60, "relay")
+	// Issue 1 — leasedBy is hardcoded to "relay" in the handler.
+	// multiple relay instances, every instance identifies itself as "relay".
+	// Fix — read it from a request header:
+	// leasedBy := r.Header.Get("X-Relay-Instance-ID")
+	// if leasedBy == "" {
+	//		http.Error(w, "X-Relay-Instance-ID header required", http.StatusBadRequest)
+	//		return
+	//}
+	// Service 4 sets this header to its pod name or instance UUID on every lease call.
+
+	// Fix — make TTL configurable via query param with a sane default:
+	ttl := 120 // default
+	if raw := r.URL.Query().Get("lease_ttl_seconds"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err == nil && n > 0 && n <= 600 {
+			ttl = n
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	leaseID, leaseUntil, events, err := h.repo.LeaseOutboxBatch(ctx, limit, ttl, "relay")
 	if err != nil {
 		http.Error(w, "failed to lease outbox events", http.StatusInternalServerError)
 		return
