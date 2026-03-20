@@ -4,48 +4,30 @@ import (
 	"context"
 
 	"zord-token-enclave/internal/crypto"
-	"zord-token-enclave/internal/models"
-	"zord-token-enclave/internal/repository"
-
-	"github.com/google/uuid"
 )
 
 type TokenService struct {
 	crypto *crypto.Crypto
-	repo   *repository.TokenRepository
 }
 
-func NewTokenService(c *crypto.Crypto, r *repository.TokenRepository) *TokenService {
-	return &TokenService{crypto: c, repo: r}
+// ✅ Constructor (no repo)
+func NewTokenService(c *crypto.Crypto) *TokenService {
+	return &TokenService{crypto: c}
 }
 
-// ✅ Existing single-field tokenization (UNCHANGED)
-func (s *TokenService) Tokenize(ctx context.Context, tenantID, kind string, plaintext []byte) (string, error) {
-	ciphertext, nonce, err := s.crypto.Encrypt(plaintext)
-	if err != nil {
-		return "", err
-	}
+// ✅ Single field tokenize (stateless)
+func (s *TokenService) Tokenize(
+	ctx context.Context,
+	tenantID,
+	kind string,
+	plaintext []byte,
+) (string, error) {
 
-	tokenID := uuid.New().String()
-
-	rec := models.TokenRecord{
-		TokenID:    tokenID,
-		TenantID:   tenantID,
-		Kind:       kind,
-		Ciphertext: ciphertext,
-		Nonce:      nonce,
-		KeyVersion: 1,
-		Status:     "ACTIVE",
-	}
-
-	if err := s.repo.Insert(ctx, rec); err != nil {
-		return "", err
-	}
-
-	return tokenID, nil
+	// tenantID & kind kept for compatibility (can be used later)
+	return s.crypto.EncryptToToken(plaintext)
 }
 
-// ✅ NEW: Bulk PII tokenization
+// ✅ Bulk tokenize (UNCHANGED logic)
 func (s *TokenService) TokenizePII(
 	ctx context.Context,
 	tenantID string,
@@ -55,30 +37,43 @@ func (s *TokenService) TokenizePII(
 
 	result := make(map[string]string)
 
-	for kind, value := range pii {
+	for field, value := range pii {
 
 		if value == "" {
 			continue
 		}
 
-		// Reuse existing Tokenize logic
-		tokenID, err := s.Tokenize(ctx, tenantID, kind, []byte(value))
+		token, err := s.Tokenize(ctx, tenantID, field, []byte(value))
 		if err != nil {
 			return nil, err
 		}
 
-		result[kind] = tokenID
+		result[field] = token
 	}
 
 	return result, nil
 }
 
-// ✅ Existing detokenization (UNCHANGED)
-func (s *TokenService) Detokenize(ctx context.Context, tokenID string) ([]byte, error) {
-	rec, err := s.repo.Get(ctx, tokenID)
-	if err != nil {
-		return nil, err
+// ✅ Bulk detokenize (stateless)
+func (s *TokenService) DetokenizeFields(
+	tokens map[string]string,
+) (map[string]string, error) {
+
+	result := make(map[string]string)
+
+	for field, token := range tokens {
+
+		if token == "" {
+			continue
+		}
+
+		plain, err := s.crypto.DecryptFromToken(token)
+		if err != nil {
+			return nil, err
+		}
+
+		result[field] = string(plain)
 	}
 
-	return s.crypto.Decrypt(rec.Ciphertext, rec.Nonce)
+	return result, nil
 }

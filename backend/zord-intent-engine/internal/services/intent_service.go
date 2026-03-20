@@ -91,16 +91,9 @@ func parseAmount(value string) (decimal.Decimal, error) {
 }
 
 type enclaveTokenizeRequest struct {
-	TenantID string `json:"tenant_id"`
-	TraceID  string `json:"trace_id"`
-	PII      struct {
-		AccountNumber string `json:"account_number"`
-		IFSC          string `json:"ifsc"`
-		VPA           string `json:"vpa"`
-		Name          string `json:"name"`
-		Phone         string `json:"phone"`
-		Email         string `json:"email"`
-	} `json:"pii"`
+	TenantID string            `json:"tenant_id"`
+	TraceID  string            `json:"trace_id"`
+	PII      map[string]string `json:"pii"`
 }
 
 func callEnclaveTokenize(ctx context.Context, req enclaveTokenizeRequest) (map[string]string, error) {
@@ -255,14 +248,15 @@ func (s *IntentService) ProcessIncomingIntent(
 	tokenReq := enclaveTokenizeRequest{
 		TenantID: in.TenantID.String(),
 		TraceID:  in.TraceID.String(),
+		PII: map[string]string{
+			"account_number": canonicalInput.AccountNumber,
+			"ifsc":           canonicalInput.Beneficiary.Instrument.IFSC,
+			"vpa":            canonicalInput.Beneficiary.Instrument.VPA,
+			"name":           canonicalInput.Beneficiary.Name,
+			"phone":          canonicalInput.Remitter.Phone,
+			"email":          canonicalInput.Remitter.Email,
+		},
 	}
-
-	tokenReq.PII.AccountNumber = canonicalInput.AccountNumber
-	tokenReq.PII.IFSC = canonicalInput.Beneficiary.Instrument.IFSC
-	tokenReq.PII.VPA = canonicalInput.Beneficiary.Instrument.VPA
-	tokenReq.PII.Name = canonicalInput.Beneficiary.Name
-	tokenReq.PII.Phone = canonicalInput.Remitter.Phone
-	tokenReq.PII.Email = canonicalInput.Remitter.Email
 
 	tokenMap, err := callEnclaveTokenize(ctx, tokenReq)
 

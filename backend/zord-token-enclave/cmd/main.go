@@ -2,21 +2,17 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/lib/pq"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
 	"zord-token-enclave/internal/config"
 	"zord-token-enclave/internal/crypto"
-	"zord-token-enclave/internal/db"
 	"zord-token-enclave/internal/handlers"
 	"zord-token-enclave/internal/models"
-	"zord-token-enclave/internal/repository"
 	"zord-token-enclave/internal/services"
 	"zord-token-enclave/kafka"
 	"zord-token-enclave/tracing"
@@ -28,47 +24,11 @@ func main() {
 
 	cfg := config.Load()
 
-	// ✅ Connect DB using Docker-provided env
-	// ✅ Connect DB using Docker-provided env parts
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbUser := os.Getenv("DB_USER")
-	dbPass := os.Getenv("DB_PASSWORD")
-	dbName := os.Getenv("DB_NAME")
-	dbSSL := os.Getenv("DB_SSLMODE")
-
-	if dbHost == "" || dbPort == "" || dbUser == "" || dbName == "" {
-		log.Fatal("❌ DB env vars not set (DB_HOST, DB_PORT, DB_USER, DB_NAME)")
-	}
-
-	dbURL := "postgres://" + dbUser + ":" + dbPass +
-		"@" + dbHost + ":" + dbPort + "/" + dbName +
-		"?sslmode=" + dbSSL
-
-	database, err := sql.Open("postgres", dbURL)
-	if err != nil {
-		log.Fatal("❌ Failed to open DB:", err)
-	}
-
-	defer database.Close()
-
-	if err := database.Ping(); err != nil {
-		log.Fatal("❌ Failed to ping DB:", err)
-	}
-
-	// ✅ Create tables
-	if err := db.CreateTables(database); err != nil {
-		log.Fatal("❌ Failed to create tables:", err)
-	}
-
 	// ✅ Crypto service
 	cryptoSvc := crypto.NewCrypto(cfg.MasterKey)
 
-	// ✅ Repository
-	tokenRepo := repository.NewTokenRepository(database)
-
-	// ✅ Domain service
-	tokenSvc := services.NewTokenService(cryptoSvc, tokenRepo)
+	// ✅ Stateless Token Service (NO DB)
+	tokenSvc := services.NewTokenService(cryptoSvc)
 
 	// -------- KAFKA SETUP --------
 	ctx := context.Background()
@@ -170,6 +130,7 @@ func main() {
 
 	// ✅ HTTP handlers
 	tokenHandler := handlers.NewTokenHandler(tokenSvc)
+	detokenizeHandler := handlers.NewDetokenizeHandler(tokenSvc)
 
 	// ✅ Gin router
 	r := gin.New()
@@ -178,22 +139,16 @@ func main() {
 		otelgin.Middleware("zord-token-enclave"),
 	)
 
-	r.GET("v1/health", func(c *gin.Context) {
-		if err := database.Ping(); err != nil {
-			c.JSON(500, gin.H{
-				"status": "unhealthy",
-				"error":  "database not reachable",
-			})
-			return
-		}
-
+	// ✅ Health check (no DB now)
+	r.GET("/v1/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"status": "ok",
 		})
 	})
 
+	// ✅ APIs
 	r.POST("/v1/tokenize", tokenHandler.Tokenize)
-	r.GET("/v1/detokenize/:token", tokenHandler.Detokenize)
+	r.POST("/v1/detokenize", detokenizeHandler.Detokenize)
 
 	port := os.Getenv("PORT")
 	if port == "" {
