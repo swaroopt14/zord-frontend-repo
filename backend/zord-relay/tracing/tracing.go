@@ -4,109 +4,73 @@ import (
 	"context"
 	"log"
 	"os"
-	"strconv"
 	"time"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+	"go.opentelemetry.io/otel/trace"
 )
 
-// InitTracing initializes OpenTelemetry tracing for zord-relay.
-func InitTracing(serviceName string) func() {
+// Tracer is the global tracer for zord-relay.
+// Use this to start spans in the dispatch loop and relay loop.
+var Tracer trace.Tracer
+
+// Init initialises OpenTelemetry tracing.
+// If OTEL_EXPORTER_OTLP_ENDPOINT is not set, tracing is a no-op —
+// spans are created but immediately discarded. Safe for local development.
+// Returns a cleanup function that must be called on shutdown.
+func Init(serviceName string) func() {
 	ctx := context.Background()
 
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 	if endpoint == "" {
-		endpoint = "localhost:4317"
-	}
-
-	insecure := true
-	if v := os.Getenv("OTEL_EXPORTER_OTLP_INSECURE"); v != "" {
-		if parsed, err := strconv.ParseBool(v); err == nil {
-			insecure = parsed
-		}
-	}
-
-	traceExp, err := otlptracegrpc.New(ctx, traceOpts(endpoint, insecure)...)
-	if err != nil {
-		log.Printf("Failed to create OTLP exporter: %v", err)
+		// No exporter configured — use a no-op tracer.
+		// Spans will still be created and propagated so trace_id is correct,
+		// but nothing is exported.
+		log.Println("tracing: OTEL_EXPORTER_OTLP_ENDPOINT not set — running with no-op exporter")
+		Tracer = otel.Tracer(serviceName)
 		return func() {}
+	}
+
+	exporter, err := otlptracehttp.New(ctx,
+		otlptracehttp.WithEndpoint(endpoint),
+		otlptracehttp.WithInsecure(),
+	)
+	if err != nil {
+		log.Fatalf("tracing: failed to create OTLP exporter: %v", err)
 	}
 
 	res, err := resource.New(ctx,
-		resource.WithFromEnv(),
-		resource.WithProcess(),
-		resource.WithTelemetrySDK(),
 		resource.WithAttributes(
-			semconv.ServiceNameKey.String(serviceName),
-			semconv.ServiceVersionKey.String("1.0.0"),
+			semconv.ServiceName(serviceName),
 		),
 	)
 	if err != nil {
-		log.Printf("Failed to create resource: %v", err)
-		return func() {}
+		log.Fatalf("tracing: failed to create resource: %v", err)
 	}
 
-	// Create trace provider
-	tp := trace.NewTracerProvider(
-		trace.WithBatcher(traceExp, trace.WithBatchTimeout(5*time.Second)),
-		trace.WithResource(res),
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(res),
+		// Sample 100% of traces in development.
+		// In production, set OTEL_TRACES_SAMPLER=parentbased_traceidratio
+		// and OTEL_TRACES_SAMPLER_ARG=0.1 for 10% sampling.
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
 
-	// Set global trace provider
 	otel.SetTracerProvider(tp)
+	Tracer = otel.Tracer(serviceName)
 
-	metricExp, err := otlpmetricgrpc.New(ctx, metricOpts(endpoint, insecure)...)
-	if err != nil {
-		log.Printf("Failed to create OTLP metric exporter: %v", err)
-	}
+	log.Printf("tracing: initialised with OTLP endpoint %s", endpoint)
 
-	var mp *metric.MeterProvider
-	if metricExp != nil {
-		reader := metric.NewPeriodicReader(metricExp, metric.WithInterval(10*time.Second))
-		mp = metric.NewMeterProvider(
-			metric.WithReader(reader),
-			metric.WithResource(res),
-		)
-		otel.SetMeterProvider(mp)
-	}
-
-	// Set global propagator for trace context
-	otel.SetTextMapPropagator(propagation.TraceContext{})
-
-	log.Printf("OpenTelemetry tracing initialized for service: %s (endpoint=%s)", serviceName, endpoint)
-
-	// Return cleanup function
 	return func() {
-		if mp != nil {
-			if err := mp.Shutdown(context.Background()); err != nil {
-				log.Printf("Error shutting down meter provider: %v", err)
-			}
-		}
-		if err := tp.Shutdown(context.Background()); err != nil {
-			log.Printf("Error shutting down tracer provider: %v", err)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := tp.Shutdown(ctx); err != nil {
+			log.Printf("tracing: shutdown error: %v", err)
 		}
 	}
-}
-
-func traceOpts(endpoint string, insecure bool) []otlptracegrpc.Option {
-	opts := []otlptracegrpc.Option{otlptracegrpc.WithEndpoint(endpoint)}
-	if insecure {
-		opts = append(opts, otlptracegrpc.WithInsecure())
-	}
-	return opts
-}
-
-func metricOpts(endpoint string, insecure bool) []otlpmetricgrpc.Option {
-	opts := []otlpmetricgrpc.Option{otlpmetricgrpc.WithEndpoint(endpoint)}
-	if insecure {
-		opts = append(opts, otlpmetricgrpc.WithInsecure())
-	}
-	return opts
 }
