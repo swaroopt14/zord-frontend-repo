@@ -90,7 +90,7 @@ func main() {
 			LeaseTTLSecs: cfg.LeaseTTLSeconds,
 			// ConnectorID and CorridorID are defaults — overridden per-event
 			// by the connector_id and corridor_id fields in the outbox payload.
-			ConnectorID: "razorpayx_prod",
+			ConnectorID: "00000000-0000-0000-0000-000000000000",
 			CorridorID:  "IMPS",
 		},
 	)

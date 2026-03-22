@@ -4,15 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 	"zord-relay/model"
 	"zord-relay/psp"
 	"zord-relay/utils"
-	"fmt"
+
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
+
 type DispatchLoopConfig struct {
 	WorkerCount  int
 	BatchSize    int
@@ -34,17 +36,18 @@ type DispatchLoopConfig struct {
 // Service 4's own DB before acking/nacking back to Service 2.
 //
 // The five steps per event:
-//   Step 1 — DispatchCreated:  mint dispatch_id (idempotent), write dispatches row
-//                              + DispatchCreated outbox event atomically.
-//   Step 2 — Detokenize:       call Service 3 JIT to resolve PII tokens.
-//                              If this fails → FAILED + nack. No PSP call made.
-//   Step 3 — AttemptSent:      write AttemptSent outbox event + mark dispatches SENT
-//                              atomically. Must happen BEFORE the PSP HTTP call.
-//   Step 4 — PSP call:         call the PSP with real PII in memory only.
-//                              Discard PII immediately after call returns.
-//                              On failure → DispatchFailed outbox + FAILED + nack.
-//   Step 5 — ProviderAcked:    write ProviderAcked outbox event + mark PROVIDER_ACKED
-//                              atomically. Then ack back to Service 2.
+//
+//	Step 1 — DispatchCreated:  mint dispatch_id (idempotent), write dispatches row
+//	                           + DispatchCreated outbox event atomically.
+//	Step 2 — Detokenize:       call Service 3 JIT to resolve PII tokens.
+//	                           If this fails → FAILED + nack. No PSP call made.
+//	Step 3 — AttemptSent:      write AttemptSent outbox event + mark dispatches SENT
+//	                           atomically. Must happen BEFORE the PSP HTTP call.
+//	Step 4 — PSP call:         call the PSP with real PII in memory only.
+//	                           Discard PII immediately after call returns.
+//	                           On failure → DispatchFailed outbox + FAILED + nack.
+//	Step 5 — ProviderAcked:    write ProviderAcked outbox event + mark PROVIDER_ACKED
+//	                           atomically. Then ack back to Service 2.
 type DispatchLoop struct {
 	db           *sql.DB
 	intentClient IntentClientIface
@@ -56,9 +59,9 @@ type DispatchLoop struct {
 
 	// Circuit breaker state — protects Service 2's retry budget when PSP is down.
 	// When consecutive PSP failures exceed threshold, the poller pauses leasing.
-	cbMu            sync.Mutex
-	cbFailures      int       // consecutive PSP failures across all workers
-	cbOpenAt        time.Time // when circuit opened (zero = closed)
+	cbMu       sync.Mutex
+	cbFailures int       // consecutive PSP failures across all workers
+	cbOpenAt   time.Time // when circuit opened (zero = closed)
 }
 
 func NewDispatchLoop(
@@ -290,7 +293,7 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 			return true
 		}
 	} else {
-		dispatchID =  uuid.New().String()
+		dispatchID = uuid.New().String()
 
 		d := &model.Dispatch{
 			DispatchID:   dispatchID,
@@ -418,8 +421,16 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 		CreatedAt:     asSentAt,
 		Payload: model.AttemptSentPayload{
 			DispatchID:   dispatchID,
+			ConnectorID:  connectorID,
+			CorridorID:   corridorID,
 			AttemptCount: 1,
 			SentAt:       asSentAt,
+			// CorrelationCarriers must match exactly what was sent to the PSP.
+			// Service 5 uses these to correlate incoming webhook/statement signals.
+			CorrelationCarriers: model.CorrelationCarriers{
+				ReferenceID: dispatchID,
+				Narration:   "ZRD:" + contractID,
+			},
 		},
 	}
 
@@ -450,8 +461,8 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 		ReferenceID: dispatchID,
 		Narration:   "ZRD:" + contractID,
 		// Amount and Currency come from top-level outbox columns, not payload JSONB.
-		Amount:      toSmallestUnit(e.Amount, e.Currency),
-		Mode:        corridorID,
+		Amount: toSmallestUnit(e.Amount, e.Currency),
+		Mode:   corridorID,
 		Beneficiary: psp.Beneficiary{
 			Name:          rb.Name,
 			AccountNumber: rb.AccountNumber,
