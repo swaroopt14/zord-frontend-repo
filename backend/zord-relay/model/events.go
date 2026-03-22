@@ -39,22 +39,28 @@ type CorrelationCarriers struct {
 // before ProviderAcked, we know a PSP call was in-flight for this dispatch_id.
 // Service 4 can recover by querying the PSP using reference_id = dispatch_id.
 type AttemptSentEvent struct {
-	EventID      string             `json:"event_id"`
-	EventType    string             `json:"event_type"` // "AttemptSent"
-	TenantID     string             `json:"tenant_id"`
-	IntentID     string             `json:"intent_id"`
-	ContractID   string             `json:"contract_id"`
-	DispatchID   string             `json:"dispatch_id"`
-	TraceID      string             `json:"trace_id"`
-	SchemaVersion string            `json:"schema_version"`
-	CreatedAt    time.Time          `json:"created_at"`
-	Payload      AttemptSentPayload `json:"payload"`
+	EventID       string           `json:"event_id"`
+	EventType     string           `json:"event_type"` // "AttemptSent"
+	TenantID      string           `json:"tenant_id"`
+	IntentID      string           `json:"intent_id"`
+	ContractID    string           `json:"contract_id"`
+	DispatchID    string           `json:"dispatch_id"`
+	TraceID       string           `json:"trace_id"`
+	SchemaVersion string           `json:"schema_version"`
+	CreatedAt     time.Time        `json:"created_at"`
+	Payload       AttemptSentPayload `json:"payload"`
 }
 
+// AttemptSentPayload matches what Service 5 (Outcome Fusion) expects.
+// CorrelationCarriers must be present so Service 5 can update dispatch_index
+// with the carriers it will use to correlate incoming outcome signals.
 type AttemptSentPayload struct {
-	DispatchID   string    `json:"dispatch_id"`
-	AttemptCount int       `json:"attempt_count"`
-	SentAt       time.Time `json:"sent_at"`
+	DispatchID          string              `json:"dispatch_id"`
+	ConnectorID         string              `json:"connector_id"`
+	CorridorID          string              `json:"corridor_id"`
+	AttemptCount        int                 `json:"attempt_count"`
+	SentAt              time.Time           `json:"sent_at"`
+	CorrelationCarriers CorrelationCarriers `json:"correlation_carriers"`
 }
 
 // ProviderAckedEvent is published after the PSP returns 200 OK.
