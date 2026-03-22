@@ -12,43 +12,44 @@ import (
 // TokenClient calls Service 3 (Token Enclave) for JIT detokenization.
 // Detokenization must only happen immediately before a PSP call.
 // Resolved values must never be logged, stored, or passed outside
-// the function that calls Do().
+// the scope of the PSP call that consumes them.
 type TokenClient interface {
-	// Detokenize resolves a slice of token IDs to their plaintext values.
-	// purpose must be "PSP_EXECUTION" for dispatch calls.
-	// Returns a map of token_id → plaintext value.
-	// The caller is responsible for zeroing the map values after use.
 	Detokenize(ctx context.Context, req DetokenizeRequest) (*DetokenizeResponse, error)
 }
 
+// DetokenizeRequest matches Service 3's /v1/detokenize input exactly.
+// It is a flat map of field-name → token-value.
+// Only send the fields you actually need for the PSP call.
+// Example:
+//
+//	{
+//	  "account_number": "tok_thZQ2Y8oOP6CUg...",
+//	  "name":           "tok_h+v05u6HV5ypX...",
+//	  "ifsc":           "tok_3lHFptxRL9DPy...",
+//	  "vpa":            "tok_SuqX4NuAK+4aV..."
+//	}
 type DetokenizeRequest struct {
-	TenantID         string            `json:"tenant_id"`
-	TraceID          string            `json:"trace_id"`
-	IntentID         string            `json:"intent_id"`
-	Purpose          string            `json:"purpose"`           // "PSP_EXECUTION"
-	RequestedTTLSecs int               `json:"requested_ttl_seconds"`
-	Items            []DetokenizeItem  `json:"items"`
+	AccountNumber string `json:"account_number,omitempty"`
+	Name          string `json:"name,omitempty"`
+	IFSC          string `json:"ifsc,omitempty"`
+	VPA           string `json:"vpa,omitempty"`
+	Email         string `json:"email,omitempty"`
+	Phone         string `json:"phone,omitempty"`
 }
 
-type DetokenizeItem struct {
-	TokenID string `json:"token_id"`
-}
-
+// DetokenizeResponse is the resolved plaintext map returned by Service 3.
+// Same field names as the request, values are now plaintext.
+// These values exist in memory only — zero them after the PSP call.
 type DetokenizeResponse struct {
-	ExpiresAt time.Time              `json:"expires_at"`
-	Items     []DetokenizeResultItem `json:"items"`
+	AccountNumber string `json:"account_number,omitempty"`
+	Name          string `json:"name,omitempty"`
+	IFSC          string `json:"ifsc,omitempty"`
+	VPA           string `json:"vpa,omitempty"`
+	Email         string `json:"email,omitempty"`
+	Phone         string `json:"phone,omitempty"`
 }
 
-type DetokenizeResultItem struct {
-	TokenID   string `json:"token_id"`
-	Plaintext string `json:"plaintext"`
-	// Meta contains non-PII routing fields returned alongside the token.
-	// For bank_account tokens, meta includes ifsc.
-	Meta map[string]string `json:"meta,omitempty"`
-}
-
-// HTTPTokenClient is the real Service 3 client.
-// Wire this in when Service 3 is available.
+// HTTPTokenClient calls Service 3's real /v1/detokenize endpoint.
 type HTTPTokenClient struct {
 	baseURL string
 	http    *http.Client
@@ -93,8 +94,9 @@ func (c *HTTPTokenClient) Detokenize(ctx context.Context, req DetokenizeRequest)
 }
 
 // StubTokenClient returns placeholder values for local development.
-// Replace with HTTPTokenClient before connecting to any real PSP.
-// NEVER use this in production — it returns fake account numbers.
+// Returns the token string itself prefixed with STUB_ so it is obvious
+// in logs that real PII is not being used.
+// NEVER use in production or against any real PSP.
 type StubTokenClient struct{}
 
 func NewStubTokenClient() *StubTokenClient {
@@ -102,15 +104,19 @@ func NewStubTokenClient() *StubTokenClient {
 }
 
 func (c *StubTokenClient) Detokenize(_ context.Context, req DetokenizeRequest) (*DetokenizeResponse, error) {
-	items := make([]DetokenizeResultItem, 0, len(req.Items))
-	for _, item := range req.Items {
-		items = append(items, DetokenizeResultItem{
-			TokenID:   item.TokenID,
-			Plaintext: "STUB_" + item.TokenID, // placeholder — not a real account
-		})
-	}
 	return &DetokenizeResponse{
-		ExpiresAt: time.Now().Add(30 * time.Second),
-		Items:     items,
+		AccountNumber: stubResolve(req.AccountNumber),
+		Name:          stubResolve(req.Name),
+		IFSC:          stubResolve(req.IFSC),
+		VPA:           stubResolve(req.VPA),
+		Email:         stubResolve(req.Email),
+		Phone:         stubResolve(req.Phone),
 	}, nil
+}
+
+func stubResolve(token string) string {
+	if token == "" {
+		return ""
+	}
+	return "STUB_" + token
 }

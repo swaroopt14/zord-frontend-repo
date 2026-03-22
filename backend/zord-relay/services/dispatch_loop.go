@@ -351,20 +351,14 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 
 	// =========================================================
 	// STEP 2: Detokenize (JIT — Service 3)
-	// Use pii_tokens from the real payload structure.
-	// Resolved PII lives in rb only — zeroed by defer on any exit path.
+	// Send only the token fields present in the payload.
+	// Response fields are plaintext — zero them via defer rb.Zero().
 	// =========================================================
 	detokResp, err := l.tokenClient.Detokenize(ctx, DetokenizeRequest{
-		TenantID:         tenantID,
-		TraceID:          traceID,
-		IntentID:         intentID,
-		Purpose:          "PSP_EXECUTION",
-		RequestedTTLSecs: 30,
-		Items: []DetokenizeItem{
-			{TokenID: payload.PIITokens.AccountNumber},
-			{TokenID: payload.PIITokens.Name},
-			{TokenID: payload.PIITokens.IFSC},
-		},
+		AccountNumber: payload.PIITokens.AccountNumber,
+		Name:          payload.PIITokens.Name,
+		IFSC:          payload.PIITokens.IFSC,
+		VPA:           payload.PIITokens.VPA,
 	})
 	if err != nil {
 		log.Error("dispatch_loop: step2 detokenize failed",
@@ -377,23 +371,13 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 		return false
 	}
 
-	resolved := make(map[string]string, len(detokResp.Items))
-	for _, item := range detokResp.Items {
-		resolved[item.TokenID] = item.Plaintext
-	}
-
-	// ResolvedBeneficiary holds PII in memory only.
-	// defer rb.Zero() clears it on every return path — success or failure.
+	// PII is now in rb — zeroed by defer rb.Zero() on every exit path.
 	rb := &model.ResolvedBeneficiary{
-		AccountNumber: resolved[payload.PIITokens.AccountNumber],
-		Name:          resolved[payload.PIITokens.Name],
-		IFSC:          resolved[payload.PIITokens.IFSC],
+		AccountNumber: detokResp.AccountNumber,
+		Name:          detokResp.Name,
+		IFSC:          detokResp.IFSC,
 	}
 	defer rb.Zero()
-
-	for k := range resolved {
-		resolved[k] = ""
-	}
 
 	if rb.AccountNumber == "" || rb.Name == "" {
 		log.Error("dispatch_loop: step2 detokenize returned empty values",
@@ -460,9 +444,8 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 	pspReq := psp.PayoutRequest{
 		ReferenceID: dispatchID,
 		Narration:   "ZRD:" + contractID,
-		// Amount and Currency come from top-level outbox columns, not payload JSONB.
-		Amount: toSmallestUnit(e.Amount, e.Currency),
-		Mode:   corridorID,
+		Amount:      amountFromOutbox(e.Amount),
+		Mode:        corridorID,
 		Beneficiary: psp.Beneficiary{
 			Name:          rb.Name,
 			AccountNumber: rb.AccountNumber,
@@ -615,31 +598,21 @@ func (l *DispatchLoop) sleep(ctx context.Context, d time.Duration) {
 	}
 }
 
-// toSmallestUnit converts the amount from the outbox event to the smallest
-// currency unit for the PSP call.
-// amount is json.Number — handles both numeric 30000 and string "30000"
-// from PostgreSQL NUMERIC serialization.
-// For INR: multiplies by 100 to convert rupees → paise.
-// TODO: replace with shopspring/decimal for production-grade precision.
-func toSmallestUnit(amount json.Number, currency string) int64 {
+// amountFromOutbox converts the outbox amount to int64 for the PSP request.
+// The value is passed through exactly as stored in Service 2's outbox —
+// no unit conversion is applied. Whatever unit the tenant sent is what
+// the PSP receives. Service 4 is not responsible for unit decisions.
+func amountFromOutbox(amount json.Number) int64 {
 	value, err := amount.Int64()
 	if err != nil {
-		// Try float fallback for decimal amounts like "30000.00"
+		// Float fallback for amounts like "5000.00"
 		f, ferr := amount.Float64()
-		if ferr != nil || f == 0 {
-			return 500000 // demo fallback: ₹5000 in paise
+		if ferr != nil {
+			return 0
 		}
-		value = int64(f)
+		return int64(f)
 	}
-	if value == 0 {
-		return 500000
-	}
-	switch currency {
-	case "INR":
-		return value * 100 // rupees → paise
-	default:
-		return value * 100
-	}
+	return value
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
