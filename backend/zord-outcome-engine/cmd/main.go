@@ -43,7 +43,7 @@ func main() {
 	if strings.TrimSpace(topic) == "" {
 		// Default to the relay's dispatch event stream topic so that
 		// dispatch_index is populated even if KAFKA_TOPIC is not set.
-		topic = "dispatch.events.v1"
+		topic = "z.dispatch.events.v1"
 	}
 	groupID := "intent-engine-group"
 	err = kafka.StartConsumer(
