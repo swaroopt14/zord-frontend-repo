@@ -290,7 +290,7 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 			return true
 		}
 	} else {
-		dispatchID = "disp_" + uuid.New().String()
+		dispatchID =  uuid.New().String()
 
 		d := &model.Dispatch{
 			DispatchID:   dispatchID,
