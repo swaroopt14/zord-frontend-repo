@@ -28,13 +28,13 @@ type Config struct {
 	PoisonEventDLQTopic    string
 
 	// Service 2 outbox lease
-	IntentEngineBaseURL  string
-	LeaseTTLSeconds      int
-	LeaseInstanceID      string // unique ID for this relay instance (pod name / hostname)
+	IntentEngineBaseURL string
+	LeaseTTLSeconds     int
+	LeaseInstanceID     string // unique ID for this relay instance (pod name / hostname)
 
 	// Dispatch loop
-	DispatchWorkerCount int
-	DispatchBatchSize   int
+	DispatchWorkerCount  int
+	DispatchBatchSize    int
 	DispatchPollInterval time.Duration
 
 	// Relay (Kafka publish) loop
@@ -80,9 +80,9 @@ func Load() *Config {
 		MaxAttempts: mustInt("MAX_ATTEMPTS", 7),
 		MaxAge:      mustDuration("MAX_AGE", 8*time.Hour),
 
-		PSPBaseURL:           requireEnv("PSP_BASE_URL"),
-		PSPTimeoutSecs:       mustInt("PSP_TIMEOUT_SECONDS", 30),
-		TokenEnclaveBaseURL:  getEnv("TOKEN_ENCLAVE_BASE_URL", ""), // empty = use stub
+		PSPBaseURL:          requireEnv("PSP_BASE_URL"),
+		PSPTimeoutSecs:      mustInt("PSP_TIMEOUT_SECONDS", 30),
+		TokenEnclaveBaseURL: getEnv("TOKEN_ENCLAVE_BASE_URL", ""), // empty = use stub
 	}
 
 	cfg.validate()
