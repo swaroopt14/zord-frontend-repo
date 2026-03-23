@@ -84,15 +84,28 @@ jobs:
           upload: false
           output: ${{ env.CODEQL_RESULTS_DIR }}
 
+      - name: Locate CodeQL SARIF
+        id: locate_sarif
+        shell: bash
+        run: |
+          set -euo pipefail
+          sarif_file="$(find "${CODEQL_RESULTS_DIR}" -type f -name '*.sarif' | head -n 1)"
+          if [[ -z "${sarif_file}" ]]; then
+            echo "No SARIF file was generated under ${CODEQL_RESULTS_DIR}" >&2
+            exit 1
+          fi
+          echo "sarif_file=${sarif_file}" >> "${GITHUB_OUTPUT}"
+          echo "Found SARIF: ${sarif_file}"
+
       - name: Upload CodeQL SARIF Artifact
         uses: actions/upload-artifact@v4
         with:
           name: codeql-sarif-${{ matrix.language }}
-          path: ${{ env.CODEQL_RESULTS_DIR }}/${{ matrix.language }}.sarif
+          path: ${{ steps.locate_sarif.outputs.sarif_file }}
           if-no-files-found: error
 
       - name: Upload To GitHub Code Scanning
         if: ${{ vars.ENABLE_GITHUB_CODE_SCANNING == 'true' }}
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: ${{ env.CODEQL_RESULTS_DIR }}/${{ matrix.language }}.sarif
+          sarif_file: ${{ steps.locate_sarif.outputs.sarif_file }}

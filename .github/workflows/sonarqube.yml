@@ -54,6 +54,7 @@ jobs:
           cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
 
       - name: Run backend tests and collect coverage
+        id: coverage
         shell: bash
         run: |
           set -euo pipefail
@@ -73,7 +74,7 @@ jobs:
           done
 
           coverage_reports="$(find coverage -name '*.out' -type f | sort | paste -sd, -)"
-          echo "GO_COVERAGE_REPORTS=${coverage_reports}" >> "${GITHUB_ENV}"
+          echo "go_coverage_reports=${coverage_reports}" >> "${GITHUB_OUTPUT}"
 
       - name: Install frontend dependencies
         working-directory: ${{ env.FRONTEND_DIR }}
@@ -92,7 +93,7 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v5
         with:
           args: >-
-            -Dsonar.go.coverage.reportPaths=${{ env.GO_COVERAGE_REPORTS }}
+            -Dsonar.go.coverage.reportPaths=${{ steps.coverage.outputs.go_coverage_reports }}
 
       - name: SonarQube not configured
         if: ${{ env.SONAR_TOKEN == '' || env.SONAR_HOST_URL == '' }}
