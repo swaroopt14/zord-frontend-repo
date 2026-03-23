@@ -73,22 +73,10 @@ CREATE TABLE IF NOT EXISTS canonical_outcome_events(
 		`CREATE INDEX IF NOT EXISTS canonical_outcome_events_dispatch_idx ON canonical_outcome_events(dispatch_id);`,
 
 		`
-CREATE TABLE IF NOT EXISTS pending_correlation_queue(
-	queue_id UUID PRIMARY KEY,
-	event_id UUID NOT NULL,
-	tenant_id UUID NOT NULL,
-	connector_id UUID NOT NULL,
-	reason TEXT NOT NULL,
-	next_attempt_at TIMESTAMPTZ NOT NULL,
-	attempt_count INT NOT NULL DEFAULT 0,
-	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);`,
-		`CREATE INDEX IF NOT EXISTS pending_correlation_queue_next_attempt_idx ON pending_correlation_queue(next_attempt_at);`,
-
-		`
 CREATE TABLE IF NOT EXISTS fused_outcomes(
 	contract_id UUID PRIMARY KEY,
 	current_state TEXT NOT NULL,
+	finality_certificate_id UUID,
 	final_state TEXT,
 	finality_confidence INT NOT NULL DEFAULT 0,
 	finality_basis TEXT,
@@ -109,10 +97,11 @@ CREATE TABLE IF NOT EXISTS poll_schedule(
 );`,
 		`
 CREATE TABLE IF NOT EXISTS finality_certificates(
-	contract_id UUID PRIMARY KEY,
+	finality_certificate_id UUID PRIMARY KEY,
+	contract_id UUID NOT NULL,
 	final_state TEXT NOT NULL,
 	confidence INT NOT NULL,
-	input_hashes TEXT NOT NULL,
+	input_hashes JSONB NOT NULL,
 	rule_id TEXT NOT NULL,
 	signature TEXT NOT NULL,
 	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

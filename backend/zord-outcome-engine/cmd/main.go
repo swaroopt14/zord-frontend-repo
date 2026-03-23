@@ -14,7 +14,6 @@ import (
 	"zord-outcome-engine/handlers"
 	"zord-outcome-engine/kafka"
 	"zord-outcome-engine/routes"
-	"zord-outcome-engine/services"
 	"zord-outcome-engine/storage"
 
 	"github.com/gin-gonic/gin"
@@ -81,10 +80,9 @@ func main() {
 		log.Fatal("Failed to init encryption key: ", err)
 	}
 
-	// Start background workers (correlation + backfill scheduler + poll worker).
-	services.StartPendingCorrelationWorker(ctx)
+	// Start background workers (backfill scheduler + poll worker).
 	//services.StartBackfillScheduler(ctx)
-	services.StartPollWorker(ctx)
+	//services.StartPollWorker(ctx)
 
 	h := &handlers.Handler{ //need to add h
 		S3store: s3store,
