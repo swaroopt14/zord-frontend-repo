@@ -15,5 +15,6 @@ type RawOutcomeEnvelope struct {
 	ReceivedAt           time.Time `json:"received_at"`
 	RawBytesSHA256       []byte    `json:"raw_bytes_sha256"`
 	ObjectStoreRef       string    `json:"object_store_ref"`
+	CorridorID           string
 	CreatedAt            time.Time `json:"created_at"`
 }

@@ -44,13 +44,13 @@ func (s *RawOutcomeService) Ingest(ctx context.Context, req models.IngestRequest
 
 	// Resolve tenant_id and trace_id from dispatch_index using dispatch_id(reference_id) + connector_id.
 	// This is the only reliable source for webhook/poll/SFTP because we don't rely on headers.
-	var tenantIDStr, traceIDStr, contractIDStr, intentIDStr string
+	var tenantIDStr, traceIDStr, contractIDStr, intentIDStr, corridorID string
 	err = db.DB.QueryRowContext(ctx, `
-SELECT tenant_id::text, trace_id::text, contract_id::text, intent_id::text
+SELECT tenant_id::text, trace_id::text, contract_id::text, intent_id::text, corridor_id::text
 FROM dispatch_index
 WHERE dispatch_id = $1::uuid AND connector_id = $2::uuid
 LIMIT 1
-`, dispatchUUID, connectorUUID).Scan(&tenantIDStr, &traceIDStr, &contractIDStr, &intentIDStr)
+`, dispatchUUID, connectorUUID).Scan(&tenantIDStr, &traceIDStr, &contractIDStr, &intentIDStr, &corridorID)
 	if err != nil {
 		log.Printf("raw_outcome.ingest.dispatch_index_lookup_failed source_class=%s connector_id=%s dispatch_id=%s err=%v", req.SourceClass, req.ConnectorID, dispatchUUID.String(), err)
 		return nil, err
@@ -66,8 +66,6 @@ LIMIT 1
 		log.Printf("raw_outcome.ingest.bad_trace_id source_class=%s trace_id=%s err=%v", req.SourceClass, traceIDStr, err)
 		return nil, err
 	}
-	contractUUID := parseUUIDPtr(contractIDStr)
-	intentUUID := parseUUIDPtr(intentIDStr)
 	log.Printf("raw_outcome.ingest.dispatch_index_resolved source_class=%s connector_id=%s dispatch_id=%s tenant_id=%s trace_id=%s contract_id=%s intent_id=%s", req.SourceClass, req.ConnectorID, dispatchUUID.String(), tenantIDStr, traceIDStr, contractIDStr, intentIDStr)
 
 	// Store encrypted payload in S3 (encryption happens inside storage).
@@ -89,6 +87,7 @@ LIMIT 1
 		ReceivedAt:           receivedAt,
 		RawBytesSHA256:       sum[:],
 		ObjectStoreRef:       objRef,
+		CorridorID:           corridorID,
 		CreatedAt:            time.Now().UTC(),
 	}
 	// Persist raw_outcome_envelopes row using db.DB directly.
@@ -107,6 +106,7 @@ LIMIT 1
 		ConnectorID:          connectorUUID,
 		SourceClass:          req.SourceClass,
 		ReceivedAt:           receivedAt,
+		corridorID:           corridorID,
 		RawBytesSHA256:       sum[:],
 	}
 	canonical, err := normalizeAndInsertCanonical(ctx, meta, req.Payload)
@@ -116,20 +116,23 @@ LIMIT 1
 	}
 	log.Printf("raw_outcome.ingest.normalized source_class=%s envelope_id=%s canonical_event_id=%s status=%s provider_event_id=%s utr=%s", req.SourceClass, envelopeID.String(), canonical.EventID.String(), canonical.StatusCandidate, safeStr(canonical.ProviderEventID), safeStr(canonical.UTR))
 
-	// Correlate: reference_id is the dispatch_id, so we can apply immediately with full confidence.
-	res := &correlationResult{
-		DispatchID:            &dispatchUUID,
-		ContractID:            contractUUID,
-		IntentID:              intentUUID,
-		TraceID:               &traceUUID,
-		CorrelationConfidence: 100,
-		Reason:                "dispatch_id",
-	}
-	if err := applyCorrelationOrEnqueue(ctx, canonical.EventID, canonical.TenantID, canonical.ConnectorID, res); err != nil {
-		log.Printf("raw_outcome.ingest.correlation_apply_failed source_class=%s canonical_event_id=%s dispatch_id=%s err=%v", req.SourceClass, canonical.EventID.String(), dispatchUUID.String(), err)
+	// Run correlation engine: L1 match by reference_id (dispatch_id), L2 by provider_ref_hash.
+	dispatchIDStr := dispatchUUID.String()
+	res, err := correlateCanonical(ctx, &dispatchIDStr, canonical.ProviderRefHash)
+	if err != nil {
+		log.Printf("raw_outcome.ingest.correlation_engine_failed source_class=%s canonical_event_id=%s dispatch_id=%s err=%v", req.SourceClass, canonical.EventID.String(), dispatchUUID.String(), err)
 		return nil, err
 	}
-	log.Printf("raw_outcome.ingest.correlation_applied source_class=%s canonical_event_id=%s dispatch_id=%s confidence=%d reason=%s", req.SourceClass, canonical.EventID.String(), dispatchUUID.String(), res.CorrelationConfidence, res.Reason)
+	if res.DispatchID == nil {
+		//Need to check this logic if Correlation failed
+		log.Printf("raw_outcome.ingest.correlation_unmatched source_class=%s canonical_event_id=%s dispatch_id=%s reason=%s", req.SourceClass, canonical.EventID.String(), dispatchUUID.String(), res.Reason)
+	} else {
+		if err := applyCorrelation(ctx, canonical.EventID, res); err != nil {
+			log.Printf("raw_outcome.ingest.correlation_apply_failed source_class=%s canonical_event_id=%s dispatch_id=%s err=%v", req.SourceClass, canonical.EventID.String(), dispatchUUID.String(), err)
+			return nil, err
+		}
+		log.Printf("raw_outcome.ingest.correlation_applied source_class=%s canonical_event_id=%s dispatch_id=%s confidence=%d reason=%s", req.SourceClass, canonical.EventID.String(), dispatchUUID.String(), res.CorrelationConfidence, res.Reason)
+	}
 
 	out := &models.IngestResponse{
 		RawOutcomeEnvelopeID: envelopeID.String(),

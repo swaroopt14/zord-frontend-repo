@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 	"zord-outcome-engine/db"
 	"zord-outcome-engine/models"
@@ -25,6 +26,7 @@ type RawEnvelopeMeta struct {
 	TraceID              uuid.UUID
 	ConnectorID          uuid.UUID
 	SourceClass          string
+	corridorID           string
 	ReceivedAt           time.Time
 	RawBytesSHA256       []byte
 }
@@ -143,6 +145,27 @@ func (n *OutcomeNormalizer) normalizeByConnector(ctx context.Context, meta *RawE
 	if status == "" {
 		status = "PENDING"
 	}
+	var CorridorID *string
+	keys := []string{
+		"corridor_id",
+		"mode",
+		"rail",
+		"channel",
+		"payment_method",
+		"transfer_type",
+	}
+	for _, key := range keys {
+		if v, ok := obj[key].(string); ok && v != "" {
+			c := NormalizeCorridorCandidate(v)
+			CorridorID = &c
+			break
+		}
+	}
+	//Fallback to dispatch_index data
+	if CorridorID == nil || *CorridorID == "" {
+		c := meta.corridorID
+		CorridorID = &c
+	}
 
 	// provider_event_id: fallback priority: provider_event_id > payout_id > provider_payout_id > provider_reference
 	var providerEventID *string
@@ -156,7 +179,7 @@ func (n *OutcomeNormalizer) normalizeByConnector(ctx context.Context, meta *RawE
 		providerEventID = v
 	}
 	var providerRefHash *string
-	if v, ok := obj["provider_ref"].(string); ok && v != "" {
+	if v, ok := obj["utr"].(string); ok && v != "" {
 		h := sha256.Sum256([]byte(v))
 		s := hex.EncodeToString(h[:])
 		providerRefHash = &s
@@ -164,7 +187,29 @@ func (n *OutcomeNormalizer) normalizeByConnector(ctx context.Context, meta *RawE
 
 	utr := parseStringPtr(obj["utr"])
 
-	observedAt := parseTimeMaybe(obj["observed_at"])
+	var observedAt *time.Time
+	keystime := []string{
+		"observed_at",
+		"event_time",
+		"created_at",
+		"processed_at",
+		"updated_at",
+		"txn_date",
+		"timestamp",
+	}
+
+	for _, key := range keystime {
+		if v, ok := obj[key]; ok {
+			if t := parseTimeMaybe(v); t != nil {
+				observedAt = t
+				break // stop once found ✅
+			}
+		}
+	}
+	if observedAt == nil {
+		t := meta.ReceivedAt
+		observedAt = &t
+	}
 
 	var amountStr *string
 	if v, ok := obj["amount"]; ok {
@@ -189,6 +234,7 @@ func (n *OutcomeNormalizer) normalizeByConnector(ctx context.Context, meta *RawE
 		ProviderEventID: providerEventID,
 		ProviderRefHash: providerRefHash,
 		UTR:             utr,
+		CorridorID:      CorridorID,
 		ObservedAt:      observedAt,
 		Amount:          amountStr,
 		Currency:        currency,
@@ -232,6 +278,32 @@ func normalizeStatusCandidate(v any) string {
 			return ""
 		}
 		return "PENDING"
+	}
+}
+func NormalizeCorridorCandidate(v string) string {
+	s := strings.ToUpper(strings.TrimSpace(v))
+
+	switch s {
+	case "IMPS", "IMMEDIATE_PAYMENT":
+		return "IMPS"
+
+	case "NEFT":
+		return "NEFT"
+
+	case "RTGS":
+		return "RTGS"
+
+	case "UPI":
+		return "UPI"
+
+	case "CARD", "DEBIT_CARD", "CREDIT_CARD":
+		return "CARD"
+
+	case "WALLET":
+		return "WALLET"
+
+	default:
+		return s // keep unknown values as-is
 	}
 }
 

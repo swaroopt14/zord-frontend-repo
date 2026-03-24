@@ -17,6 +17,7 @@ type correlationResult struct {
 	Reason                string
 }
 
+// correlateCanonical tries to match an event to a dispatch via L1 (reference_id) then L2 (provider_ref_hash).
 func correlateCanonical(ctx context.Context, referenceID *string, providerRefHash *string) (*correlationResult, error) {
 	if referenceID != nil && *referenceID != "" {
 		if res, err := findDispatchByReferenceID(ctx, *referenceID); err == nil {
@@ -81,17 +82,8 @@ LIMIT 1
 	}, nil
 }
 
-func applyCorrelationOrEnqueue(ctx context.Context, eventID uuid.UUID, tenantID uuid.UUID, connectorID uuid.UUID, res *correlationResult) error {
-	if res == nil || res.DispatchID == nil {
-		_, err := db.DB.ExecContext(ctx, `
-INSERT INTO pending_correlation_queue(
-	queue_id, event_id, tenant_id, connector_id, reason, next_attempt_at, attempt_count
-) VALUES ($1,$2,$3,$4,$5,NOW() + INTERVAL '30 seconds',0)
-`,
-			uuid.New(), eventID, tenantID, connectorID, "correlation_failed",
-		)
-		return err
-	}
+// applyCorrelation writes the matched dispatch IDs onto the canonical event row.
+func applyCorrelation(ctx context.Context, eventID uuid.UUID, res *correlationResult) error {
 	_, err := db.DB.ExecContext(ctx, `
 UPDATE canonical_outcome_events SET
 	contract_id = $1,
