@@ -49,7 +49,7 @@ func (h *TokenHandler) Tokenize(c *gin.Context) {
 		req.PII,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "tokenization failed"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 

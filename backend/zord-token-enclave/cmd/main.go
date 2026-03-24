@@ -2,17 +2,22 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/lib/pq"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
 	"zord-token-enclave/internal/config"
-	"zord-token-enclave/internal/crypto"
+	"zord-token-enclave/internal/db"
 	"zord-token-enclave/internal/handlers"
+	"zord-token-enclave/internal/keymanager"
 	"zord-token-enclave/internal/models"
+	"zord-token-enclave/internal/repository"
 	"zord-token-enclave/internal/services"
 	"zord-token-enclave/kafka"
 	"zord-token-enclave/tracing"
@@ -24,13 +29,59 @@ func main() {
 
 	cfg := config.Load()
 
-	// ✅ Crypto service
-	cryptoSvc := crypto.NewCrypto(cfg.MasterKey)
+	// ---------------- DB SETUP ----------------
+	// ---------------- DB SETUP ----------------
+	database, err := sql.Open("postgres", cfg.DBURL)
+	if err != nil {
+		log.Fatal("❌ Failed to connect DB:", err)
+	}
 
-	// ✅ Stateless Token Service (NO DB)
-	tokenSvc := services.NewTokenService(cryptoSvc)
+	if err := database.Ping(); err != nil {
+		log.Fatal("❌ DB not reachable:", err)
+	}
 
-	// -------- KAFKA SETUP --------
+	if err := db.CreateTables(database); err != nil {
+		log.Fatal("❌ Failed to create tables:", err)
+	}
+
+	// ---------------- REPO + KEY MANAGER ----------------
+	tokenRepo := repository.NewTokenRepository(database)
+	keyManager := keymanager.NewKeyManager(tokenRepo)
+
+	// ---------------- SERVICE ----------------
+	tokenSvc := services.NewTokenService(tokenRepo, keyManager)
+
+	// ---------------- MIGRATION WORKER ----------------
+	go func() {
+		for {
+			log.Println("🔁 Starting key migration cycle...")
+
+			// ⚠️ For now hardcoded tenant (can extend later)
+			err := tokenSvc.MigrateKeys(context.Background(), "tenant_1")
+			if err != nil {
+				log.Println("❌ Migration error:", err)
+			} else {
+				log.Println("✅ Migration cycle completed")
+			}
+
+			time.Sleep(1 * time.Minute)
+		}
+	}()
+
+	go func() {
+		for {
+			log.Println("🔐 Checking if key rotation needed...")
+
+			err := tokenSvc.AutoRotateKeys(context.Background())
+			if err != nil {
+				log.Println("❌ Auto-rotation error:", err)
+			}
+
+			time.Sleep(10 * time.Minute) // configurable
+		}
+	}()
+
+	// ---------------- KAFKA SETUP ----------------
 	ctx := context.Background()
 
 	brokers := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
@@ -46,12 +97,12 @@ func main() {
 
 		pii := map[string]string{}
 
-		// account number (root)
+		// account number
 		if v, ok := canonical["account_number"].(string); ok {
 			pii["account_number"] = v
 		}
 
-		// beneficiary fields
+		// beneficiary
 		if beneficiary, ok := canonical["beneficiary"].(map[string]interface{}); ok {
 
 			if name, ok := beneficiary["name"].(string); ok {
@@ -70,7 +121,7 @@ func main() {
 			}
 		}
 
-		// remitter fields
+		// remitter
 		if remitter, ok := canonical["remitter"].(map[string]interface{}); ok {
 
 			if phone, ok := remitter["phone"].(string); ok {
@@ -110,10 +161,7 @@ func main() {
 		)
 	}
 
-	handler := kafka.BuildTokenizeHandler(
-		ctx,
-		tokenizeLogic,
-	)
+	handler := kafka.BuildTokenizeHandler(ctx, tokenizeLogic)
 
 	go func() {
 		err := kafka.StartConsumer(
@@ -128,25 +176,23 @@ func main() {
 		}
 	}()
 
-	// ✅ HTTP handlers
+	// ---------------- HTTP HANDLERS ----------------
 	tokenHandler := handlers.NewTokenHandler(tokenSvc)
 	detokenizeHandler := handlers.NewDetokenizeHandler(tokenSvc)
 
-	// ✅ Gin router
+	// ---------------- ROUTER ----------------
 	r := gin.New()
 	r.Use(
 		gin.Recovery(),
 		otelgin.Middleware("zord-token-enclave"),
 	)
 
-	// ✅ Health check (no DB now)
+	// health
 	r.GET("/v1/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status": "ok",
-		})
+		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	// ✅ APIs
+	// APIs
 	r.POST("/v1/tokenize", tokenHandler.Tokenize)
 	r.POST("/v1/detokenize", detokenizeHandler.Detokenize)
 

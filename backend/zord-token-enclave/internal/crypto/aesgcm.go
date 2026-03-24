@@ -79,3 +79,17 @@ func (c *Crypto) DecryptFromToken(token string) ([]byte, error) {
 
 	return gcm.Open(nil, nonce, ciphertext, nil)
 }
+
+func (c *Crypto) Decrypt(ciphertext, nonce []byte) ([]byte, error) {
+	block, err := aes.NewCipher(c.key)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	return gcm.Open(nil, nonce, ciphertext, nil)
+}

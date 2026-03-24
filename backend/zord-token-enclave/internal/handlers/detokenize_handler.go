@@ -26,7 +26,7 @@ func (h *DetokenizeHandler) Detokenize(c *gin.Context) {
 	}
 
 	// ✅ Call service
-	resp, err := h.svc.DetokenizeFields(req)
+	resp, err := h.svc.DetokenizeFields(c.Request.Context(), req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(), // helpful for debugging
