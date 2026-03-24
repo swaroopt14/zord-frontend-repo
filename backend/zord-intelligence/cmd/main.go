@@ -80,6 +80,13 @@ func main() {
 	// Without this, the /sla-breach endpoint always shows 0 even during real breaches.
 	slaWorker := worker.NewSLAWorker(slaRepo, actionService, projectionService)
 
+	// PolicyCronWorker evaluates all cron-triggered policies every 5 minutes.
+	// It scans projection_state for active tenant+corridor pairs and calls
+	// policyService.EvaluateForCron for each one.
+	// Without this worker, cron policies (P_SLA_BREACH_RISK, P_PENDING_BACKLOG_AGING,
+	// P_EVIDENCE_MISSING, P_SLA_BREACH_RATE_HIGH) would NEVER fire, even if enabled.
+	cronWorker := worker.NewPolicyCronWorker(projRepo, policyService)
+
 	// ── Step 8: Create HTTP handlers ──────────────────────────────────────
 	// Handlers need repos (not services — handlers only read data).
 	healthHandler := handlers.NewHealthHandler()
@@ -113,7 +120,8 @@ func main() {
 	// They will run until ctx is cancelled (service shutdown).
 	go outboxWorker.Start(ctx)
 	go slaWorker.Start(ctx)
-	log.Println("main: background workers started")
+	go cronWorker.Start(ctx)
+	log.Println("main: background workers started (outbox + sla + policy-cron)")
 
 	// ── Step 13: Start Kafka consumers ────────────────────────────────────
 	// Starts 8 goroutines, one per input topic.

@@ -1,12 +1,5 @@
 package persistence
-
-// What is this file?
-// Reads and writes the policy_registry table.
-//
-// WHO READS FROM THIS FILE?
 //   policy_service.go → GetByTrigger() to find policies to evaluate on each event
-//
-// WHO WRITES TO THIS FILE?
 //   policy_handler.go → Insert(), SetEnabled() when ops team manages policies via API
 
 import (
@@ -26,17 +19,6 @@ func NewPolicyRepo(pool *pgxpool.Pool) *PolicyRepo {
 	return &PolicyRepo{pool: pool}
 }
 
-// GetByTrigger returns all ENABLED policies for a given trigger type and value.
-// This is the most important query in ZPI — called on every Kafka event.
-//
-// EXAMPLE:
-//
-//	When a "final.contract.updated" event arrives:
-//	policies := policyRepo.GetByTrigger(ctx, "event", "final.contract.updated")
-//	→ returns [P_SLA_BREACH_RISK, P_FAILURE_BURST, P_DUPLICATE_RISK]
-//	→ policy_service evaluates each one
-//
-// The WHERE enabled = true means disabled policies are completely skipped.
 func (r *PolicyRepo) GetByTrigger(ctx context.Context, triggerType, triggerValue string) ([]models.Policy, error) {
 	sql := `
 		SELECT policy_id, version, scope_type, trigger_type, trigger_value,
@@ -47,8 +29,7 @@ func (r *PolicyRepo) GetByTrigger(ctx context.Context, triggerType, triggerValue
 		  AND  enabled       = true
 		ORDER  BY policy_id
 	`
-	// COALESCE(tenant_id, '') converts NULL to empty string
-	// because Go strings cannot be NULL — only pointers can be nil
+	
 
 	rows, err := r.pool.Query(ctx, sql, triggerType, triggerValue)
 	if err != nil {
@@ -155,8 +136,42 @@ func (r *PolicyRepo) Insert(ctx context.Context, p models.Policy) error {
 	return nil
 }
 
-// SetEnabled enables or disables a policy by ID.
-// Called by policy_handler.go for the enable/disable API endpoints.
+// GetAllCronPolicies returns every enabled cron-triggered policy regardless
+// of their schedule string. Called by EvaluateForCron in policy_service.
+// WHY A SEPARATE METHOD (not reusing GetByTrigger)?
+// GetByTrigger filters by trigger_value (the schedule string).
+// We need ALL cron policies, so we filter only by trigger_type = 'cron'.
+// A new method makes the intent explicit and keeps GetByTrigger unchanged.
+func (r *PolicyRepo) GetAllCronPolicies(ctx context.Context) ([]models.Policy, error) {
+	sql := `
+		SELECT policy_id, version, scope_type, trigger_type, trigger_value,
+		       dsl, enabled, COALESCE(tenant_id, ''), created_at, updated_at
+		FROM   policy_registry
+		WHERE  trigger_type = 'cron'
+		  AND  enabled      = true
+		ORDER  BY policy_id
+	`
+	rows, err := r.pool.Query(ctx, sql)
+	if err != nil {
+		return nil, fmt.Errorf("policy_repo.GetAllCronPolicies: %w", err)
+	}
+	defer rows.Close()
+
+	var result []models.Policy
+	for rows.Next() {
+		var p models.Policy
+		if err := rows.Scan(
+			&p.PolicyID, &p.Version, &p.ScopeType,
+			&p.TriggerType, &p.TriggerValue, &p.DSL,
+			&p.Enabled, &p.TenantID,
+			&p.CreatedAt, &p.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("policy_repo.GetAllCronPolicies scan: %w", err)
+		}
+		result = append(result, p)
+	}
+	return result, nil
+}
 func (r *PolicyRepo) SetEnabled(ctx context.Context, policyID string, enabled bool) error {
 	sql := `
 		UPDATE policy_registry
