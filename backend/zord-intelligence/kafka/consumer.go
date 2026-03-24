@@ -1,39 +1,16 @@
 package kafka
 
-// What is this file?
-// This file is ZPI's "ears" — it listens to 7 Kafka topics simultaneously.
-// When a message arrives, it decodes the JSON and calls the right service.
-//
-// WHO CALLS THIS FILE?
-// cmd/main.go calls StartConsumers() once at startup.
-//
-// WHAT DOES IT CALL?
-// It calls projection_service and policy_service when events arrive.
-// We pass these in as an interface (explained below).
-
 import (
 	"context"
 	"encoding/json"
 	"log"
+	"strings"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/zord/zord-intelligence/config"
 	"github.com/zord/zord-intelligence/internal/models"
 )
 
-// EventHandler defines what methods the consumer needs from the services layer.
-//
-// WHY AN INTERFACE HERE?
-// The consumer doesn't care about the concrete type (projectionService or policyService).
-// It just needs to call Handle methods. Using an interface:
-//  1. Makes testing easy — you can pass a mock
-//  2. Keeps kafka/ decoupled from internal/services/
-//
-// Think of it like a Java interface:
-//
-//	public interface EventHandler {
-//	    void handleIntentCreated(IntentCreatedEvent e);
-//	}
 type EventHandler interface {
 	HandleIntentCreated(ctx context.Context, e models.IntentCreatedEvent) error
 	HandleDispatchCreated(ctx context.Context, e models.DispatchAttemptCreatedEvent) error
@@ -42,19 +19,13 @@ type EventHandler interface {
 	HandleFinalContractUpdated(ctx context.Context, e models.FinalContractUpdatedEvent) error
 	HandleEvidencePackReady(ctx context.Context, e models.EvidencePackReadyEvent) error
 	HandleDLQEvent(ctx context.Context, e models.DLQEvent) error
-	// HandleStatementMatch handles Service 5's new StatementMatchEvent.
-	// Topic: statement.match.event (new topic — requires Service 5 upgrade)
 	HandleStatementMatch(ctx context.Context, e models.StatementMatchEvent) error
 }
 
-// StartConsumers launches one goroutine per Kafka topic.
-// Each goroutine runs forever until ctx is cancelled (service shutdown).
-//
-// Called once from cmd/main.go:
-//
-//	kafka.StartConsumers(ctx, cfg, handler)
+
 func StartConsumers(ctx context.Context, cfg *config.Config, handler EventHandler) {
-	brokers := []string{cfg.KafkaBrokers}
+	
+	brokers := strings.Split(cfg.KafkaBrokers, ",")
 
 	// Each topic gets its own goroutine.
 	// "go func()" starts the function in the background immediately.
@@ -135,22 +106,6 @@ func StartConsumers(ctx context.Context, cfg *config.Config, handler EventHandle
 	log.Println("kafka: all 8 consumers started")
 }
 
-// consume is the shared loop used by every topic above.
-// It reads messages forever until ctx is cancelled.
-//
-// PARAMETERS:
-//
-//	brokers  → Kafka broker addresses
-//	topic    → which topic to read
-//	groupID  → consumer group name (all ZPI instances share one group)
-//	handle   → function to call for each message
-//
-// MANUAL OFFSET COMMIT:
-// We only commit the offset (tell Kafka "I processed this message")
-// AFTER handle() returns nil (success).
-// If handle() returns an error, we do NOT commit.
-// This means Kafka will redeliver the message after restart.
-// This is called "at-least-once processing" — safe if your handlers are idempotent.
 func consume(
 	ctx context.Context,
 	brokers []string,

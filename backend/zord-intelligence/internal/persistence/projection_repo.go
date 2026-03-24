@@ -1,58 +1,5 @@
 package persistence
 
-// ============================================================
-// projection_repo.go — ATOMIC SQL OPERATIONS (Race-Condition Fix)
-// ============================================================
-//
-// THE BUG WE ARE FIXING (read-modify-write race):
-// ─────────────────────────────────────────────────
-// Old code pattern:
-//   1. SELECT value from DB into Go variable
-//   2. value++ in Go
-//   3. UPDATE DB with new value
-//
-// When two Kafka goroutines run this simultaneously for the same corridor:
-//
-//   Goroutine A reads:  total_count = 100
-//   Goroutine B reads:  total_count = 100   ← sees same stale value!
-//   Goroutine A writes: total_count = 101
-//   Goroutine B writes: total_count = 101   ← OVERWRITES A, count lost!
-//
-// Two events happened but count only went 100 → 101, not 102.
-// In fintech: wrong KPIs → wrong policy decisions → ops misses real problems.
-//
-// THE FIX: Move arithmetic INTO SQL.
-// PostgreSQL executes each statement atomically.
-// No other connection can interrupt a running statement.
-//
-//   -- Atomic: read, add, write all in one locked step
-//   UPDATE ... SET value_json = jsonb_set(
-//     value_json,
-//     '{total_count}',
-//     to_jsonb((value_json->>'total_count')::int + 1)
-//   )
-//
-// BONUS FIX: Histogram-based percentiles (replaces the raw sample array)
-// ────────────────────────────────────────────────────────────────────────
-// Old code: stored up to 10,000 raw float64 samples in a JSON array.
-// Problem:  every event reads AND rewrites the entire array (expensive).
-//           80KB+ of JSON per corridor per day.
-//
-// New code: 20-bucket histogram. Each bucket is just a counter.
-// Storage: ~20 integers regardless of how many samples we've seen.
-// Each update increments one bucket counter (O(1), tiny SQL).
-// Percentiles are estimated from bucket distribution (accurate enough for ops).
-//
-// JSONB OPERATORS USED IN THIS FILE:
-// ────────────────────────────────────
-//   ->  'key'        returns JSONB value for key
-//   ->> 'key'        returns TEXT value for key (for casting to numbers)
-//   jsonb_set(obj, path, value)  replaces a field inside a JSONB object
-//   to_jsonb(x)      converts any Postgres value to JSONB
-//   COALESCE(x, 0)   returns x if not NULL, else 0 (handles missing keys)
-//   GREATEST(x, 0)   returns max(x, 0) — prevents negative counters
-//   NULLIF(x, 0)     returns NULL if x=0 (used before division to avoid /0 error)
-
 import (
 	"context"
 	"encoding/json"
@@ -76,9 +23,7 @@ func NewProjectionRepo(pool *pgxpool.Pool) *ProjectionRepo {
 	return &ProjectionRepo{pool: pool}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // ATOMIC COUNTER OPERATIONS  (the core race-condition fix)
-// ─────────────────────────────────────────────────────────────────────────────
 
 // AtomicIncrementSuccess atomically adds 1 to settled_count AND total_count,
 // then recomputes the rate. Called when final_state == "SETTLED".
@@ -541,13 +486,8 @@ func (r *ProjectionRepo) UpsertWithValue(
 	})
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // PRIVATE HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ─────────────────────────────────────────────────────────────────────────────
 // SLA BREACH RATE OPERATIONS (atomic SQL, race-condition free)
-// ─────────────────────────────────────────────────────────────────────────────
 
 // AtomicIncrementSLABreached atomically increments breach counter AND updates average.
 // Called when an SLA timer is marked BREACHED.
@@ -764,7 +704,8 @@ func (r *ProjectionRepo) AtomicIncrementFirstAttempt(
 // that had at least one retry. Called when HandleFinalityCertIssued sees SETTLED
 // and the intent previously had retry_attempts > 0 on this corridor.
 //
-// NOTE: We track "recovered" conservatively — we increment when a SETTLED cert
+//	We track "recovered" conservatively — we increment when a SETTLED cert
+//
 // arrives on a corridor that has retry_attempts > 0 in the window. This is a
 // corridor-level aggregate, not per-intent tracking, which keeps it stateless.
 func (r *ProjectionRepo) AtomicIncrementRetryRecovered(
@@ -827,9 +768,7 @@ func (r *ProjectionRepo) recomputeRetryRecoveryRate(
 	return nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // STATEMENT MATCH RATE OPERATIONS
-// ─────────────────────────────────────────────────────────────────────────────
 
 // AtomicRecordStatementMatch records one StatementMatchEvent (MATCHED or UNMATCHED).
 // Called by HandleStatementMatch in projection_service.
@@ -953,9 +892,7 @@ func (r *ProjectionRepo) recomputeStatementMatchRate(
 	return nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // PROVIDER REF MISSING RATE OPERATIONS
-// ─────────────────────────────────────────────────────────────────────────────
 
 // AtomicRecordProviderRef records whether a finality cert had a provider reference.
 // Called by HandleFinalityCertIssued using the new HasProviderRef field.
@@ -1052,9 +989,7 @@ func (r *ProjectionRepo) recomputeProviderRefMissingRate(
 	return nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // CONFLICT RATE IN FUSION OPERATIONS
-// ─────────────────────────────────────────────────────────────────────────────
 
 // AtomicRecordFusionConflict records the conflict data from one FinalityCertIssuedEvent.
 // Called by HandleFinalityCertIssued using the new ConflictCount + ConflictTypes fields.
@@ -1305,4 +1240,39 @@ func estimatePercentileFromHistogram(
 	}
 
 	return latencyBucketBounds[18] // fallback: last finite bound
+}
+
+// TenantCorridorPair holds one unique (tenant_id, corridor_id) combination.
+// Used by the PolicyCronWorker to know which pairs to evaluate.
+type TenantCorridorPair struct {
+	TenantID   string
+	CorridorID string
+}
+
+func (r *ProjectionRepo) GetActiveTenantCorridorPairs(ctx context.Context) ([]TenantCorridorPair, error) {
+	sql := `
+		SELECT DISTINCT
+		       tenant_id,
+		       split_part(projection_key, '.', 3) AS corridor_id
+		FROM   projection_state
+		WHERE  projection_key LIKE 'corridor.%'
+		  AND  split_part(projection_key, '.', 3) != ''
+		  AND  window_end > now() - interval '24 hours'
+		ORDER  BY tenant_id, corridor_id
+	`
+	rows, err := r.pool.Query(ctx, sql)
+	if err != nil {
+		return nil, fmt.Errorf("projection_repo.GetActiveTenantCorridorPairs: %w", err)
+	}
+	defer rows.Close()
+
+	var result []TenantCorridorPair
+	for rows.Next() {
+		var pair TenantCorridorPair
+		if err := rows.Scan(&pair.TenantID, &pair.CorridorID); err != nil {
+			return nil, fmt.Errorf("projection_repo.GetActiveTenantCorridorPairs scan: %w", err)
+		}
+		result = append(result, pair)
+	}
+	return result, nil
 }

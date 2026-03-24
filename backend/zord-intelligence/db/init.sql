@@ -1,12 +1,5 @@
--- ============================================================
--- zord-intelligence database schema
--- This file runs automatically when you do: docker-compose up
--- ============================================================
 
-
--- ── TABLE 1: projection_state ────────────────────────────────
---
--- WHAT IS THIS?
+-- TABLE 1: projection_state
 -- ZPI reads Kafka events and computes KPI numbers from them.
 -- For example: "corridor razorpay.UPI has 97% success rate in last 24h"
 -- Those computed numbers are stored here.
@@ -73,9 +66,7 @@ CREATE INDEX IF NOT EXISTS idx_proj_tenant_key
     ON projection_state (tenant_id, projection_key, window_end DESC);
 
 
--- ── TABLE 2: policy_registry ─────────────────────────────────
---
--- WHAT IS THIS?
+-- TABLE 2: policy_registry
 -- Rules that ZPI evaluates. When conditions are met, ZPI creates an ActionContract.
 --
 -- THINK OF IT LIKE:
@@ -141,9 +132,7 @@ CREATE INDEX IF NOT EXISTS idx_policy_enabled_trigger
     WHERE enabled = true;
 
 
--- ── TABLE 3: action_contracts ────────────────────────────────
---
--- WHAT IS THIS?
+-- TABLE 3: action_contracts
 -- Every decision ZPI makes is recorded here as an immutable signed record.
 -- This is ZPI's audit trail — you can always answer "why did ZPI do that?"
 --
@@ -238,9 +227,8 @@ CREATE INDEX IF NOT EXISTS idx_ac_policy
     ON action_contracts (policy_id, tenant_id, created_at DESC);
 
 
--- ── TABLE 4: actuation_outbox ────────────────────────────────
---
--- WHAT IS THIS?
+-- TABLE 4: actuation_outbox 
+
 -- A delivery queue. When ZPI creates an ActionContract that needs to
 -- trigger another service (retry, hold, alert), it writes to this table.
 -- A background worker (outbox_worker.go) reads this and sends to Kafka.
@@ -307,9 +295,7 @@ CREATE INDEX IF NOT EXISTS idx_outbox_pending
     WHERE status IN ('PENDING', 'FAILED');
 
 
--- ── TABLE 5: sla_timers ──────────────────────────────────────
---
--- WHAT IS THIS?
+-- TABLE 5: sla_timers
 -- Tracks the SLA (Service Level Agreement) deadline for each intent.
 -- When a merchant creates a payout, there is a deadline by which it
 -- must reach finality. This table tracks whether we are on time.
@@ -363,3 +349,85 @@ CREATE TABLE IF NOT EXISTS sla_timers (
 CREATE INDEX IF NOT EXISTS idx_sla_active_deadline
     ON sla_timers (tenant_id, sla_deadline ASC)
     WHERE status = 'ACTIVE';
+
+-- ── SEED: Pilot policies ─────────────────────────────────────────────────────
+--
+-- These are the 8 policies required for pilot 
+-- All start DISABLED (enabled = false) for safety.
+-- The ops team enables them one-by-one via the API after verifying thresholds:
+--   POST /v1/intelligence/policies/P_SLA_BREACH_RISK/enable
+--
+-- ON CONFLICT DO NOTHING means running init.sql twice is safe —
+-- existing rows are untouched (idempotent seed).
+--
+-- DSL guide:
+--   WHEN <metric> <op> <threshold>  AND  <metric> <op> <threshold>
+--   THEN ACTION <decision> severity=<HIGH|MEDIUM|LOW>
+--
+-- Time units: 6h = 6 hours, 30m = 30 minutes (handled by parseThreshold in Go)
+-- Plain numbers: 0.70 = rate (0–1), 500 = count
+
+INSERT INTO policy_registry
+    (policy_id, version, scope_type, trigger_type, trigger_value, dsl, enabled)
+VALUES
+
+-- P1: SLA breach risk — fires when p95 finality is over 6h AND backlog > 500
+-- scope: corridor (checked per corridor)  trigger: cron every 5 min
+('P_SLA_BREACH_RISK', 1, 'corridor', 'cron', '*/5 * * * *',
+'WHEN corridor.finality_p95_seconds > 6h AND corridor.total_pending > 500
+THEN ACTION ESCALATE severity=HIGH',
+false),
+
+-- P2: Failure burst — fires when success rate drops below 70% in this corridor
+-- scope: corridor  trigger: event (fires immediately when outcome arrives)
+('P_FAILURE_BURST', 1, 'corridor', 'event', 'outcome.event.normalized',
+'WHEN corridor.success_rate < 0.70
+THEN ACTION ESCALATE severity=HIGH',
+false),
+
+-- P3: Pending backlog aging — fires when 6h+ bucket gets too large
+-- scope: corridor  trigger: cron every 5 min
+('P_PENDING_BACKLOG_AGING', 1, 'corridor', 'cron', '*/5 * * * *',
+'WHEN corridor.pending_6h_plus > 50
+THEN ACTION OPEN_OPS_INCIDENT severity=MEDIUM',
+false),
+
+-- P4: Conflict spike — fires when Outcome Fusion conflict rate is very high
+-- A high conflict rate means PSP signals are unreliable — needs investigation
+-- scope: corridor  trigger: finality cert event
+('P_CONFLICT_SPIKE', 1, 'corridor', 'event', 'finality.certificate.issued',
+'WHEN corridor.success_rate < 0.85
+THEN ACTION NOTIFY severity=MEDIUM',
+false),
+
+-- P5: Evidence missing — fires when evidence readiness drops below 80%
+-- scope: tenant  trigger: cron every hour (we use */5 for pilot simplicity)
+('P_EVIDENCE_MISSING', 1, 'tenant', 'cron', '*/5 * * * *',
+'WHEN tenant.evidence_readiness_rate < 0.80
+THEN ACTION GENERATE_EVIDENCE severity=LOW',
+false),
+
+-- P6: DLQ retry suggestion — fires when statement match rate drops
+-- Low match rate = payouts settled but not in statement = reconciliation exception
+-- scope: corridor  trigger: statement match event
+('P_STATEMENT_MISMATCH_SPIKE', 1, 'corridor', 'event', 'statement.match.event',
+'WHEN corridor.statement_match_rate < 0.90
+THEN ACTION OPEN_OPS_INCIDENT severity=MEDIUM',
+false),
+
+-- P7: Corridor degradation advisory — fires when success rate falls but not critical
+-- Advisory only — suggests human review, no auto-action
+-- scope: corridor  trigger: finality cert event
+('P_CORRIDOR_DEGRADATION', 1, 'corridor', 'event', 'finality.certificate.issued',
+'WHEN corridor.success_rate < 0.90
+THEN ACTION ADVISORY_RECOMMENDATION severity=LOW',
+false),
+
+-- P8: SLA breach rate rising — fires when breach rate exceeds 5%
+-- scope: tenant  trigger: cron every 5 min
+('P_SLA_BREACH_RATE_HIGH', 1, 'tenant', 'cron', '*/5 * * * *',
+'WHEN tenant.sla_breach_rate > 0.05
+THEN ACTION ESCALATE severity=HIGH',
+false)
+
+ON CONFLICT (policy_id) DO NOTHING;
