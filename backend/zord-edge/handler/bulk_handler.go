@@ -1,10 +1,13 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"path/filepath"
@@ -53,6 +56,65 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 	}
 	defer src.Close()
 
+	fileBytes, err := io.ReadAll(src)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read file"})
+		return
+	}
+
+	// 🔐 Hash
+	fileHashBytes := sha256.Sum256(fileBytes)
+	fileHash := hex.EncodeToString(fileHashBytes[:])
+
+	tenantID := c.MustGet("tenant_id").(uuid.UUID)
+
+	fileTraceID := uuid.NewString()
+
+	log.Printf(
+		"Bulk file stored | filename=%s size=%d hash=%s ",
+		file.Filename,
+		len(fileBytes),
+		fileHash,
+	)
+
+	filePayload := map[string]interface{}{
+		"file_name":           file.Filename,
+		"file_size_bytes":     len(fileBytes),
+		"file_content_hash":   fileHash,
+		"row_count_estimate":  strings.Count(string(fileBytes), "\n") - 1,
+		"file_upload_channel": "CSV",
+		"file_data":           fileBytes,
+	}
+
+	payloadBytes, err := json.Marshal(filePayload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to build file payload",
+		})
+		return
+	}
+
+	fileMsg := model.RawIntentMessage{
+		TenantID:       tenantID.String(),
+		TraceID:        fileTraceID,
+		IdempotencyKey: uuid.NewString(),
+		PayloadSize:    len(payloadBytes),  // 🔥 updated
+		Payload:        payloadBytes,       // 🔥 updated
+		ContentType:    "application/json", // 🔥 updated
+		SourceType:     "BULK_FILE",
+	}
+
+	_, err = services.ProcessRawIntent(context.Background(), fileMsg, h.S3store)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to store bulk file envelope",
+		})
+		return
+	}
+
+	// 🔄 New reader (clean)
+	reader := bytes.NewReader(fileBytes)
+
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 
 	var rows [][]string
@@ -61,7 +123,7 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 
 	case ".xlsx":
 
-		f, err := excelize.OpenReader(src)
+		f, err := excelize.OpenReader(reader)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid excel file"})
 			return
@@ -77,9 +139,9 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 
 	case ".csv":
 
-		reader := csv.NewReader(src)
+		csvReader := csv.NewReader(reader)
 
-		rows, err = reader.ReadAll()
+		rows, err = csvReader.ReadAll()
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid CSV file"})
 			return
@@ -109,7 +171,6 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 	}
 
 	headers := rows[0]
-	tenantID := c.MustGet("tenant_id").(uuid.UUID)
 
 	results := make([]BulkResult, len(rows)-1)
 
