@@ -98,9 +98,9 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 		TenantID:       tenantID.String(),
 		TraceID:        fileTraceID,
 		IdempotencyKey: uuid.NewString(),
-		PayloadSize:    len(payloadBytes),  // 🔥 updated
-		Payload:        payloadBytes,       // 🔥 updated
-		ContentType:    "application/json", // 🔥 updated
+		PayloadSize:    len(payloadBytes),
+		Payload:        payloadBytes,
+		ContentType:    "application/json",
 		SourceType:     "BULK_FILE",
 	}
 
