@@ -313,6 +313,84 @@ func (r *PaymentIntentRepo) UpdateSnapshotRefs(
 	WHERE intent_id = $6
 	`
 
-	_, err := r.db.ExecContext(ctx, query, canonicalRef, nirRef, govRef, hash, prevHash, intentID)
+	if _, err := r.db.ExecContext(ctx, query, objectRef, hash, intentID); err != nil {
+		return err
+	}
+
+	insertVersionQuery := `
+	INSERT INTO intent_versions (intent_id, version_no, prev_hash, created_at)
+	VALUES ($1, $2, $3, now())
+	ON CONFLICT (intent_id, version_no) DO NOTHING
+	`
+
+	var versionNo int
+	if err := r.db.QueryRowContext(ctx, `
+	SELECT COALESCE(MAX(version_no), 0) + 1
+	FROM intent_versions
+	WHERE intent_id = $1
+`, intentID).Scan(&versionNo); err != nil {
+		return err
+	}
+
+	_, err := r.db.ExecContext(ctx, insertVersionQuery, intentID, versionNo, prevHash)
+
 	return err
+}
+func (r *PaymentIntentRepo) GetSnapshotVersionContext(
+	ctx context.Context,
+	intentID string,
+) (int, string, error) {
+	var currentVersion int
+	err := r.db.QueryRowContext(ctx, `
+		SELECT COALESCE(MAX(version_no), 0)
+		FROM intent_versions
+		WHERE intent_id = $1
+	`, intentID).Scan(&currentVersion)
+	if err != nil {
+		return 0, "", err
+	}
+
+	// first version
+	if currentVersion == 0 {
+		return 1, "", nil
+	}
+
+	var prevHash string
+	err = r.db.QueryRowContext(ctx, `
+		SELECT canonical_hash
+		FROM payment_intents
+		WHERE intent_id = $1
+	`, intentID).Scan(&prevHash)
+	if err != nil {
+		return 0, "", err
+	}
+
+	return currentVersion + 1, prevHash, nil
+}
+func (r *PaymentIntentRepo) GetPreviousTenantCanonicalHash(
+	ctx context.Context,
+	tenantID string,
+	intentID string,
+) (string, error) {
+	var prevHash string
+
+	err := r.db.QueryRowContext(ctx, `
+		SELECT canonical_hash
+		FROM payment_intents
+		WHERE tenant_id = $1
+		  AND intent_id <> $2
+		  AND canonical_hash IS NOT NULL
+		  AND canonical_hash <> ''
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, tenantID, intentID).Scan(&prevHash)
+
+	if err == sql.ErrNoRows {
+		return "GENESIS", nil
+	}
+	if err != nil {
+		return "", err
+	}
+
+	return prevHash, nil
 }

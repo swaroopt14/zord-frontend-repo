@@ -66,6 +66,17 @@ type CanonicalIntentRepository interface {
 		hash string,
 		prevHash string,
 	) error
+
+	GetSnapshotVersionContext(
+		ctx context.Context,
+		intentID string,
+	) (int, string, error)
+
+	GetPreviousTenantCanonicalHash(
+		ctx context.Context,
+		tenantID string,
+		intentID string,
+	) (string, error)
 }
 
 func NewIntentService(
@@ -397,9 +408,20 @@ func (s *IntentService) ProcessIncomingIntent(
 	// -------- STEP 11: WORM SNAPSHOT (S3) --------
 
 	version := 1
-	prevHash := ""
 
-	canonicalBytes, _ := json.Marshal(saved)
+	prevHash, err := s.repo.GetPreviousTenantCanonicalHash(
+		ctx,
+		saved.TenantID,
+		saved.IntentID,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	canonicalBytes, err := json.Marshal(saved)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	canonicalRef, hash, _ := s.s3.StoreSnapshot(
 		ctx,
@@ -429,12 +451,14 @@ func (s *IntentService) ProcessIncomingIntent(
 		hash,
 		prevHash,
 	)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	saved.CanonicalSnapshotRef = canonicalRef
 	saved.NIRSnapshotRef = nirRef
 	saved.GovernanceSnapshotRef = govRef
 	saved.CanonicalHash = hash
-	saved.PrevHash = prevHash
 
 	return &saved, nil, nil
 }
@@ -533,6 +557,47 @@ func (s *IntentService) ProcessTokenizeResult(
 	if err != nil {
 		return nil, err
 	}
+	version := 1
+
+	prevHash, err := s.repo.GetPreviousTenantCanonicalHash(
+		ctx,
+		saved.TenantID,
+		saved.IntentID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	canonicalBytes, err := json.Marshal(saved)
+	if err != nil {
+		return nil, err
+	}
+
+	objectRef, hash, err := s.s3.StoreCanonicalSnapshot(
+		ctx,
+		saved.TenantID,
+		saved.IntentID,
+		version,
+		canonicalBytes,
+		prevHash,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.repo.UpdateCanonicalSnapshotMeta(
+		ctx,
+		saved.IntentID,
+		objectRef,
+		hash,
+		prevHash,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	saved.CanonicalRef = objectRef
+	saved.CanonicalHash = hash
 
 	return &saved, nil
 }

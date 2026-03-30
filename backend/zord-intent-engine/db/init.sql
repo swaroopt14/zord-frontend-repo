@@ -35,7 +35,6 @@ CREATE TABLE IF NOT EXISTS payment_intents (
     status TEXT NOT NULL,
     confidence_score NUMERIC(5,2),
     canonical_hash TEXT NOT NULL,
-    prev_hash TEXT,
     canonical_ref TEXT NOT NULL,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -126,6 +125,31 @@ CREATE INDEX IF NOT EXISTS idx_dlq_items_reason_code ON dlq_items(reason_code);
 CREATE INDEX IF NOT EXISTS idx_dlq_items_replayable ON dlq_items(replayable);
 CREATE INDEX IF NOT EXISTS idx_dlq_items_created_at ON dlq_items(created_at);
 
+
+
+-- ============================================================================
+-- INTENT VERSIONS TABLE
+-- Stores immutable version-chain linkage for intents
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS intent_versions (
+    version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    intent_id UUID NOT NULL,
+    version_no INT NOT NULL,
+    prev_hash TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT fk_intent_versions_intent
+        FOREIGN KEY (intent_id)
+        REFERENCES payment_intents(intent_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_intent_versions_intent_version
+        UNIQUE (intent_id, version_no)
+);
+
+CREATE INDEX IF NOT EXISTS idx_intent_versions_intent_id ON intent_versions(intent_id);
+CREATE INDEX IF NOT EXISTS idx_intent_versions_intent_version ON intent_versions(intent_id, version_no);
+
 -- ============================================================================
 -- VERIFICATION QUERIES
 -- Run these to verify tables were created successfully
@@ -153,7 +177,12 @@ BEGIN
     ELSE
         RAISE EXCEPTION '❌ dlq_items table creation failed';
     END IF;
-    
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'intent_versions') THEN
+    RAISE NOTICE '✅ intent_versions table created successfully';
+    ELSE
+        RAISE EXCEPTION '❌ intent_versions table creation failed';
+    END IF;
+
     RAISE NOTICE '🎉 All zord-intent-engine tables created successfully!';
 END $$;
 
@@ -167,5 +196,5 @@ SELECT
     hasrules,
     hastriggers
 FROM pg_tables 
-WHERE tablename IN ('payment_intents', 'outbox', 'dlq_items')
+WHERE tablename IN ('payment_intents', 'intent_versions','outbox', 'dlq_items')
 ORDER BY tablename;
