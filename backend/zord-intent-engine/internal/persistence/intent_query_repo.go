@@ -94,7 +94,18 @@ func (r *IntentQueryRepo) ListIntents(
 		COALESCE(beneficiary_type, '') as beneficiary_type,
 		COALESCE(pii_tokens, '{}'::jsonb) as pii_tokens,
 		COALESCE(beneficiary, '{}'::jsonb) as beneficiary,
-		status, confidence_score, created_at
+		status, confidence_score, created_at,
+		COALESCE(client_payout_ref, '') as client_payout_ref,
+		COALESCE(request_fingerprint, '') as request_fingerprint,
+		COALESCE(routing_hints_json, '{}'::jsonb) as routing_hints_json,
+		COALESCE(governance_state, '') as governance_state,
+		COALESCE(business_state, '') as business_state,
+		COALESCE(duplicate_risk_flag, false) as duplicate_risk_flag,
+		COALESCE(mapping_profile_version, '') as mapping_profile_version,
+		updated_at,
+		canonical_snapshot_ref,
+		COALESCE(nir_snapshot_ref, '') as nir_snapshot_ref,
+		COALESCE(governance_snapshot_ref, '') as governance_snapshot_ref
 	FROM payment_intents
 	%s
 	ORDER BY created_at DESC
@@ -132,6 +143,17 @@ func (r *IntentQueryRepo) ListIntents(
 			&intent.Status,
 			&intent.ConfidenceScore,
 			&intent.CreatedAt,
+			&intent.ClientPayoutRef,
+			&intent.RequestFingerprint,
+			&intent.RoutingHintsJSON,
+			&intent.GovernanceState,
+			&intent.BusinessState,
+			&intent.DuplicateRiskFlag,
+			&intent.MappingProfileVersion,
+			&intent.UpdatedAt,
+			&intent.CanonicalSnapshotRef,
+			&intent.NIRSnapshotRef,
+			&intent.GovernanceSnapshotRef,
 		)
 
 		if err != nil {
@@ -164,7 +186,18 @@ func (r *IntentQueryRepo) GetIntentByID(
 		COALESCE(beneficiary_type, '') as beneficiary_type,
 		COALESCE(pii_tokens, '{}'::jsonb) as pii_tokens,
 		COALESCE(beneficiary, '{}'::jsonb) as beneficiary,
-		status, confidence_score, created_at
+		status, confidence_score, created_at,
+		COALESCE(client_payout_ref, '') as client_payout_ref,
+		COALESCE(request_fingerprint, '') as request_fingerprint,
+		COALESCE(routing_hints_json, '{}'::jsonb) as routing_hints_json,
+		COALESCE(governance_state, '') as governance_state,
+		COALESCE(business_state, '') as business_state,
+		COALESCE(duplicate_risk_flag, false) as duplicate_risk_flag,
+		COALESCE(mapping_profile_version, '') as mapping_profile_version,
+		updated_at,
+		canonical_snapshot_ref,
+		COALESCE(nir_snapshot_ref, '') as nir_snapshot_ref,
+		COALESCE(governance_snapshot_ref, '') as governance_snapshot_ref
 	FROM payment_intents
 	WHERE intent_id = $1
 `
@@ -189,6 +222,17 @@ func (r *IntentQueryRepo) GetIntentByID(
 		&intent.Status,
 		&intent.ConfidenceScore,
 		&intent.CreatedAt,
+		&intent.ClientPayoutRef,
+		&intent.RequestFingerprint,
+		&intent.RoutingHintsJSON,
+		&intent.GovernanceState,
+		&intent.BusinessState,
+		&intent.DuplicateRiskFlag,
+		&intent.MappingProfileVersion,
+		&intent.UpdatedAt,
+		&intent.CanonicalSnapshotRef,
+		&intent.NIRSnapshotRef,
+		&intent.GovernanceSnapshotRef,
 	)
 
 	if err != nil {

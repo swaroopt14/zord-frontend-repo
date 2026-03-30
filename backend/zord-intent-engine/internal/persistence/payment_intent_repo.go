@@ -73,8 +73,12 @@ func (r *PaymentIntentRepo) Save(
     amount, currency, deadline_at,
     constraints, beneficiary_type, pii_tokens, beneficiary,
     status, confidence_score,
-    canonical_ref, canonical_hash, prev_hash,
-    created_at
+    canonical_snapshot_ref, nir_snapshot_ref, governance_snapshot_ref,
+    canonical_hash, prev_hash,
+    created_at,
+    client_payout_ref, request_fingerprint, routing_hints_json,
+    governance_state, business_state, duplicate_risk_flag,
+    mapping_profile_version, updated_at
 )
 VALUES (
     $1,$2,$3,$4,
@@ -84,7 +88,11 @@ VALUES (
     $15,$16,$17,$18,
     $19,$20,
     $21,$22,$23,
-    $24
+    $24,$25,
+    $26,
+    $27,$28,$29,
+    $30,$31,$32,
+    $33,$34
 )`
 
 	_, err = tx.ExecContext(
@@ -116,11 +124,22 @@ VALUES (
 		intent.Status,          // $19
 		intent.ConfidenceScore, // $20
 
-		intent.CanonicalRef,  // $21
-		intent.CanonicalHash, // $22
-		intent.PrevHash,      // $23
+		intent.CanonicalSnapshotRef,  // $21
+		intent.NIRSnapshotRef,        // $22
+		intent.GovernanceSnapshotRef, // $23
+		intent.CanonicalHash,         // $24
+		intent.PrevHash,              // $25
 
-		intent.CreatedAt, // $24
+		intent.CreatedAt, // $26
+
+		intent.ClientPayoutRef,       // $27
+		intent.RequestFingerprint,    // $28
+		intent.RoutingHintsJSON,      // $29
+		intent.GovernanceState,       // $30
+		intent.BusinessState,         // $31
+		intent.DuplicateRiskFlag,     // $32
+		intent.MappingProfileVersion, // $33
+		intent.UpdatedAt,             // $34
 	)
 
 	if err != nil {
@@ -209,7 +228,18 @@ func (r *PaymentIntentRepo) FindByEnvelope(
 		beneficiary,
 		status,
 		confidence_score,
-		created_at
+		created_at,
+		client_payout_ref,
+		request_fingerprint,
+		routing_hints_json,
+		governance_state,
+		business_state,
+		duplicate_risk_flag,
+		mapping_profile_version,
+		updated_at,
+		canonical_snapshot_ref,
+		COALESCE(nir_snapshot_ref, '') as nir_snapshot_ref,
+		COALESCE(governance_snapshot_ref, '') as governance_snapshot_ref
 	FROM payment_intents
 	WHERE tenant_id = $1
 	  AND envelope_id = $2
@@ -241,6 +271,17 @@ func (r *PaymentIntentRepo) FindByEnvelope(
 		&intent.Status,
 		&intent.ConfidenceScore,
 		&intent.CreatedAt,
+		&intent.ClientPayoutRef,
+		&intent.RequestFingerprint,
+		&intent.RoutingHintsJSON,
+		&intent.GovernanceState,
+		&intent.BusinessState,
+		&intent.DuplicateRiskFlag,
+		&intent.MappingProfileVersion,
+		&intent.UpdatedAt,
+		&intent.CanonicalSnapshotRef,
+		&intent.NIRSnapshotRef,
+		&intent.GovernanceSnapshotRef,
 	)
 
 	if err == sql.ErrNoRows {
@@ -253,21 +294,25 @@ func (r *PaymentIntentRepo) FindByEnvelope(
 	return &intent, nil
 }
 
-func (r *PaymentIntentRepo) UpdateCanonicalSnapshotMeta(
+func (r *PaymentIntentRepo) UpdateSnapshotRefs(
 	ctx context.Context,
 	intentID string,
-	objectRef string,
+	canonicalRef string,
+	nirRef string,
+	govRef string,
 	hash string,
 	prevHash string,
 ) error {
 	query := `
 	UPDATE payment_intents
-	SET canonical_ref = $1,
-	    canonical_hash = $2,
-	    prev_hash = $3
-	WHERE intent_id = $4
+	SET canonical_snapshot_ref = $1,
+	    nir_snapshot_ref = $2,
+	    governance_snapshot_ref = $3,
+	    canonical_hash = $4,
+	    prev_hash = $5
+	WHERE intent_id = $6
 	`
 
-	_, err := r.db.ExecContext(ctx, query, objectRef, hash, prevHash, intentID)
+	_, err := r.db.ExecContext(ctx, query, canonicalRef, nirRef, govRef, hash, prevHash, intentID)
 	return err
 }
