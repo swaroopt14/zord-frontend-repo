@@ -52,6 +52,20 @@ func (s *ProjectionService) HandleIntentCreated(
 	ctx context.Context,
 	e models.IntentCreatedEvent,
 ) error {
+	if e.TenantID == "" || e.CorridorID == "" || e.EventID == "" {
+		log.Printf("invalid event: missing required fields tenant=%s corridor=%s event_id=%s",
+			e.TenantID, e.CorridorID, e.EventID)
+		return nil
+	}
+
+	processed, err := s.projRepo.IsProcessed(ctx, e.EventID)
+	if err != nil {
+		return fmt.Errorf("HandleIntentCreated IsProcessed event_id=%s: %w", e.EventID, err)
+	}
+	if processed {
+		return nil
+	}
+
 	window := todayWindow(e.CreatedAt)
 
 	// Step 1: atomically add to the pending backlog (race-safe SQL upsert)
@@ -72,6 +86,16 @@ func (s *ProjectionService) HandleIntentCreated(
 			e.IntentID, e.CorridorID, err)
 	}
 
+	if err := s.policyService.EvaluateForEvent(
+		ctx, e.TenantID, e.CorridorID, "canonical.intent.created", e.EventID,
+	); err != nil {
+		log.Printf("HandleIntentCreated: EvaluateForEvent failed tenant=%s corridor=%s: %v",
+			e.TenantID, e.CorridorID, err)
+	}
+	if err := s.projRepo.MarkProcessed(ctx, e.EventID); err != nil {
+		return fmt.Errorf("HandleIntentCreated MarkProcessed event_id=%s: %w", e.EventID, err)
+	}
+
 	return nil
 }
 
@@ -81,6 +105,20 @@ func (s *ProjectionService) HandleDispatchCreated(
 	ctx context.Context,
 	e models.DispatchAttemptCreatedEvent,
 ) error {
+	if e.TenantID == "" || e.CorridorID == "" || e.EventID == "" {
+		log.Printf("invalid event: missing required fields tenant=%s corridor=%s event_id=%s",
+			e.TenantID, e.CorridorID, e.EventID)
+		return nil
+	}
+
+	processed, err := s.projRepo.IsProcessed(ctx, e.EventID)
+	if err != nil {
+		return fmt.Errorf("HandleDispatchCreated IsProcessed event_id=%s: %w", e.EventID, err)
+	}
+	if processed {
+		return nil
+	}
+
 	log.Printf("HandleDispatchCreated: attempt=%s intent=%s corridor=%s attempt_no=%d",
 		e.AttemptID, e.IntentID, e.CorridorID, e.AttemptNo)
 
@@ -88,14 +126,31 @@ func (s *ProjectionService) HandleDispatchCreated(
 
 	if e.AttemptNo > 1 {
 		// This is a retry — count both total_attempts AND retry_attempts
-		return s.projRepo.AtomicIncrementRetryAttempt(
+		if err := s.projRepo.AtomicIncrementRetryAttempt(
 			ctx, e.TenantID, e.CorridorID, window.start, window.end,
-		)
+		); err != nil {
+			return err
+		}
+	} else {
+		// First attempt — count only total_attempts
+		if err := s.projRepo.AtomicIncrementFirstAttempt(
+			ctx, e.TenantID, e.CorridorID, window.start, window.end,
+		); err != nil {
+			return err
+		}
 	}
-	// First attempt — count only total_attempts
-	return s.projRepo.AtomicIncrementFirstAttempt(
-		ctx, e.TenantID, e.CorridorID, window.start, window.end,
-	)
+
+	if err := s.policyService.EvaluateForEvent(
+		ctx, e.TenantID, e.CorridorID, "dispatch.attempt.created", e.EventID,
+	); err != nil {
+		log.Printf("HandleDispatchCreated: EvaluateForEvent failed tenant=%s corridor=%s: %v",
+			e.TenantID, e.CorridorID, err)
+	}
+	if err := s.projRepo.MarkProcessed(ctx, e.EventID); err != nil {
+		return fmt.Errorf("HandleDispatchCreated MarkProcessed event_id=%s: %w", e.EventID, err)
+	}
+
+	return nil
 }
 
 // HandleOutcomeNormalized updates the failure taxonomy when a FAILED outcome arrives.
@@ -105,7 +160,24 @@ func (s *ProjectionService) HandleOutcomeNormalized(
 	ctx context.Context,
 	e models.OutcomeNormalizedEvent,
 ) error {
+	if e.TenantID == "" || e.CorridorID == "" || e.EventID == "" {
+		log.Printf("invalid event: missing required fields tenant=%s corridor=%s event_id=%s",
+			e.TenantID, e.CorridorID, e.EventID)
+		return nil
+	}
+
+	processed, err := s.projRepo.IsProcessed(ctx, e.EventID)
+	if err != nil {
+		return fmt.Errorf("HandleOutcomeNormalized IsProcessed event_id=%s: %w", e.EventID, err)
+	}
+	if processed {
+		return nil
+	}
+
 	if e.StatusCandidate != "FAILED" || e.ReasonCode == "" {
+		if err := s.projRepo.MarkProcessed(ctx, e.EventID); err != nil {
+			return fmt.Errorf("HandleOutcomeNormalized MarkProcessed event_id=%s: %w", e.EventID, err)
+		}
 		return nil
 	}
 
@@ -119,9 +191,17 @@ func (s *ProjectionService) HandleOutcomeNormalized(
 	}
 
 	// Did this failure spike trigger any policy rules?
-	return s.policyService.EvaluateForEvent(
+	if err := s.policyService.EvaluateForEvent(
 		ctx, e.TenantID, e.CorridorID, "outcome.event.normalized", e.EventID,
-	)
+	); err != nil {
+		return err
+	}
+
+	if err := s.projRepo.MarkProcessed(ctx, e.EventID); err != nil {
+		return fmt.Errorf("HandleOutcomeNormalized MarkProcessed event_id=%s: %w", e.EventID, err)
+	}
+
+	return nil
 }
 
 // HandleFinalityCertIssued is the most critical handler in ZPI.
@@ -137,6 +217,20 @@ func (s *ProjectionService) HandleFinalityCertIssued(
 	ctx context.Context,
 	e models.FinalityCertIssuedEvent,
 ) error {
+	if e.TenantID == "" || e.CorridorID == "" || e.EventID == "" {
+		log.Printf("invalid event: missing required fields tenant=%s corridor=%s event_id=%s",
+			e.TenantID, e.CorridorID, e.EventID)
+		return nil
+	}
+
+	processed, isProcessedErr := s.projRepo.IsProcessed(ctx, e.EventID)
+	if isProcessedErr != nil {
+		return fmt.Errorf("HandleFinalityCertIssued IsProcessed event_id=%s: %w", e.EventID, isProcessedErr)
+	}
+	if processed {
+		return nil
+	}
+
 	window := todayWindow(e.DecisionAt)
 
 	// ── Update 1: success_rate ────────────────────────────────────────────
@@ -239,9 +333,17 @@ func (s *ProjectionService) HandleFinalityCertIssued(
 	}
 
 	// ── Trigger policy evaluation ─────────────────────────────────────────
-	return s.policyService.EvaluateForEvent(
+	if err := s.policyService.EvaluateForEvent(
 		ctx, e.TenantID, e.CorridorID, "finality.certificate.issued", e.EventID,
-	)
+	); err != nil {
+		return err
+	}
+
+	if err := s.projRepo.MarkProcessed(ctx, e.EventID); err != nil {
+		return fmt.Errorf("HandleFinalityCertIssued MarkProcessed event_id=%s: %w", e.EventID, err)
+	}
+
+	return nil
 }
 
 // HandleFinalContractUpdated is called when the final contract read model updates.
@@ -250,9 +352,31 @@ func (s *ProjectionService) HandleFinalContractUpdated(
 	ctx context.Context,
 	e models.FinalContractUpdatedEvent,
 ) error {
-	return s.policyService.EvaluateForEvent(
+	if e.TenantID == "" || e.CorridorID == "" || e.EventID == "" {
+		log.Printf("invalid event: missing required fields tenant=%s corridor=%s event_id=%s",
+			e.TenantID, e.CorridorID, e.EventID)
+		return nil
+	}
+
+	processed, err := s.projRepo.IsProcessed(ctx, e.EventID)
+	if err != nil {
+		return fmt.Errorf("HandleFinalContractUpdated IsProcessed event_id=%s: %w", e.EventID, err)
+	}
+	if processed {
+		return nil
+	}
+
+	if err := s.policyService.EvaluateForEvent(
 		ctx, e.TenantID, e.CorridorID, "final.contract.updated", e.EventID,
-	)
+	); err != nil {
+		return err
+	}
+
+	if err := s.projRepo.MarkProcessed(ctx, e.EventID); err != nil {
+		return fmt.Errorf("HandleFinalContractUpdated MarkProcessed event_id=%s: %w", e.EventID, err)
+	}
+
+	return nil
 }
 
 // HandleStatementMatch updates the statement_match_rate projection.
@@ -291,12 +415,31 @@ func (s *ProjectionService) HandleEvidencePackReady(
 	ctx context.Context,
 	e models.EvidencePackReadyEvent,
 ) error {
+	if e.TenantID == "" || e.EventID == "" {
+		log.Printf("invalid event: missing required fields tenant=%s event_id=%s",
+			e.TenantID, e.EventID)
+		return nil
+	}
+
+	processed, err := s.projRepo.IsProcessed(ctx, e.EventID)
+	if err != nil {
+		return fmt.Errorf("HandleEvidencePackReady IsProcessed event_id=%s: %w", e.EventID, err)
+	}
+	if processed {
+		return nil
+	}
+
 	window := todayWindow(e.CreatedAt)
 	if err := s.projRepo.AtomicIncrementEvidence(
 		ctx, e.TenantID, window.start, window.end,
 	); err != nil {
 		return fmt.Errorf("HandleEvidencePackReady tenant=%s: %w", e.TenantID, err)
 	}
+
+	if err := s.projRepo.MarkProcessed(ctx, e.EventID); err != nil {
+		return fmt.Errorf("HandleEvidencePackReady MarkProcessed event_id=%s: %w", e.EventID, err)
+	}
+
 	return nil
 }
 
@@ -389,3 +532,4 @@ func (s *ProjectionService) HandleSLATimerResolved(
 
 	return nil
 }
+

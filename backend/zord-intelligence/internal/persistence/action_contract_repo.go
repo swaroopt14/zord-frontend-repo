@@ -257,10 +257,10 @@ func (r *ActionContractRepo) InsertIfNewTx(
 	ctx context.Context,
 	tx pgx.Tx,
 	ac models.ActionContract,
-) error {
+) (bool, error) {
 	scopeJSON, err := json.Marshal(ac.ScopeRefs)
 	if err != nil {
-		return fmt.Errorf("action_repo.InsertIfNewTx marshal scope_refs: %w", err)
+		return false, fmt.Errorf("action_repo.InsertIfNewTx marshal scope_refs: %w", err)
 	}
 
 	sql := `
@@ -272,13 +272,13 @@ func (r *ActionContractRepo) InsertIfNewTx(
 			($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		ON CONFLICT (idempotency_key) DO NOTHING
 	`
-	_, err = tx.Exec(ctx, sql,
+	tag, err := tx.Exec(ctx, sql,
 		ac.ActionID, ac.TenantID, ac.PolicyID, ac.PolicyVersion,
 		string(scopeJSON), ac.InputRefsJSON, string(ac.Decision), ac.Confidence,
 		ac.PayloadJSON, ac.Signature, ac.IdempotencyKey, ac.CreatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("action_repo.InsertIfNewTx id=%s: %w", ac.ActionID, err)
+		return false, fmt.Errorf("action_repo.InsertIfNewTx id=%s: %w", ac.ActionID, err)
 	}
-	return nil
+	return tag.RowsAffected() > 0, nil
 }

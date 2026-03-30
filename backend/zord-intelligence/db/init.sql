@@ -65,6 +65,17 @@ CREATE TABLE IF NOT EXISTS projection_state (
 CREATE INDEX IF NOT EXISTS idx_proj_tenant_key
     ON projection_state (tenant_id, projection_key, window_end DESC);
 
+-- TABLE 1B: processed_events
+-- Tracks Kafka event IDs already processed by ZPI handlers.
+-- Used for idempotency to avoid double-counting on retries/replays.
+CREATE TABLE IF NOT EXISTS processed_events (
+    event_id     TEXT        PRIMARY KEY,
+    processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_processed_events_at
+    ON processed_events (processed_at DESC);
+
 
 -- TABLE 2: policy_registry
 -- Rules that ZPI evaluates. When conditions are met, ZPI creates an ActionContract.

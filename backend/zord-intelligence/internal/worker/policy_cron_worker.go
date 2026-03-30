@@ -22,6 +22,8 @@ package worker
 import (
 	"context"
 	"log"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/zord/zord-intelligence/internal/persistence"
@@ -109,9 +111,13 @@ func (w *PolicyCronWorker) runOnce(ctx context.Context) {
 		return // nothing to evaluate yet — normal for a fresh deployment
 	}
 
+	testTenant := strings.TrimSpace(os.Getenv("ZPI_TEST_TENANT"))
 	log.Printf("policy_cron_worker: evaluating %d tenant+corridor pair(s)", len(pairs))
 
 	for _, pair := range pairs {
+		if testTenant != "" && pair.TenantID != testTenant {
+			continue
+		}
 		// EvaluateForCron checks all enabled cron policies against current
 		// projection values for this specific tenant+corridor.
 		if err := w.policyService.EvaluateForCron(ctx, pair.TenantID, pair.CorridorID); err != nil {

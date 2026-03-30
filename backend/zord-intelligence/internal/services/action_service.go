@@ -152,8 +152,20 @@ func (s *ActionService) CreateAction(
 	}()
 
 	// ── Write 1: Insert ActionContract (inside transaction) ───────────────
-	if err := s.actionRepo.InsertIfNewTx(ctx, tx, contract); err != nil {
+	inserted, err := s.actionRepo.InsertIfNewTx(ctx, tx, contract)
+	if err != nil {
 		return fmt.Errorf("action_service.CreateAction insert contract: %w", err)
+	}
+	if !inserted {
+		if err := tx.Commit(ctx); err != nil {
+			return fmt.Errorf("action_service.CreateAction commit duplicate: %w", err)
+		}
+		logger.Info("action deduplicated by idempotency key",
+			"policy_id", req.PolicyID,
+			"tenant_id", req.TenantID,
+			"idempotency_key", idempotencyKey,
+		)
+		return nil
 	}
 
 	// ── Write 2: Insert outbox entry (inside SAME transaction) ───────────
