@@ -67,11 +67,6 @@ type CanonicalIntentRepository interface {
 		prevHash string,
 	) error
 
-	GetSnapshotVersionContext(
-		ctx context.Context,
-		intentID string,
-	) (int, string, error)
-
 	GetPreviousTenantCanonicalHash(
 		ctx context.Context,
 		tenantID string,

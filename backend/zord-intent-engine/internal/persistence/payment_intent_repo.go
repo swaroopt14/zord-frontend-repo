@@ -321,49 +321,9 @@ func (r *PaymentIntentRepo) UpdateSnapshotRefs(
 	ON CONFLICT (intent_id, version_no) DO NOTHING
 	`
 
-	var versionNo int
-	if err := r.db.QueryRowContext(ctx, `
-	SELECT COALESCE(MAX(version_no), 0) + 1
-	FROM intent_versions
-	WHERE intent_id = $1
-`, intentID).Scan(&versionNo); err != nil {
-		return err
-	}
-
-	_, err := r.db.ExecContext(ctx, insertVersionQuery, intentID, versionNo, prevHash)
+	_, err := r.db.ExecContext(ctx, insertVersionQuery, intentID, 1, prevHash)
 
 	return err
-}
-func (r *PaymentIntentRepo) GetSnapshotVersionContext(
-	ctx context.Context,
-	intentID string,
-) (int, string, error) {
-	var currentVersion int
-	err := r.db.QueryRowContext(ctx, `
-		SELECT COALESCE(MAX(version_no), 0)
-		FROM intent_versions
-		WHERE intent_id = $1
-	`, intentID).Scan(&currentVersion)
-	if err != nil {
-		return 0, "", err
-	}
-
-	// first version
-	if currentVersion == 0 {
-		return 1, "", nil
-	}
-
-	var prevHash string
-	err = r.db.QueryRowContext(ctx, `
-		SELECT canonical_hash
-		FROM payment_intents
-		WHERE intent_id = $1
-	`, intentID).Scan(&prevHash)
-	if err != nil {
-		return 0, "", err
-	}
-
-	return currentVersion + 1, prevHash, nil
 }
 func (r *PaymentIntentRepo) GetPreviousTenantCanonicalHash(
 	ctx context.Context,

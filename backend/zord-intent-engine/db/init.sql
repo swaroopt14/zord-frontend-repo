@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS payment_intents (
     contract_id UUID NOT NULL,
     idempotency_key TEXT,
     salient_hash TEXT NOT NULL,
+    payload_hash BYTEA NOT NULL,
 
     intent_type TEXT NOT NULL,
     canonical_version TEXT NOT NULL,
@@ -35,9 +36,21 @@ CREATE TABLE IF NOT EXISTS payment_intents (
     status TEXT NOT NULL,
     confidence_score NUMERIC(5,2),
     canonical_hash TEXT NOT NULL,
-    canonical_ref TEXT NOT NULL,
+    canonical_snapshot_ref TEXT NOT NULL,
+    nir_snapshot_ref TEXT,
+    governance_snapshot_ref TEXT,
 
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    client_payout_ref TEXT,
+    request_fingerprint TEXT,
+    routing_hints_json JSONB,
+    governance_state TEXT,
+    business_state TEXT,
+    duplicate_risk_flag BOOLEAN,
+    mapping_profile_version TEXT,
+    updated_at TIMESTAMPTZ DEFAULT now()
+
+
 );
 
 -- Create indexes for performance
@@ -64,6 +77,7 @@ CREATE TABLE IF NOT EXISTS outbox (
     schema_version TEXT,
 
     payload JSONB NOT NULL,     -- downstream message body (no raw PII)
+    payload_hash BYTEA NOT NULL,
     amount NUMERIC,
     currency CHAR(3),
 
