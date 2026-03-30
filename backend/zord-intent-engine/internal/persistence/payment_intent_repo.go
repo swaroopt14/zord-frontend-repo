@@ -20,6 +20,7 @@ func NewPaymentIntentRepo(db *sql.DB) *PaymentIntentRepo {
 
 func (r *PaymentIntentRepo) Save(
 	ctx context.Context,
+	nir *models.NormalizedIngestRecord,
 	intent models.CanonicalIntent, outbox models.OutboxEvent,
 ) (models.CanonicalIntent, error) {
 
@@ -38,6 +39,31 @@ func (r *PaymentIntentRepo) Save(
 			_ = tx.Rollback()
 		}
 	}()
+
+	if nir != nil {
+		nirQuery := `
+		INSERT INTO normalized_ingest_records (
+			nir_id, envelope_id, tenant_id,
+			detected_format, profile_id, profile_version,
+			fields_json, field_confidence_summary, unmapped_json, mapping_uncertain_flag,
+			created_at
+		) VALUES (
+			$1, $2, $3,
+			$4, $5, $6,
+			$7, $8, $9, $10,
+			$11
+		)`
+		_, err = tx.ExecContext(ctx, nirQuery,
+			nir.NIRID, nir.EnvelopeID, nir.TenantID,
+			nir.DetectedFormat, nir.ProfileID, nir.ProfileVersion,
+			nir.FieldsJSON, nir.FieldConfidenceSummary, nir.UnmappedJSON, nir.MappingUncertainFlag,
+			nir.CreatedAt,
+		)
+		if err != nil {
+			log.Printf("Repo.Save: INSERT normalized_ingest_records failed: %v", err)
+			return intent, err
+		}
+	}
 
 	query := `
 	INSERT INTO payment_intents (
