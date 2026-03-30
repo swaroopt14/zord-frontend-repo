@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -45,6 +46,7 @@ var enclaveHTTPClient = &http.Client{
 type CanonicalIntentRepository interface {
 	Save(
 		ctx context.Context,
+		nir *models.NormalizedIngestRecord,
 		intent models.CanonicalIntent,
 		outbox models.OutboxEvent,
 	) (models.CanonicalIntent, error)
@@ -191,11 +193,34 @@ func (s *IntentService) ProcessIncomingIntent(
 		return nil, &models.DLQEntry{ReasonCode: "PAYLOAD_DECRYPTION_FAILED"}, nil
 	}
 
+	// -------- STEP 4: Recompute SHA256(raw_bytes) and compare --------
+	rawHash := sha256.Sum256(decryptedPayload)
+	if len(in.PayloadHash) > 0 && !bytes.Equal(rawHash[:], in.PayloadHash) {
+		log.Printf("⚠️ Raw payload hash mismatch for EnvelopeID=%s", in.EnvelopeID)
+		return nil, &models.DLQEntry{ReasonCode: "RAW_PAYLOAD_INTEGRITY_FAILED"}, nil
+	}
+
 	var parsed models.ParsedIncomingIntent
 	if err := json.Unmarshal(decryptedPayload, &parsed); err != nil {
 		return nil, &models.DLQEntry{
 			ReasonCode: "INVALID_JSON_PAYLOAD",
 		}, nil
+	}
+
+	// -------- STEP 6: Build NIR --------
+	fieldsJSON, _ := json.Marshal(parsed)
+	nir := &models.NormalizedIngestRecord{
+		NIRID:                  uuid.New(),
+		EnvelopeID:             in.EnvelopeID,
+		TenantID:               in.TenantID,
+		DetectedFormat:         "json",
+		ProfileID:              "default",
+		ProfileVersion:         "v1",
+		FieldsJSON:             fieldsJSON,
+		FieldConfidenceSummary: json.RawMessage(`{"overall": 1.0}`),
+		UnmappedJSON:           json.RawMessage(`{}`),
+		MappingUncertainFlag:   false,
+		CreatedAt:              time.Now().UTC(),
 	}
 
 	// -------- STEP 5.5: Idempotency guard --------
@@ -347,7 +372,7 @@ func (s *IntentService) ProcessIncomingIntent(
 
 	outbox, _ := CanonicalIntentToOutboxEvent(canonical, canonicalPayload)
 
-	saved, _ := s.repo.Save(ctx, canonical, outbox)
+	saved, _ := s.repo.Save(ctx, nir, canonical, outbox)
 
 	// -------- STEP 11: WORM SNAPSHOT (S3) --------
 
@@ -463,7 +488,7 @@ func (s *IntentService) ProcessTokenizeResult(
 		return nil, err
 	}
 
-	saved, err := s.repo.Save(ctx, intent, outbox)
+	saved, err := s.repo.Save(ctx, nil, intent, outbox)
 	if err != nil {
 		return nil, err
 	}
@@ -511,7 +536,7 @@ func (s *IntentService) processWebhook(
 		CreatedAt:     time.Now(),
 	}
 
-	saved, err := s.repo.Save(ctx, canonical, outbox)
+	saved, err := s.repo.Save(ctx, nil, canonical, outbox)
 	if err != nil {
 		return nil, nil, err
 	}

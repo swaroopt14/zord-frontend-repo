@@ -129,6 +129,34 @@ func CreateTables() error {
 		return err
 	}
 
+	// NORMALIZED INGEST RECORDS TABLE
+	normalizedIngestRecords := `
+	CREATE TABLE IF NOT EXISTS normalized_ingest_records (
+		nir_id UUID PRIMARY KEY,
+		envelope_id UUID NOT NULL,
+		tenant_id UUID NOT NULL,
+		detected_format TEXT,
+		profile_id TEXT,
+		profile_version TEXT,
+		fields_json JSONB,
+		field_confidence_summary JSONB,
+		unmapped_json JSONB,
+		mapping_uncertain_flag BOOLEAN,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+	);`
+
+	if _, err := DB.Exec(normalizedIngestRecords); err != nil {
+		return err
+	}
+
+	if _, err := DB.Exec(`CREATE INDEX IF NOT EXISTS idx_nirs_tenant_id ON normalized_ingest_records(tenant_id);`); err != nil {
+		return err
+	}
+
+	if _, err := DB.Exec(`CREATE INDEX IF NOT EXISTS idx_nirs_envelope_id ON normalized_ingest_records(envelope_id);`); err != nil {
+		return err
+	}
+
 	log.Println("✅ Canonical Intent Engine tables ensured")
 	return nil
 }
