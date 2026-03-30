@@ -42,7 +42,6 @@ type CanonicalIntent struct {
 	NIRSnapshotRef        string `db:"nir_snapshot_ref" json:"nir_snapshot_ref,omitempty"`
 	GovernanceSnapshotRef string `db:"governance_snapshot_ref" json:"governance_snapshot_ref,omitempty"`
 	CanonicalHash         string `db:"canonical_hash" json:"canonical_hash,omitempty"`
-	PrevHash              string `db:"prev_hash" json:"prev_hash,omitempty"`
 	PayloadHash           []byte
 
 	// 🆕 Additional Canonical Schema fields

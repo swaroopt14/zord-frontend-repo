@@ -74,7 +74,7 @@ func (r *PaymentIntentRepo) Save(
     constraints, beneficiary_type, pii_tokens, beneficiary,
     status, confidence_score,
     canonical_snapshot_ref, nir_snapshot_ref, governance_snapshot_ref,
-    canonical_hash, prev_hash,
+    canonical_hash,
     created_at,
     client_payout_ref, request_fingerprint, routing_hints_json,
     governance_state, business_state, duplicate_risk_flag,
@@ -92,7 +92,7 @@ VALUES (
     $26,
     $27,$28,$29,
     $30,$31,$32,
-    $33,$34
+    $33
 )`
 
 	_, err = tx.ExecContext(
@@ -128,18 +128,17 @@ VALUES (
 		intent.NIRSnapshotRef,        // $22
 		intent.GovernanceSnapshotRef, // $23
 		intent.CanonicalHash,         // $24
-		intent.PrevHash,              // $25
 
-		intent.CreatedAt, // $26
+		intent.CreatedAt, // $25
 
-		intent.ClientPayoutRef,       // $27
-		intent.RequestFingerprint,    // $28
-		intent.RoutingHintsJSON,      // $29
-		intent.GovernanceState,       // $30
-		intent.BusinessState,         // $31
-		intent.DuplicateRiskFlag,     // $32
-		intent.MappingProfileVersion, // $33
-		intent.UpdatedAt,             // $34
+		intent.ClientPayoutRef,       // $26
+		intent.RequestFingerprint,    // $27
+		intent.RoutingHintsJSON,      // $28
+		intent.GovernanceState,       // $29
+		intent.BusinessState,         // $30
+		intent.DuplicateRiskFlag,     // $31
+		intent.MappingProfileVersion, // $32
+		intent.UpdatedAt,             // $33
 	)
 
 	if err != nil {
@@ -308,12 +307,11 @@ func (r *PaymentIntentRepo) UpdateSnapshotRefs(
 	SET canonical_snapshot_ref = $1,
 	    nir_snapshot_ref = $2,
 	    governance_snapshot_ref = $3,
-	    canonical_hash = $4,
-	    prev_hash = $5
-	WHERE intent_id = $6
+	    canonical_hash = $4
+	WHERE intent_id = $5
 	`
 
-	if _, err := r.db.ExecContext(ctx, query, objectRef, hash, intentID); err != nil {
+	if _, err := r.db.ExecContext(ctx, query, canonicalRef, nirRef, govRef, hash, intentID); err != nil {
 		return err
 	}
 

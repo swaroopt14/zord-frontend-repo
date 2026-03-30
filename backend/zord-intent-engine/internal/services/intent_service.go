@@ -442,7 +442,7 @@ func (s *IntentService) ProcessIncomingIntent(
 
 	// -------- STEP 12: UPDATE DB WITH WORM METADATA --------
 
-	s.repo.UpdateSnapshotRefs(
+	err = s.repo.UpdateSnapshotRefs(
 		ctx,
 		saved.IntentID,
 		canonicalRef,
@@ -573,8 +573,9 @@ func (s *IntentService) ProcessTokenizeResult(
 		return nil, err
 	}
 
-	objectRef, hash, err := s.s3.StoreCanonicalSnapshot(
+	canonicalRef, hash, err := s.s3.StoreSnapshot(
 		ctx,
+		"canonical",
 		saved.TenantID,
 		saved.IntentID,
 		version,
@@ -585,18 +586,47 @@ func (s *IntentService) ProcessTokenizeResult(
 		return nil, err
 	}
 
-	err = s.repo.UpdateCanonicalSnapshotMeta(
+	nirBytes := []byte(`{}`)
+	nirRef, _, err := s.s3.StoreSnapshot(
 		ctx,
+		"nir",
+		saved.TenantID,
 		saved.IntentID,
-		objectRef,
-		hash,
-		prevHash,
+		version,
+		nirBytes,
+		"",
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	saved.CanonicalRef = objectRef
+	govBytes := []byte(`{"state":"` + intent.GovernanceState + `"}`)
+	govRef, _, err := s.s3.StoreSnapshot(
+		ctx,
+		"governance",
+		saved.TenantID,
+		saved.IntentID,
+		version,
+		govBytes,
+		"",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.repo.UpdateSnapshotRefs(
+		ctx,
+		saved.IntentID,
+		canonicalRef,
+		nirRef,
+		govRef,
+		hash,
+		prevHash,
+	)
+
+	saved.CanonicalSnapshotRef = canonicalRef
+	saved.NIRSnapshotRef = nirRef
+	saved.GovernanceSnapshotRef = govRef
 	saved.CanonicalHash = hash
 
 	return &saved, nil

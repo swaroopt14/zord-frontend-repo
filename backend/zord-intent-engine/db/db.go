@@ -33,7 +33,6 @@ func CreateTables() error {
     confidence_score NUMERIC(5,2),
     -- 🆕 WORM / Tamper-evidence fields
     canonical_hash TEXT NOT NULL,
-    prev_hash TEXT,
     canonical_snapshot_ref TEXT NOT NULL,
     nir_snapshot_ref TEXT,
     governance_snapshot_ref TEXT,
