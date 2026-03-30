@@ -12,22 +12,22 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-// StoreCanonicalSnapshot stores canonical JSON in append-only WORM path
+// StoreSnapshot stores canonical/nir/gov JSON in append-only WORM path
 // and returns (objectRef, hash)
-func (s *S3Store) StoreCanonicalSnapshot(
+func (s *S3Store) StoreSnapshot(
 	ctx context.Context,
+	folder string,
 	tenantID string,
 	intentID string,
 	version int,
-	canonicalJSON []byte,
+	jsonData []byte,
 	prevHash string,
 ) (string, string, error) {
 
 	// Build hash chain:
-	// hash_i = sha256(prev_hash || canonical_bytes || tenantID || intentID || version)
 	h := sha256.New()
 	h.Write([]byte(prevHash))
-	h.Write(canonicalJSON)
+	h.Write(jsonData)
 	h.Write([]byte(tenantID))
 	h.Write([]byte(intentID))
 	h.Write([]byte(fmt.Sprintf("%d", version)))
@@ -38,7 +38,8 @@ func (s *S3Store) StoreCanonicalSnapshot(
 	year, month, day := now.Date()
 
 	objectKey := fmt.Sprintf(
-		"canonical/%s/%s/%04d/%02d/%02d/v%04d.json",
+		"%s/%s/%s/%04d/%02d/%02d/v%04d.json",
+		folder,
 		tenantID,
 		intentID,
 		year,
@@ -50,7 +51,7 @@ func (s *S3Store) StoreCanonicalSnapshot(
 	_, err := s.Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(s.BucketName),
 		Key:         aws.String(objectKey),
-		Body:        bytes.NewReader(canonicalJSON),
+		Body:        bytes.NewReader(jsonData),
 		ContentType: aws.String("application/json"),
 	})
 	if err != nil {

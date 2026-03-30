@@ -38,8 +38,20 @@ type CanonicalIntent struct {
 	CreatedAt time.Time `json:"created_at"`
 
 	// 🆕 WORM fields
-	CanonicalRef  string `db:"canonical_ref"`
-	CanonicalHash string `db:"canonical_hash"`
-	PrevHash      string `db:"prev_hash"`
+	CanonicalSnapshotRef  string `db:"canonical_snapshot_ref" json:"canonical_snapshot_ref,omitempty"`
+	NIRSnapshotRef        string `db:"nir_snapshot_ref" json:"nir_snapshot_ref,omitempty"`
+	GovernanceSnapshotRef string `db:"governance_snapshot_ref" json:"governance_snapshot_ref,omitempty"`
+	CanonicalHash         string `db:"canonical_hash" json:"canonical_hash,omitempty"`
+	PrevHash              string `db:"prev_hash" json:"prev_hash,omitempty"`
 	PayloadHash   []byte
+
+	// 🆕 Additional Canonical Schema fields
+	ClientPayoutRef       string          `json:"client_payout_ref,omitempty"`
+	RequestFingerprint    string          `json:"request_fingerprint,omitempty"`
+	RoutingHintsJSON      json.RawMessage `json:"routing_hints_json,omitempty"`
+	GovernanceState       string          `json:"governance_state,omitempty"`
+	BusinessState         string          `json:"business_state,omitempty"`
+	DuplicateRiskFlag     bool            `json:"duplicate_risk_flag,omitempty"`
+	MappingProfileVersion string          `json:"mapping_profile_version,omitempty"`
+	UpdatedAt             *time.Time      `json:"updated_at,omitempty"`
 }

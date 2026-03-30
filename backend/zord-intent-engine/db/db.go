@@ -34,8 +34,19 @@ func CreateTables() error {
     -- 🆕 WORM / Tamper-evidence fields
     canonical_hash TEXT NOT NULL,
     prev_hash TEXT,
-    canonical_ref TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    canonical_snapshot_ref TEXT NOT NULL,
+    nir_snapshot_ref TEXT,
+    governance_snapshot_ref TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- 🆕 Additional Canonical Schema fields
+    client_payout_ref TEXT,
+    request_fingerprint TEXT,
+    routing_hints_json JSONB,
+    governance_state TEXT,
+    business_state TEXT,
+    duplicate_risk_flag BOOLEAN,
+    mapping_profile_version TEXT,
+    updated_at TIMESTAMPTZ DEFAULT now()
 );`
 
 	if _, err := DB.Exec(paymentIntents); err != nil {

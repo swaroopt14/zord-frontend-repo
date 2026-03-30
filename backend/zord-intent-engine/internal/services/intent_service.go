@@ -57,10 +57,12 @@ type CanonicalIntentRepository interface {
 		envelopeID string,
 	) (*models.CanonicalIntent, error)
 
-	UpdateCanonicalSnapshotMeta(
+	UpdateSnapshotRefs(
 		ctx context.Context,
 		intentID string,
-		objectRef string,
+		canonicalRef string,
+		nirRef string,
+		govRef string,
 		hash string,
 		prevHash string,
 	) error
@@ -373,6 +375,15 @@ func (s *IntentService) ProcessIncomingIntent(
 
 		Status:    "CREATED",
 		CreatedAt: time.Now().UTC(),
+
+		ClientPayoutRef:       "NA",
+		RequestFingerprint:    in.IdempotencyKey,
+		RoutingHintsJSON:      json.RawMessage(`{}`),
+		GovernanceState:       "PENDING",
+		BusinessState:         "NEW",
+		DuplicateRiskFlag:     false,
+		MappingProfileVersion: nir.ProfileVersion,
+		UpdatedAt:             func(t time.Time) *time.Time { return &t }(time.Now().UTC()),
 	}
 
 	// -------- STEP 10: OUTBOX + PERSISTENCE (ATOMIC DB) --------
@@ -390,8 +401,9 @@ func (s *IntentService) ProcessIncomingIntent(
 
 	canonicalBytes, _ := json.Marshal(saved)
 
-	objectRef, hash, _ := s.s3.StoreCanonicalSnapshot(
+	canonicalRef, hash, _ := s.s3.StoreSnapshot(
 		ctx,
+		"canonical",
 		saved.TenantID,
 		saved.IntentID,
 		version,
@@ -399,17 +411,28 @@ func (s *IntentService) ProcessIncomingIntent(
 		prevHash,
 	)
 
+	var nirRef string
+	nirBytes, _ := json.Marshal(nir)
+	nirRef, _, _ = s.s3.StoreSnapshot(ctx, "nir", saved.TenantID, saved.IntentID, version, nirBytes, "")
+
+	govBytes := []byte(`{"state":"` + canonical.GovernanceState + `"}`)
+	govRef, _, _ := s.s3.StoreSnapshot(ctx, "governance", saved.TenantID, saved.IntentID, version, govBytes, "")
+
 	// -------- STEP 12: UPDATE DB WITH WORM METADATA --------
 
-	s.repo.UpdateCanonicalSnapshotMeta(
+	s.repo.UpdateSnapshotRefs(
 		ctx,
 		saved.IntentID,
-		objectRef,
+		canonicalRef,
+		nirRef,
+		govRef,
 		hash,
 		prevHash,
 	)
 
-	saved.CanonicalRef = objectRef
+	saved.CanonicalSnapshotRef = canonicalRef
+	saved.NIRSnapshotRef = nirRef
+	saved.GovernanceSnapshotRef = govRef
 	saved.CanonicalHash = hash
 	saved.PrevHash = prevHash
 
@@ -485,6 +508,15 @@ func (s *IntentService) ProcessTokenizeResult(
 
 		Status:    "CREATED",
 		CreatedAt: time.Now().UTC(),
+
+		ClientPayoutRef:       "NA",
+		RequestFingerprint:    "KAFKA_TOKENIZED",
+		RoutingHintsJSON:      json.RawMessage(`{}`),
+		GovernanceState:       "PENDING",
+		BusinessState:         "NEW",
+		DuplicateRiskFlag:     false,
+		MappingProfileVersion: "v1", // Default for async flow
+		UpdatedAt:             func(t time.Time) *time.Time { return &t }(time.Now().UTC()),
 	}
 
 	payload, err := json.Marshal(intent)
@@ -529,6 +561,15 @@ func (s *IntentService) processWebhook(
 		Constraints: json.RawMessage("{}"),
 		PIITokens:   json.RawMessage("{}"),
 		Beneficiary: json.RawMessage("{}"),
+
+		ClientPayoutRef:       "NA",
+		RequestFingerprint:    in.IdempotencyKey,
+		RoutingHintsJSON:      json.RawMessage(`{}`),
+		GovernanceState:       "WEBHOOK",
+		BusinessState:         "NEW",
+		DuplicateRiskFlag:     false,
+		MappingProfileVersion: "WEBHOOK",
+		UpdatedAt:             func(t time.Time) *time.Time { return &t }(time.Now().UTC()),
 	}
 
 	payload := []byte("{}")
