@@ -34,6 +34,14 @@ func main() {
 	cfg := config.Load()
 	log.Printf("main: config loaded (env=%s port=%s)", cfg.Environment, cfg.HTTPPort)
 
+	if err := kafkapkg.EnsureTopics(cfg.KafkaBrokers, []string{
+		cfg.TopicActuationAlert,
+		cfg.TopicActuationRetry,
+		cfg.TopicActuationEvidence,
+	}); err != nil {
+		log.Printf("main: kafka topic ensure failed: %v", err)
+	}
+
 	// ── Step 3: Connect to PostgreSQL ──────────────────────────────────────
 	// Opens a connection pool. Crashes if DB is unreachable.
 	pool := db.Connect(cfg)
@@ -63,6 +71,13 @@ func main() {
 	policyService := services.NewPolicyService(policyRepo, projRepo, actionService)
 
 	projectionService := services.NewProjectionService(projRepo, policyService, slaRepo)
+	corridorHealthIngestionHandler := handlers.NewCorridorHealthHandler(projRepo)
+	slaTimerIngestionHandler := handlers.NewSLATimerHandler(projRepo)
+	kafkaIngestionHandler := handlers.NewKafkaIngestionHandler(
+		projectionService,
+		corridorHealthIngestionHandler,
+		slaTimerIngestionHandler,
+	)
 
 	// ── Step 6: Create Kafka producer ──────────────────────────────────────
 	// Producer is used by the outbox worker to send actuation events.
@@ -126,7 +141,7 @@ func main() {
 	// ── Step 13: Start Kafka consumers ────────────────────────────────────
 	// Starts 8 goroutines, one per input topic.
 	// projectionService implements the EventHandler interface — receives all events.
-	kafkapkg.StartConsumers(ctx, cfg, projectionService)
+	kafkapkg.StartConsumers(ctx, cfg, kafkaIngestionHandler)
 	log.Println("main: kafka consumers started")
 
 	// ── Step 14: Start HTTP server ────────────────────────────────────────

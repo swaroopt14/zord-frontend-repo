@@ -22,6 +22,13 @@ type EventHandler interface {
 	HandleStatementMatch(ctx context.Context, e models.StatementMatchEvent) error
 }
 
+type CorridorHealthTickHandler interface {
+	HandleCorridorHealthTick(ctx context.Context, e models.CorridorHealthTickEvent) error
+}
+
+type SLATimerTickHandler interface {
+	HandleSLATimerTick(ctx context.Context, e models.SLATimerTickEvent) error
+}
 
 func StartConsumers(ctx context.Context, cfg *config.Config, handler EventHandler) {
 	
@@ -103,7 +110,29 @@ func StartConsumers(ctx context.Context, cfg *config.Config, handler EventHandle
 			return handler.HandleStatementMatch(ctx, e)
 		})
 
-	log.Println("kafka: all 8 consumers started")
+	if corridorHealthHandler, ok := handler.(CorridorHealthTickHandler); ok {
+		go consume(ctx, brokers, cfg.TopicCorridorHealthTick, cfg.KafkaGroupID,
+			func(msg kafka.Message) error {
+				var e models.CorridorHealthTickEvent
+				if err := json.Unmarshal(msg.Value, &e); err != nil {
+					return err
+				}
+				return corridorHealthHandler.HandleCorridorHealthTick(ctx, e)
+			})
+	}
+
+	if slaTimerHandler, ok := handler.(SLATimerTickHandler); ok {
+		go consume(ctx, brokers, cfg.TopicSLATimerTick, cfg.KafkaGroupID,
+			func(msg kafka.Message) error {
+				var e models.SLATimerTickEvent
+				if err := json.Unmarshal(msg.Value, &e); err != nil {
+					return err
+				}
+				return slaTimerHandler.HandleSLATimerTick(ctx, e)
+			})
+	}
+
+	log.Println("kafka: consumers started")
 }
 
 func consume(

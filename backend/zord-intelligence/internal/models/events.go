@@ -197,3 +197,23 @@ type DLQEvent struct {
 	FailedAt      time.Time `json:"failed_at"`
 	TraceID       string    `json:"trace_id"`
 }
+
+// CorridorHealthTickEvent is a lightweight corridor heartbeat.
+// Used by Service 7 to keep an operational "health status" projection per corridor.
+type CorridorHealthTickEvent struct {
+	EventID    string    `json:"event_id"`
+	TenantID   string    `json:"tenant_id"`
+	CorridorID string    `json:"corridor_id"`
+	TickAt     time.Time `json:"tick_at"`
+	TraceID    string    `json:"trace_id"`
+}
+
+// SLATimerTickEvent is a lightweight SLA timer heartbeat per corridor.
+// Used by Service 7 to keep an operational SLA tick projection per corridor.
+type SLATimerTickEvent struct {
+	EventID    string    `json:"event_id"`
+	TenantID   string    `json:"tenant_id"`
+	CorridorID string    `json:"corridor_id"`
+	TickAt     time.Time `json:"tick_at"`
+	TraceID    string    `json:"trace_id"`
+}

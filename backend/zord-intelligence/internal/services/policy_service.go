@@ -19,6 +19,7 @@ type PolicyService struct {
 	policyRepo    *persistence.PolicyRepo
 	projRepo      *persistence.ProjectionRepo
 	actionService *ActionService
+	mlFeatures    *MLFeaturesService
 }
 
 // NewPolicyService creates a PolicyService.
@@ -31,6 +32,7 @@ func NewPolicyService(
 		policyRepo:    policyRepo,
 		projRepo:      projRepo,
 		actionService: actionService,
+		mlFeatures:    NewMLFeaturesService(projRepo),
 	}
 }
 
@@ -40,6 +42,17 @@ func (s *PolicyService) EvaluateForEvent(
 	ctx context.Context,
 	tenantID, corridorID, topic, eventID string,
 ) error {
+	if corridorID != "" {
+		if err := s.mlFeatures.RefreshForPair(ctx, tenantID, corridorID); err != nil {
+			logger.Error("ml features refresh failed",
+				"tenant_id", tenantID,
+				"corridor_id", corridorID,
+				"topic", topic,
+				"error", err,
+			)
+		}
+	}
+
 	policies, err := s.policyRepo.GetByTrigger(ctx, "event", topic)
 	if err != nil {
 		return fmt.Errorf("policy_service.EvaluateForEvent get policies: %w", err)
@@ -76,6 +89,14 @@ func (s *PolicyService) EvaluateForCron(
 	policies, err := s.policyRepo.GetAllCronPolicies(ctx)
 	if err != nil {
 		return fmt.Errorf("policy_service.EvaluateForCron get policies: %w", err)
+	}
+
+	if err := s.mlFeatures.RefreshForPair(ctx, tenantID, corridorID); err != nil {
+		logger.Error("ml features refresh failed",
+			"tenant_id", tenantID,
+			"corridor_id", corridorID,
+			"error", err,
+		)
 	}
 
 	for _, policy := range policies {
@@ -220,6 +241,33 @@ func (s *PolicyService) buildEvalContext(
 		return nil, fmt.Errorf("buildEvalContext sla_breach_rate tenant=%s: %w", tenantID, err)
 	}
 	evalMap["tenant.sla_breach_rate"] = slaVal.BreachRate
+
+	var anomalyVal struct {
+		Value float64 `json:"value"`
+	}
+	if err := s.projRepo.GetValueAs(ctx, tenantID,
+		fmt.Sprintf("corridor.anomaly_score.%s", corridorID), &anomalyVal); err != nil {
+		return nil, fmt.Errorf("buildEvalContext anomaly_score corridor=%s: %w", corridorID, err)
+	}
+	evalMap["corridor.anomaly_score"] = anomalyVal.Value
+
+	var slaRiskVal struct {
+		Value float64 `json:"value"`
+	}
+	if err := s.projRepo.GetValueAs(ctx, tenantID,
+		fmt.Sprintf("corridor.sla_breach_risk.%s", corridorID), &slaRiskVal); err != nil {
+		return nil, fmt.Errorf("buildEvalContext sla_breach_risk corridor=%s: %w", corridorID, err)
+	}
+	evalMap["corridor.sla_breach_risk"] = slaRiskVal.Value
+
+	var failureShiftVal struct {
+		Value float64 `json:"value"`
+	}
+	if err := s.projRepo.GetValueAs(ctx, tenantID,
+		fmt.Sprintf("corridor.failure_cluster_shift_score.%s", corridorID), &failureShiftVal); err != nil {
+		return nil, fmt.Errorf("buildEvalContext failure_cluster_shift_score corridor=%s: %w", corridorID, err)
+	}
+	evalMap["corridor.failure_cluster_shift_score"] = failureShiftVal.Value
 
 	return evalMap, nil
 }

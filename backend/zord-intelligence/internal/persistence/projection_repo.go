@@ -121,11 +121,16 @@ func (r *ProjectionRepo) AtomicIncrementPending(
 			value_json = jsonb_set(
 				jsonb_set(
 					projection_state.value_json,
-					'{total_pending}',
-					to_jsonb(COALESCE((projection_state.value_json->>'total_pending')::int, 0) + 1)
+					'{bucket_0_10m}',
+					to_jsonb(COALESCE((projection_state.value_json->>'bucket_0_10m')::int, 0) + 1)
 				),
-				'{bucket_0_10m}',
-				to_jsonb(COALESCE((projection_state.value_json->>'bucket_0_10m')::int, 0) + 1)
+				'{total_pending}',
+				to_jsonb(
+					(COALESCE((projection_state.value_json->>'bucket_0_10m')::int, 0) + 1) +
+					COALESCE((projection_state.value_json->>'bucket_10_60m')::int, 0) +
+					COALESCE((projection_state.value_json->>'bucket_1_6h')::int, 0) +
+					COALESCE((projection_state.value_json->>'bucket_6h_plus')::int, 0)
+				)
 			),
 			computed_at = now()
 	`
@@ -135,8 +140,9 @@ func (r *ProjectionRepo) AtomicIncrementPending(
 	return nil
 }
 
-// AtomicDecrementPending atomically subtracts 1 from total_pending.
-// GREATEST(x, 0) prevents the counter going below zero if events replay.
+// AtomicDecrementPending atomically subtracts 1 from bucket_0_10m and
+// recomputes total_pending as the sum of all buckets.
+// GREATEST(x, 0) prevents counters going below zero if events replay.
 func (r *ProjectionRepo) AtomicDecrementPending(
 	ctx context.Context,
 	tenantID, corridorID string,
@@ -154,9 +160,18 @@ func (r *ProjectionRepo) AtomicDecrementPending(
 		ON CONFLICT (tenant_id, projection_key, window_start, projection_version)
 		DO UPDATE SET
 			value_json = jsonb_set(
-				projection_state.value_json,
+				jsonb_set(
+					projection_state.value_json,
+					'{bucket_0_10m}',
+					to_jsonb(GREATEST(COALESCE((projection_state.value_json->>'bucket_0_10m')::int, 0) - 1, 0))
+				),
 				'{total_pending}',
-				to_jsonb(GREATEST(COALESCE((projection_state.value_json->>'total_pending')::int, 0) - 1, 0))
+				to_jsonb(
+					GREATEST(COALESCE((projection_state.value_json->>'bucket_0_10m')::int, 0) - 1, 0) +
+					COALESCE((projection_state.value_json->>'bucket_10_60m')::int, 0) +
+					COALESCE((projection_state.value_json->>'bucket_1_6h')::int, 0) +
+					COALESCE((projection_state.value_json->>'bucket_6h_plus')::int, 0)
+				)
 			),
 			computed_at = now()
 	`
@@ -1253,10 +1268,10 @@ func (r *ProjectionRepo) GetActiveTenantCorridorPairs(ctx context.Context) ([]Te
 	sql := `
 		SELECT DISTINCT
 		       tenant_id,
-		       split_part(projection_key, '.', 3) AS corridor_id
+		       regexp_replace(projection_key, '^corridor\.[^.]+\.', '') AS corridor_id
 		FROM   projection_state
 		WHERE  projection_key LIKE 'corridor.%'
-		  AND  split_part(projection_key, '.', 3) != ''
+		  AND  regexp_replace(projection_key, '^corridor\.[^.]+\.', '') != ''
 		  AND  window_end > now() - interval '24 hours'
 		ORDER  BY tenant_id, corridor_id
 	`
