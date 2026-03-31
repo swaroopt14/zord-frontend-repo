@@ -154,10 +154,12 @@ func main() {
 					job.EnvelopeID,
 					dlq.ReasonCode,
 				)
-				// Persist DLQ entry
-				_, err := dlqRepo.Save(ctx, *dlq)
-				if err != nil {
-					log.Printf("Worker %d: Failed to save DLQ entry: %v", id, err)
+				// Persist DLQ entry only if not already persisted (no DLQID)
+				if dlq.DLQID == "" {
+					_, err := dlqRepo.Save(ctx, *dlq)
+					if err != nil {
+						log.Printf("Worker %d: Failed to save DLQ entry: %v", id, err)
+					}
 				}
 				continue
 			}
