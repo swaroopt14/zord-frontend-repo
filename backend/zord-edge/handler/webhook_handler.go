@@ -17,76 +17,97 @@ import (
 	"github.com/google/uuid"
 )
 
-func (h *Handler) WebhookHandler(context *gin.Context) {
-	provider := context.GetString("psp_provider")
-	rawPayloadAny, ok := context.Get("raw_payload")
+func (h *Handler) WebhookHandler(c *gin.Context) {
+
+	// ── STRICT: Only from verified middleware context ──
+
+	provider := c.GetString("psp_provider")
+	if provider == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "psp_provider missing from context"})
+		return
+	}
+
+	connectorID := c.GetString("connector_id")
+	if connectorID == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "connector_id missing from context"})
+		return
+	}
+
+	tenantIDStr := c.GetString("tenant_id")
+	if tenantIDStr == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "tenant_id missing from verified context"})
+		return
+	}
+
+	tenantUUID, err := uuid.Parse(tenantIDStr)
+	if err != nil {
+		log.Printf("Webhook invalid tenant_id provider=%s connector_id=%s tenant=%s",
+			provider, connectorID, tenantIDStr)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid tenant_id in context"})
+		return
+	}
+
+	idempotencyKey := c.GetString("psp_event_id")
+	if idempotencyKey == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "psp_event_id missing from context"})
+		return
+	}
+
+	rawPayloadAny, ok := c.Get("raw_payload")
 	if !ok {
-		context.JSON(400, gin.H{"error": "raw_payload missing"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "raw_payload missing from context"})
 		return
 	}
 	rawPayload := rawPayloadAny.([]byte)
 
-	tenantIDStr := context.GetString("tenant_id")
-	if tenantIDStr == "" {
-		tenantIDStr = context.Query("tenant_id")
-	}
-	if tenantIDStr == "" {
-		context.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id is required"})
-		return
-	}
-
-	// Determine Idempotency Key
-	idempotencyKey := context.GetString("psp_event_id")
-	if idempotencyKey == "" {
-		context.JSON(http.StatusBadRequest, gin.H{"error": "missing X-PSP-Event-Id"})
-		return
-	}
-
+	// ── Observability ──
 	traceID := uuid.New().String()
 	envelopeID := uuid.New().String()
 	receivedAt := time.Now().UTC()
 
-	tenantUUID, err := uuid.Parse(tenantIDStr)
-	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"error": "invalid tenant_id"})
-		return
-	}
-
-	contentType := context.GetHeader("Content-Type")
+	// ── Metadata ──
+	contentType := c.GetHeader("Content-Type")
 	if contentType == "" {
 		contentType = "application/json"
 	}
-	sourceType := "WEBHOOK:" + provider
-	if eventType := context.GetString("psp_event_type"); eventType != "" {
+
+	sourceType := "WEBHOOK:" + provider + ":" + connectorID
+
+	if eventType := c.GetString("psp_event_type"); eventType != "" {
 		sourceType += ":" + eventType
 	}
 
-	sourceSystem := context.GetHeader("X-Zord-Source-System")
+	sourceSystem := c.GetHeader("X-Zord-Source-System")
 	if sourceSystem == "" {
 		sourceSystem = "UNKNOWN"
 	}
 
-	requestCtx, cancel := stdctx.WithTimeout(context.Request.Context(), 5*time.Second)
+	// ── Context with timeout ──
+	reqCtx, cancel := stdctx.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
-	context.Request = context.Request.WithContext(requestCtx)
+	c.Request = c.Request.WithContext(reqCtx)
 
-	headersBytes, _ := json.Marshal(context.Request.Header)
+	// ── Headers hash ──
+	headersBytes, _ := json.Marshal(c.Request.Header)
 	headersHashSum := sha256.Sum256(headersBytes)
 	headersHash := headersHashSum[:]
 
+	// ── Encrypt payload ──
 	encryptedPayload, err := vault.Encrypt(rawPayload)
 	if err != nil {
-		log.Printf("Webhook encrypt failed, provider=%s trace_id=%s: %v", provider, traceID, err)
-		context.JSON(http.StatusInternalServerError, gin.H{"error": "failed to encrypt payload"})
+		log.Printf("Webhook encrypt failed provider=%s connector_id=%s trace_id=%s: %v",
+			provider, connectorID, traceID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to encrypt payload"})
 		return
 	}
 
-	// Compute fingerprint: Hash(payload + idempotencyKey + tenantID)
+	// ── Fingerprint (strong idempotency) ──
 	fingerprintInput := append(rawPayload, []byte(idempotencyKey+tenantUUID.String())...)
 	fingerprintSum := sha256.Sum256(fingerprintInput)
 	fingerprint := fingerprintSum[:]
 
-	rawIntent := model.RawIntentMessage{
+	// ── Build message ──
+	msg := model.RawIntentMessage{
 		TenantID:           tenantUUID.String(),
 		TraceID:            traceID,
 		IdempotencyKey:     idempotencyKey,
@@ -100,10 +121,11 @@ func (h *Handler) WebhookHandler(context *gin.Context) {
 		SchemaHint:         nil,
 	}
 
-	duplicateID, err := services.PersistIdempotency(requestCtx, rawIntent)
+	// ── Idempotency ──
+	dupID, err := services.PersistIdempotency(reqCtx, msg)
 	if err != nil {
 		if errors.Is(err, services.ErrFingerprintMismatch) {
-			context.JSON(http.StatusBadRequest, gin.H{
+			c.JSON(http.StatusBadRequest, gin.H{
 				"IdempotencyKey": idempotencyKey,
 				"ErrorCode":      "IDEMPOTENCY_CONFLICT",
 				"ErrorMsg":       "IDEMPOTENCY_KEY_REUSE_WITH_DIFFERENT_PAYLOAD",
@@ -111,8 +133,11 @@ func (h *Handler) WebhookHandler(context *gin.Context) {
 			})
 			return
 		}
-		log.Printf("Webhook idempotency persist failed, provider=%s trace_id=%s: %v", provider, traceID, err)
-		context.JSON(http.StatusInternalServerError, gin.H{
+
+		log.Printf("Webhook idempotency persist failed provider=%s connector_id=%s trace_id=%s: %v",
+			provider, connectorID, traceID, err)
+
+		c.JSON(http.StatusInternalServerError, gin.H{
 			"ErrorCode":  "INTERNAL_SERVER_ERROR",
 			"ErrorMsg":   "Failed to persist idempotency key.",
 			"HttpStatus": http.StatusInternalServerError,
@@ -120,45 +145,56 @@ func (h *Handler) WebhookHandler(context *gin.Context) {
 		return
 	}
 
-	// Duplicate webhook deliveries are common; acknowledge quickly without reprocessing.
-	if duplicateID != uuid.Nil {
-		log.Printf("Duplicate webhook detected for provider=%s, idempotency_key=%s, Envelope_Id=%s", provider, idempotencyKey, duplicateID)
-		context.JSON(http.StatusOK, gin.H{
+	// ── Duplicate ──
+	if dupID != uuid.Nil {
+		log.Printf("Webhook duplicate event provider=%s connector_id=%s event_id=%s trace_id=%s",
+			provider, connectorID, idempotencyKey, traceID)
+
+		c.JSON(http.StatusOK, gin.H{
 			"status":     "received",
 			"trace_id":   traceID,
-			"EnvelopeID": duplicateID.String(),
+			"EnvelopeID": dupID.String(),
 		})
 		return
 	}
 
-	storageAck, err := services.ProcessRawIntent(requestCtx, rawIntent, h.S3store, envelopeID, receivedAt)
+	// ── S3 ──
+	data, err := services.ProcessRawIntent(reqCtx, msg, h.S3store, envelopeID, receivedAt)
 	if err != nil {
-		log.Printf("Webhook ProcessRawIntent failed, provider=%s trace_id=%s: %v", provider, traceID, err)
-		context.JSON(http.StatusInternalServerError, gin.H{
-			"TraceID":   rawIntent.TraceID,
+		log.Printf("Webhook ProcessRawIntent failed provider=%s connector_id=%s trace_id=%s: %v",
+			provider, connectorID, traceID, err)
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"TraceID":   traceID,
 			"ErrorCode": "INTERNAL_ERROR",
 			"ErrorMsg":  err.Error(),
 		})
 		return
 	}
 
-	if storageAck == nil {
-		log.Printf("Webhook S3 data is nil, provider=%s trace_id=%s", provider, traceID)
-		context.JSON(http.StatusInternalServerError, gin.H{
-			"TraceID":   rawIntent.TraceID,
+	if data == nil {
+		log.Printf("Webhook S3 data nil provider=%s connector_id=%s trace_id=%s",
+			provider, connectorID, traceID)
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"TraceID":   traceID,
 			"ErrorCode": "INTERNAL_ERROR",
 			"ErrorMsg":  "S3 data is nil",
 		})
 		return
 	}
 
-	payloadHashSum := sha256.Sum256(rawPayload)
-	rawIntent.PayloadHash = payloadHashSum[:]
+	// ── Payload hash ──
+	hash := sha256.Sum256(rawPayload)
+	msg.PayloadHash = hash[:]
 
-	if err := services.RawIntent(requestCtx, rawIntent, storageAck); err != nil {
-		log.Printf("Webhook RawIntent persist failed, provider=%s trace_id=%s: %v", provider, traceID, err)
-		context.JSON(http.StatusInternalServerError, gin.H{
-			"TraceID":    rawIntent.TraceID,
+	// ── Persist ──
+	if err := services.RawIntent(reqCtx, msg, data); err != nil {
+		log.Printf("Webhook RawIntent persist failed provider=%s connector_id=%s trace_id=%s: %v",
+			provider, connectorID, traceID, err)
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"TraceID":    traceID,
 			"ErrorCode":  "INTERNAL_SERVER_ERROR",
 			"ErrorMsg":   "Failed to persist raw intent.",
 			"HttpStatus": http.StatusInternalServerError,
@@ -166,7 +202,7 @@ func (h *Handler) WebhookHandler(context *gin.Context) {
 		return
 	}
 
-	context.JSON(http.StatusOK, gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"status":   "received",
 		"trace_id": traceID,
 	})
