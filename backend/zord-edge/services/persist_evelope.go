@@ -4,10 +4,9 @@ import (
 	"context"
 	"encoding/base64"
 	"log"
-	"time"
+	"os"
 
 	"zord-edge/db"
-	"zord-edge/kafka"
 	"zord-edge/model"
 	"zord-edge/vault"
 
@@ -15,45 +14,53 @@ import (
 )
 
 func RawIntent(ctx context.Context,
-	msg model.RawIntentMessage, ack *model.AckMessage) error {
+	rawIntent model.RawIntentMessage, storageAck *model.AckMessage) error {
 
-	envelopeID, err := uuid.Parse(ack.EnvelopeId)
+	envelopeID, err := uuid.Parse(storageAck.EnvelopeId)
 	if err != nil {
-		log.Printf("Invalid EnvelopeId: %s", ack.EnvelopeId)
+		log.Printf("Invalid EnvelopeId: %s", storageAck.EnvelopeId)
 		return err
 	}
-	trace_id, err := uuid.Parse(msg.TraceID)
+	traceID, err := uuid.Parse(rawIntent.TraceID)
 	if err != nil {
-		log.Printf("Invalid TraceID: %s", msg.TraceID)
+		log.Printf("Invalid TraceID: %s", rawIntent.TraceID)
 		return err
 	}
-	tenantUUID, err := uuid.Parse(msg.TenantID)
+	tenantID, err := uuid.Parse(rawIntent.TenantID)
 	if err != nil {
-		log.Printf("Invalid TenantId: %s", msg.TenantID)
+		log.Printf("Invalid TenantId: %s", rawIntent.TenantID)
 		return err
 	}
-	ObjRef := ack.ObjectRef
+	objectRef := storageAck.ObjectRef
 
-	EnvelopeHash := BuildEnvelopeHash(msg, ack)
-	EnvelopeSignature := vault.SignEnvelopeHash(EnvelopeHash)
-	encodedSig := base64.StdEncoding.EncodeToString(EnvelopeSignature)
-	storedSignature := "ZORD_" + encodedSig
+	envelopeHash := BuildEnvelopeHash(rawIntent, storageAck)
+	envelopeSignature := vault.SignEnvelopeHash(envelopeHash)
+	encodedSignature := base64.StdEncoding.EncodeToString(envelopeSignature)
+	storedSignature := "ZORD_" + encodedSignature
 
 	envelope := model.IngressEnvelope{
-		TraceID:           trace_id,
+		TraceID:           traceID,
 		EnvelopeID:        envelopeID,
-		TenantID:          tenantUUID,
-		Source:            msg.SourceType, //req.Source,
-		SourceSystem:      "RAzerpay",     //req.SourceSystem,
-		ContentType:       msg.ContentType,
-		IdempotencyKey:    msg.IdempotencyKey,
-		PayloadSize:       msg.PayloadSize,
-		PayloadHash:       msg.PayloadHash,
-		EnvelopeHash:      EnvelopeHash,
-		EnvelopeSignature: storedSignature,
-		ObjectRef:         ObjRef,
-		Status:            "RECEIVED",
-		ReceivedAt:        ack.ReceivedAt,
+		TenantID:          tenantID,
+		Source:            rawIntent.SourceType,
+		SourceSystem:      rawIntent.SourceSystem,
+		ContentType:       rawIntent.ContentType,
+		IdempotencyKey:    rawIntent.IdempotencyKey,
+		PayloadSize:       rawIntent.PayloadSize,
+		PayloadHash:       rawIntent.PayloadHash,
+		EnvelopeHash:                 envelopeHash,
+		EnvelopeSignature:            storedSignature,
+		RequestHeadersHash:           rawIntent.RequestHeadersHash,
+		SchemaHint:                   rawIntent.SchemaHint,
+		EncryptionKeyID:              os.Getenv("VAULT_KEY_ID"),
+		ObjectStoreVersion:           os.Getenv("OBJECT_STORE_VERSION"),
+		IdempotencyReservationStatus: "RESERVED",
+		PrincipalID:                  tenantID,
+		AuthMethod:                   "API_KEY",
+		ObjectRef:                    objectRef,
+		Status:                       "RECEIVED",
+		ReceivedAt:                   storageAck.ReceivedAt,
+		Payload:                      rawIntent.Payload,
 	}
 
 	// Envolope.SaveRawIntent()
@@ -67,45 +74,47 @@ func RawIntent(ctx context.Context,
 	return nil
 }
 
-func SendToIntentEngine(
-	msg model.RawIntentMessage, ack *model.AckMessage, pro *kafka.Producer) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+func SaveToIngressOutbox(
+	ctx context.Context, rawIntent model.RawIntentMessage, storageAck *model.AckMessage) error {
 
-	envelopeID, err := uuid.Parse(ack.EnvelopeId)
+	envelopeID, err := uuid.Parse(storageAck.EnvelopeId)
 	if err != nil {
-		log.Printf("Invalid EnvelopeId: %s", ack.EnvelopeId)
+		log.Printf("Invalid EnvelopeId: %s", storageAck.EnvelopeId)
 		return err
 	}
-	trace_id, err := uuid.Parse(msg.TraceID)
+	traceID, err := uuid.Parse(rawIntent.TraceID)
 	if err != nil {
-		log.Printf("Invalid TraceID: %s", msg.TraceID)
+		log.Printf("Invalid TraceID: %s", rawIntent.TraceID)
 		return err
 	}
-	tenantUUID, err := uuid.Parse(msg.TenantID)
+	tenantID, err := uuid.Parse(rawIntent.TenantID)
 	if err != nil {
-		log.Printf("Invalid TenantId: %s", msg.TenantID)
+		log.Printf("Invalid TenantId: %s", rawIntent.TenantID)
 		return err
 	}
-	ObjRef := ack.ObjectRef
+	objectRef := storageAck.ObjectRef
 
-	var NewEnvelope model.Event
+	topic := "vault.envelope.accepted.v1"
 
-	NewEnvelope = model.Event{
-		TraceID:          trace_id,
-		EnvelopeID:       envelopeID,
-		TenantID:         tenantUUID,
-		ObjectRef:        ObjRef,
-		ReceivedAt:       ack.ReceivedAt,
-		Source:           msg.SourceType,
-		IdempotencyKey:   msg.IdempotencyKey,
-		EncryptedPayload: msg.Payload,
-		PayloadHash:      msg.PayloadHash,
-	}
-
-	err = kafka.SendRawIntentMessage(ctx, NewEnvelope, pro)
+	query := `
+		INSERT INTO ingress_outbox
+		(trace_id, envelope_id, tenant_id, object_ref, received_at, source, idempotency_key, encrypted_payload, payload_hash, topic)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`
+	_, err = db.DB.ExecContext(ctx, query,
+		traceID,
+		envelopeID,
+		tenantID,
+		objectRef,
+		storageAck.ReceivedAt,
+		rawIntent.SourceType,
+		rawIntent.IdempotencyKey,
+		rawIntent.Payload,
+		rawIntent.PayloadHash,
+		topic,
+	)
 	if err != nil {
-		log.Printf("Failed to send raw intent message: %v", err)
+		log.Printf("Failed to insert into ingress_outbox: %v", err)
 		return err
 	}
 	return nil

@@ -26,6 +26,8 @@ services: # Define the containers/services to run
       - AWS_EC2_METADATA_DISABLED=true
       - S3_BUCKET=arealis-zord-vault
       - SIGNING_KEY_PATH=/run/secrets/ed25519_private.pem
+      - VAULT_KEY_ID=key-1234567890
+      - OBJECT_STORE_VERSION=v1
     depends_on: # Service dependencies (wait for health checks)
       postgres:
         condition: service_healthy

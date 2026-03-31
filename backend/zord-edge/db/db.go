@@ -29,7 +29,12 @@ func CreateTable() error {
 	tenant_id UUID NOT NULL,
 	idempotency_key TEXT NOT NULL,
 	first_envelope_id  UUID NULL,
-	status TEXT NOT NULL DEFAULT 'pending',
+	status TEXT NOT NULL DEFAULT 'RESERVED',
+	request_fingerprint BYTEA,
+	first_seen_at TIMESTAMPTZ DEFAULT now(),
+	last_seen_at TIMESTAMPTZ DEFAULT now(),
+	resolution_type TEXT NOT NULL DEFAULT 'CREATED',
+	expires_at TIMESTAMPTZ,
 	created_at TIMESTAMPTZ DEFAULT now(),
 	updated_at TIMESTAMPTZ DEFAULT now(),
 	PRIMARY KEY (tenant_id, idempotency_key),
@@ -54,6 +59,13 @@ func CreateTable() error {
 	envelope_hash BYTEA NOT NULL,
 	envelope_signature BYTEA NOT NULL,
 	vault_object_ref TEXT,
+	request_headers_hash BYTEA,
+	schema_hint TEXT,
+	encryption_key_id TEXT,
+	object_store_version TEXT,
+	idempotency_reservation_status TEXT,
+	principal_id UUID,
+	auth_method TEXT,
 	received_at TIMESTAMPTZ NOT NULL,
 	status TEXT NOT NULL DEFAULT 'pending'
 	--error_code TEXT,
@@ -76,5 +88,29 @@ func CreateTable() error {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	ingress_outbox :=
+		`CREATE TABLE IF NOT EXISTS "ingress_outbox"(
+	outbox_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	trace_id UUID NOT NULL,
+	envelope_id UUID NOT NULL,
+	tenant_id UUID NOT NULL,
+	object_ref TEXT NOT NULL,
+	received_at TIMESTAMPTZ NOT NULL,
+	source TEXT NOT NULL,
+	idempotency_key TEXT NOT NULL,
+	encrypted_payload BYTEA NOT NULL,
+	payload_hash BYTEA NOT NULL,
+	topic TEXT NOT NULL,
+	status TEXT NOT NULL DEFAULT 'PENDING',
+	attempts INT NOT NULL DEFAULT 0,
+	next_retry_at TIMESTAMPTZ
+	);`
+
+	_, err = DB.Exec(ingress_outbox)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	return nil
 }

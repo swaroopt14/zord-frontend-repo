@@ -20,7 +20,7 @@ func Routes(router *gin.Engine, h *handler.Handler) {
 
 	// Webhook routes
 	webhooks := router.Group("/v1/raw/envelopes")
-	webhooks.Use(middleware.VerifyWebhookSignature())
+	webhooks.Use(middleware.VerifyWebhookSignature(), middleware.TransportValidation()) //Need to check with sudarshan
 	{
 		webhooks.POST("/webhooks/:provider", h.WebhookHandler)
 	}
@@ -32,7 +32,8 @@ func Routes(router *gin.Engine, h *handler.Handler) {
 	protected := router.Group("/v1")
 	protected.Use(
 		middleware.Authenticate(),
-		middleware.TraceMiddleware(),
+		//middleware.TraceMiddleware(),
+		middleware.TransportValidation(),
 	)
 
 	// JSON ingest (needs JSON validation + idempotency header)

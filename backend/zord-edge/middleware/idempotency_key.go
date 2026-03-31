@@ -1,9 +1,10 @@
 package middleware
 
 import (
-	"net/http"
+	"log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 func GetIdempotencyKey() gin.HandlerFunc {
@@ -11,10 +12,10 @@ func GetIdempotencyKey() gin.HandlerFunc {
 		{
 			idempotencyKey := context.GetHeader("X-Idempotency-Key")
 			if idempotencyKey == "" {
-				context.JSON(http.StatusBadRequest, gin.H{"Error": "Missing Idempotency Key"})
-				context.Abort()
-				return
+				idempotencyKey = uuid.New().String()
+				log.Printf("Generated idempotency key: %s", idempotencyKey)
 			}
+			log.Printf("Received idempotency key: %s", idempotencyKey)
 			context.Set("idempotency_key", idempotencyKey)
 			context.Next()
 
