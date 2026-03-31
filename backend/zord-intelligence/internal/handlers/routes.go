@@ -99,6 +99,15 @@ func NewRouter(
 		// Returns Outcome Fusion signal conflict rate per corridor
 		r.Get("/fusion-conflicts", kpiH.GetConflictRateInFusion)
 
+		// GET /v1/intelligence/ml/anomaly?tenant_id=X&corridor_id=Y
+		// GET /v1/intelligence/ml/sla-risk?tenant_id=X&corridor_id=Y
+		// GET /v1/intelligence/ml/failure-shift?tenant_id=X&corridor_id=Y
+		r.Route("/ml", func(r chi.Router) {
+			r.Get("/anomaly", kpiH.GetMLAnomaly)
+			r.Get("/sla-risk", kpiH.GetMLSlaRisk)
+			r.Get("/failure-shift", kpiH.GetMLFailureShift)
+		})
+
 		// ── Policy endpoints ───────────────────────────────────────────
 		// Used by ops team to manage rules
 

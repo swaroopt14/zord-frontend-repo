@@ -31,106 +31,87 @@ type SLATimerTickHandler interface {
 }
 
 func StartConsumers(ctx context.Context, cfg *config.Config, handler EventHandler) {
-	
 	brokers := strings.Split(cfg.KafkaBrokers, ",")
-
-	// Each topic gets its own goroutine.
-	// "go func()" starts the function in the background immediately.
-	// All 7 run at the same time — they don't wait for each other.
-
-	go consume(ctx, brokers, cfg.TopicIntentCreated, cfg.KafkaGroupID,
-		func(msg kafka.Message) error {
+	topicHandlers := map[string]func(kafka.Message) error{
+		cfg.TopicIntentCreated: func(msg kafka.Message) error {
 			var e models.IntentCreatedEvent
 			if err := json.Unmarshal(msg.Value, &e); err != nil {
 				return err
 			}
 			return handler.HandleIntentCreated(ctx, e)
-		})
-
-	go consume(ctx, brokers, cfg.TopicDispatchCreated, cfg.KafkaGroupID,
-		func(msg kafka.Message) error {
+		},
+		cfg.TopicDispatchCreated: func(msg kafka.Message) error {
 			var e models.DispatchAttemptCreatedEvent
 			if err := json.Unmarshal(msg.Value, &e); err != nil {
 				return err
 			}
 			return handler.HandleDispatchCreated(ctx, e)
-		})
-
-	go consume(ctx, brokers, cfg.TopicOutcomeNormalized, cfg.KafkaGroupID,
-		func(msg kafka.Message) error {
+		},
+		cfg.TopicOutcomeNormalized: func(msg kafka.Message) error {
 			var e models.OutcomeNormalizedEvent
 			if err := json.Unmarshal(msg.Value, &e); err != nil {
 				return err
 			}
 			return handler.HandleOutcomeNormalized(ctx, e)
-		})
-
-	go consume(ctx, brokers, cfg.TopicFinalityCert, cfg.KafkaGroupID,
-		func(msg kafka.Message) error {
+		},
+		cfg.TopicFinalityCert: func(msg kafka.Message) error {
 			var e models.FinalityCertIssuedEvent
 			if err := json.Unmarshal(msg.Value, &e); err != nil {
 				return err
 			}
 			return handler.HandleFinalityCertIssued(ctx, e)
-		})
-
-	go consume(ctx, brokers, cfg.TopicFinalContract, cfg.KafkaGroupID,
-		func(msg kafka.Message) error {
+		},
+		cfg.TopicFinalContract: func(msg kafka.Message) error {
 			var e models.FinalContractUpdatedEvent
 			if err := json.Unmarshal(msg.Value, &e); err != nil {
 				return err
 			}
 			return handler.HandleFinalContractUpdated(ctx, e)
-		})
-
-	go consume(ctx, brokers, cfg.TopicEvidenceReady, cfg.KafkaGroupID,
-		func(msg kafka.Message) error {
+		},
+		cfg.TopicEvidenceReady: func(msg kafka.Message) error {
 			var e models.EvidencePackReadyEvent
 			if err := json.Unmarshal(msg.Value, &e); err != nil {
 				return err
 			}
 			return handler.HandleEvidencePackReady(ctx, e)
-		})
-
-	go consume(ctx, brokers, cfg.TopicDLQ, cfg.KafkaGroupID,
-		func(msg kafka.Message) error {
+		},
+		cfg.TopicDLQ: func(msg kafka.Message) error {
 			var e models.DLQEvent
 			if err := json.Unmarshal(msg.Value, &e); err != nil {
 				return err
 			}
 			return handler.HandleDLQEvent(ctx, e)
-		})
-
-	go consume(ctx, brokers, cfg.TopicStatementMatch, cfg.KafkaGroupID,
-		func(msg kafka.Message) error {
+		},
+		cfg.TopicStatementMatch: func(msg kafka.Message) error {
 			var e models.StatementMatchEvent
 			if err := json.Unmarshal(msg.Value, &e); err != nil {
 				return err
 			}
 			return handler.HandleStatementMatch(ctx, e)
-		})
+		},
+	}
 
 	if corridorHealthHandler, ok := handler.(CorridorHealthTickHandler); ok {
-		go consume(ctx, brokers, cfg.TopicCorridorHealthTick, cfg.KafkaGroupID,
-			func(msg kafka.Message) error {
-				var e models.CorridorHealthTickEvent
-				if err := json.Unmarshal(msg.Value, &e); err != nil {
-					return err
-				}
-				return corridorHealthHandler.HandleCorridorHealthTick(ctx, e)
-			})
+		topicHandlers[cfg.TopicCorridorHealthTick] = func(msg kafka.Message) error {
+			var e models.CorridorHealthTickEvent
+			if err := json.Unmarshal(msg.Value, &e); err != nil {
+				return err
+			}
+			return corridorHealthHandler.HandleCorridorHealthTick(ctx, e)
+		}
 	}
 
 	if slaTimerHandler, ok := handler.(SLATimerTickHandler); ok {
-		go consume(ctx, brokers, cfg.TopicSLATimerTick, cfg.KafkaGroupID,
-			func(msg kafka.Message) error {
-				var e models.SLATimerTickEvent
-				if err := json.Unmarshal(msg.Value, &e); err != nil {
-					return err
-				}
-				return slaTimerHandler.HandleSLATimerTick(ctx, e)
-			})
+		topicHandlers[cfg.TopicSLATimerTick] = func(msg kafka.Message) error {
+			var e models.SLATimerTickEvent
+			if err := json.Unmarshal(msg.Value, &e); err != nil {
+				return err
+			}
+			return slaTimerHandler.HandleSLATimerTick(ctx, e)
+		}
 	}
+
+	go consume(ctx, brokers, cfg.KafkaGroupID, topicHandlers)
 
 	log.Println("kafka: consumers started")
 }
@@ -138,69 +119,66 @@ func StartConsumers(ctx context.Context, cfg *config.Config, handler EventHandle
 func consume(
 	ctx context.Context,
 	brokers []string,
-	topic string,
 	groupID string,
-	handle func(kafka.Message) error,
+	topicHandlers map[string]func(kafka.Message) error,
 ) {
-	// kafka.NewReader creates a consumer connected to this topic
+	topics := make([]string, 0, len(topicHandlers))
+	for topic := range topicHandlers {
+		if topic == "" {
+			continue
+		}
+		topics = append(topics, topic)
+	}
+	if len(topics) == 0 {
+		log.Printf("kafka: no topics configured for group=%s", groupID)
+		return
+	}
+
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: brokers,
-		Topic:   topic,
-		GroupID: groupID,
-
-		// CommitInterval: 0 means MANUAL commit mode.
-		// We call CommitMessages() ourselves only after successful processing.
-		// This prevents message loss if the service crashes mid-processing.
+		Brokers:     brokers,
+		GroupID:     groupID,
+		GroupTopics: topics,
 		CommitInterval: 0,
-
-		// How long to wait for a new message before timing out.
-		// 3 seconds is standard — short enough to respond quickly to shutdown.
-		MaxWait: 3e9, // 3 seconds in nanoseconds
+		MaxWait:        3e9,
 	})
 
-	// defer runs when this function exits (service shutdown).
-	// Closes the Kafka connection cleanly.
 	defer func() {
 		if err := reader.Close(); err != nil {
-			log.Printf("kafka: error closing reader for topic %s: %v", topic, err)
+			log.Printf("kafka: error closing reader for group %s: %v", groupID, err)
 		}
 	}()
 
-	log.Printf("kafka: consumer started for topic=%s group=%s", topic, groupID)
+	log.Printf("kafka: group consumer started for topics=%v group=%s", topics, groupID)
 
-	// This loop runs forever until ctx is cancelled.
 	for {
-		// FetchMessage blocks until:
-		//   a) A message is available
-		//   b) ctx is cancelled (service is shutting down)
 		msg, err := reader.FetchMessage(ctx)
 		if err != nil {
-			// ctx.Err() is non-nil when context is cancelled (normal shutdown)
 			if ctx.Err() != nil {
-				log.Printf("kafka: consumer shutting down for topic=%s", topic)
+				log.Printf("kafka: consumer shutting down for group=%s", groupID)
 				return
 			}
-			// Any other error: log it and continue the loop
-			// This handles temporary Kafka connectivity issues
-			log.Printf("kafka: fetch error on topic=%s: %v", topic, err)
+			log.Printf("kafka: fetch error on group=%s: %v", groupID, err)
 			continue
 		}
 
-		// Call the handler function for this message
+		handle, ok := topicHandlers[msg.Topic]
+		if !ok {
+			log.Printf("kafka: no handler registered for topic=%s partition=%d offset=%d", msg.Topic, msg.Partition, msg.Offset)
+			if err := reader.CommitMessages(ctx, msg); err != nil {
+				log.Printf("kafka: commit error on topic=%s offset=%d: %v", msg.Topic, msg.Offset, err)
+			}
+			continue
+		}
+
 		if err := handle(msg); err != nil {
-			// Handler failed — do NOT commit offset.
-			// Kafka will redeliver this message after restart.
-			log.Printf("kafka: handler error on topic=%s offset=%d: %v",
-				topic, msg.Offset, err)
+			log.Printf("kafka: handler error on topic=%s partition=%d offset=%d: %v", msg.Topic, msg.Partition, msg.Offset, err)
 			continue
 		}
 
-		// Handler succeeded — commit offset.
-		// This tells Kafka: "consumer group zord-intelligence has
-		// successfully processed message at offset X on topic Y"
+		log.Printf("kafka: consumed topic=%s partition=%d offset=%d", msg.Topic, msg.Partition, msg.Offset)
+
 		if err := reader.CommitMessages(ctx, msg); err != nil {
-			log.Printf("kafka: commit error on topic=%s offset=%d: %v",
-				topic, msg.Offset, err)
+			log.Printf("kafka: commit error on topic=%s offset=%d: %v", msg.Topic, msg.Offset, err)
 		}
 	}
 }
