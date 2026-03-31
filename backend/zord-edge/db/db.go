@@ -40,6 +40,7 @@ func CreateTable() error {
 	PRIMARY KEY (tenant_id, idempotency_key),
 	UNIQUE (tenant_id, idempotency_key)
 );`
+
 	_, err = DB.Exec(idempotencyKeys)
 	if err != nil {
 		log.Fatal(err)

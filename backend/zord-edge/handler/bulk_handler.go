@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/csv"
@@ -61,6 +60,12 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 		return
 	}
 
+	// Reset file pointer for subsequent row parsing
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reset file pointer"})
+		return
+	}
+
 	// 🔐 Hash
 	fileHashBytes := sha256.Sum256(fileBytes)
 	fileHash := hex.EncodeToString(fileHashBytes[:])
@@ -111,9 +116,6 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 		return
 	}
 
-	// 🔄 New reader (clean)
-	reader := bytes.NewReader(fileBytes)
-
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 
 	var rows [][]string
@@ -122,7 +124,7 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 
 	case ".xlsx":
 
-		f, err := excelize.OpenReader(reader)
+		f, err := excelize.OpenReader(src)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid excel file"})
 			return
@@ -138,9 +140,9 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 
 	case ".csv":
 
-		csvReader := csv.NewReader(reader)
+		reader := csv.NewReader(src)
 
-		rows, err = csvReader.ReadAll()
+		rows, err = reader.ReadAll()
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid CSV file"})
 			return
@@ -170,8 +172,6 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 	}
 
 	headers := rows[0]
-	//tenantID := c.MustGet("tenant_id").(uuid.UUID)
-
 	headersBytes, _ := json.Marshal(c.Request.Header)
 	headersHashSum := sha256.Sum256(headersBytes)
 	headersHash := headersHashSum[:]
