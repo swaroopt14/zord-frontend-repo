@@ -10,6 +10,7 @@ import (
 
 	"zord-prompt-layer/dto"
 	"zord-prompt-layer/model"
+	"zord-prompt-layer/utils"
 )
 
 var uuidRegex = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
@@ -38,7 +39,7 @@ func isFailureQuery(q string) bool {
 		strings.Contains(s, "dlq")
 }
 
-func (r *LiveSQLRetriever) Retrieve(req dto.QueryRequest, intentID, traceID string, topK int) ([]model.RetrievedChunk, error) {
+func (r *LiveSQLRetriever) Retrieve(req dto.QueryRequest, intentID, traceID string, topK int, scope utils.QueryScope) ([]model.RetrievedChunk, error) {
 	tenantID := ""
 	if strings.TrimSpace(req.TenantID) != "" {
 		resolved, err := r.resolveTenantID(req.TenantID)
@@ -56,27 +57,27 @@ func (r *LiveSQLRetriever) Retrieve(req dto.QueryRequest, intentID, traceID stri
 	chunks := make([]model.RetrievedChunk, 0, topK*4)
 
 	if r.edgeDB != nil {
-		c, err := r.fetchFromEdge(tenantID, traceID, topK)
+		c, err := r.fetchFromEdge(tenantID, traceID, topK, scope)
 		if err != nil {
 			return nil, err
 		}
 		chunks = append(chunks, c...)
 	}
 	if r.intentDB != nil {
-		c, err := r.fetchFromIntent(tenantID, intentID, traceID, topK, failureOnly)
+		c, err := r.fetchFromIntent(tenantID, intentID, traceID, topK, failureOnly, scope)
 		if err != nil {
 			return nil, err
 		}
 		chunks = append(chunks, c...)
 
-		d, err := r.fetchFromIntentDLQ(tenantID, topK)
+		d, err := r.fetchFromIntentDLQ(tenantID, topK, scope)
 		if err != nil {
 			return nil, err
 		}
 		chunks = append(chunks, d...)
 	}
 	if r.relayDB != nil {
-		c, err := r.fetchFromRelay(tenantID, intentID, traceID, topK, failureOnly)
+		c, err := r.fetchFromRelay(tenantID, intentID, traceID, topK, failureOnly, scope)
 		if err != nil {
 			return nil, err
 		}
@@ -115,17 +116,19 @@ func (r *LiveSQLRetriever) resolveTenantID(input string) (string, error) {
 	return strings.ToLower(tenantID), nil
 }
 
-func (r *LiveSQLRetriever) fetchFromEdge(tenantID, traceID string, topK int) ([]model.RetrievedChunk, error) {
+func (r *LiveSQLRetriever) fetchFromEdge(tenantID, traceID string, topK int, scope utils.QueryScope) ([]model.RetrievedChunk, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.timeout)
 	defer cancel()
 
 	args := []any{}
+
 	q := `
-		SELECT envelope_id::text, trace_id::text, source, source_system,
-		       idempotency_key, status, content_type, payload_size::text, received_at::text
-		FROM ingress_envelopes
-		WHERE 1=1
-	`
+	SELECT envelope_id::text, trace_id::text, source, source_system,
+	       status, content_type, payload_size::text, received_at::text
+	FROM ingress_envelopes
+	WHERE 1=1
+`
+
 	if tenantID != "" {
 		q += fmt.Sprintf(" AND tenant_id::text = $%d", len(args)+1)
 		args = append(args, tenantID)
@@ -134,6 +137,11 @@ func (r *LiveSQLRetriever) fetchFromEdge(tenantID, traceID string, topK int) ([]
 		q += fmt.Sprintf(" AND trace_id::text = $%d", len(args)+1)
 		args = append(args, strings.ToLower(traceID))
 	}
+	if scope.HasExplicitTime {
+		q += fmt.Sprintf(" AND received_at >= $%d AND received_at < $%d", len(args)+1, len(args)+2)
+		args = append(args, scope.StartUTC, scope.EndUTC)
+	}
+
 	q += fmt.Sprintf(" ORDER BY received_at DESC LIMIT %d", topK)
 
 	rows, err := r.edgeDB.QueryContext(ctx, q, args...)
@@ -144,10 +152,11 @@ func (r *LiveSQLRetriever) fetchFromEdge(tenantID, traceID string, topK int) ([]
 
 	out := make([]model.RetrievedChunk, 0, topK)
 	for rows.Next() {
-		var envelopeID, tr, source, sourceSystem, idemKey, status, contentType, payloadSize, receivedAt string
-		if err := rows.Scan(&envelopeID, &tr, &source, &sourceSystem, &idemKey, &status, &contentType, &payloadSize, &receivedAt); err != nil {
+		var envelopeID, tr, source, sourceSystem, status, contentType, payloadSize, receivedAt string
+		if err := rows.Scan(&envelopeID, &tr, &source, &sourceSystem, &status, &contentType, &payloadSize, &receivedAt); err != nil {
 			return nil, err
 		}
+
 		out = append(out, model.RetrievedChunk{
 			ChunkID:    "edge_" + envelopeID,
 			SourceType: "edge_ingress_envelope",
@@ -155,14 +164,14 @@ func (r *LiveSQLRetriever) fetchFromEdge(tenantID, traceID string, topK int) ([]
 			TraceID:    tr,
 			TenantID:   tenantID,
 			Score:      0.99,
-			Text: fmt.Sprintf("Edge ingress envelope %s: source=%s source_system=%s status=%s content_type=%s size=%s idempotency_key=%s received_at=%s trace_id=%s",
-				envelopeID, source, sourceSystem, status, contentType, payloadSize, idemKey, receivedAt, tr),
+			Text: fmt.Sprintf("Edge ingress event: source=%s source_system=%s status=%s content_type=%s size=%s received_at=%s",
+				source, sourceSystem, status, contentType, payloadSize, receivedAt),
 		})
 	}
 	return out, rows.Err()
 }
 
-func (r *LiveSQLRetriever) fetchFromIntent(tenantID, intentID, traceID string, topK int, failureOnly bool) ([]model.RetrievedChunk, error) {
+func (r *LiveSQLRetriever) fetchFromIntent(tenantID, intentID, traceID string, topK int, failureOnly bool, scope utils.QueryScope) ([]model.RetrievedChunk, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.timeout)
 	defer cancel()
 
@@ -188,6 +197,11 @@ func (r *LiveSQLRetriever) fetchFromIntent(tenantID, intentID, traceID string, t
 	if failureOnly {
 		q += " AND status ILIKE '%FAIL%'"
 	}
+	if scope.HasExplicitTime {
+		q += fmt.Sprintf(" AND created_at >= $%d AND created_at < $%d", len(args)+1, len(args)+2)
+		args = append(args, scope.StartUTC, scope.EndUTC)
+	}
+
 	q += fmt.Sprintf(" ORDER BY created_at DESC LIMIT %d", topK)
 
 	rows, err := r.intentDB.QueryContext(ctx, q, args...)
@@ -218,8 +232,8 @@ func (r *LiveSQLRetriever) fetchFromIntent(tenantID, intentID, traceID string, t
 			TraceID:    tr,
 			TenantID:   tenantID,
 			Score:      1.0,
-			Text: fmt.Sprintf("Intent %s: status=%s type=%s amount=%s %s confidence=%s envelope_id=%s created_at=%s trace_id=%s",
-				id, status, intentType, amount, currency, confidenceVal, envelopeID, createdAt, tr),
+			Text: fmt.Sprintf("Intent event: status=%s type=%s amount=%s %s confidence=%s created_at=%s",
+				status, intentType, amount, currency, confidenceVal, createdAt),
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -247,6 +261,11 @@ func (r *LiveSQLRetriever) fetchFromIntent(tenantID, intentID, traceID string, t
 	if failureOnly {
 		q += " AND status ILIKE '%FAIL%'"
 	}
+	if scope.HasExplicitTime {
+		q += fmt.Sprintf(" AND created_at >= $%d AND created_at < $%d", len(args)+1, len(args)+2)
+		args = append(args, scope.StartUTC, scope.EndUTC)
+	}
+
 	q += fmt.Sprintf(" ORDER BY created_at DESC LIMIT %d", topK)
 
 	rows2, err := r.intentDB.QueryContext(ctx, q, args...)
@@ -268,13 +287,13 @@ func (r *LiveSQLRetriever) fetchFromIntent(tenantID, intentID, traceID string, t
 			TraceID:    tr.String,
 			TenantID:   tenantID,
 			Score:      0.95,
-			Text: fmt.Sprintf("Outbox event %s: aggregate_id=%s event_type=%s status=%s retry_count=%s created_at=%s sent_at=%s trace_id=%s",
-				eventID.String, aggID.String, eventType.String, status.String, retryCount.String, createdAt.String, sentAt.String, tr.String),
+			Text: fmt.Sprintf("Outbox event: event_type=%s status=%s retry_count=%s created_at=%s sent_at=%s",
+				eventType.String, status.String, retryCount.String, createdAt.String, sentAt.String),
 		})
 	}
 	return out, rows2.Err()
 }
-func (r *LiveSQLRetriever) fetchFromIntentDLQ(tenantID string, topK int) ([]model.RetrievedChunk, error) {
+func (r *LiveSQLRetriever) fetchFromIntentDLQ(tenantID string, topK int, scope utils.QueryScope) ([]model.RetrievedChunk, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.timeout)
 	defer cancel()
 
@@ -288,6 +307,11 @@ func (r *LiveSQLRetriever) fetchFromIntentDLQ(tenantID string, topK int) ([]mode
 		q += fmt.Sprintf(" AND tenant_id::text = $%d", len(args)+1)
 		args = append(args, tenantID)
 	}
+	if scope.HasExplicitTime {
+		q += fmt.Sprintf(" AND created_at >= $%d AND created_at < $%d", len(args)+1, len(args)+2)
+		args = append(args, scope.StartUTC, scope.EndUTC)
+	}
+
 	// dlq_items are already failure records; no extra failureOnly condition needed
 	q += fmt.Sprintf(" ORDER BY created_at DESC LIMIT %d", topK)
 
@@ -309,14 +333,14 @@ func (r *LiveSQLRetriever) fetchFromIntentDLQ(tenantID string, topK int) ([]mode
 			RecordID:   dlqID.String,
 			TenantID:   tID.String,
 			Score:      0.97,
-			Text: fmt.Sprintf("DLQ item %s: stage=%s reason_code=%s replayable=%s envelope_id=%s created_at=%s error_detail=%s",
-				dlqID.String, stage.String, reasonCode.String, replayable.String, envelopeID.String, createdAt.String, errorDetail.String),
+			Text: fmt.Sprintf("DLQ item: stage=%s reason_code=%s replayable=%s created_at=%s error_detail=%s",
+				stage.String, reasonCode.String, replayable.String, createdAt.String, errorDetail.String),
 		})
 	}
 	return out, rows.Err()
 }
 
-func (r *LiveSQLRetriever) fetchFromRelay(tenantID, intentID, traceID string, topK int, failureOnly bool) ([]model.RetrievedChunk, error) {
+func (r *LiveSQLRetriever) fetchFromRelay(tenantID, intentID, traceID string, topK int, failureOnly bool, scope utils.QueryScope) ([]model.RetrievedChunk, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.timeout)
 	defer cancel()
 
@@ -341,6 +365,11 @@ func (r *LiveSQLRetriever) fetchFromRelay(tenantID, intentID, traceID string, to
 	if failureOnly {
 		q += " AND status ILIKE '%FAIL%'"
 	}
+	if scope.HasExplicitTime {
+		q += fmt.Sprintf(" AND created_at >= $%d AND created_at < $%d", len(args)+1, len(args)+2)
+		args = append(args, scope.StartUTC, scope.EndUTC)
+	}
+
 	q += fmt.Sprintf(" ORDER BY created_at DESC LIMIT %d", topK)
 
 	rows, err := r.relayDB.QueryContext(ctx, q, args...)
@@ -363,8 +392,8 @@ func (r *LiveSQLRetriever) fetchFromRelay(tenantID, intentID, traceID string, to
 			TraceID:    tr,
 			TenantID:   tenantID,
 			Score:      0.93,
-			Text: fmt.Sprintf("Relay contract %s: intent_id=%s envelope_id=%s status=%s created_at=%s trace_id=%s",
-				contractID, id, envelopeID, status, createdAt, tr),
+			Text: fmt.Sprintf("Relay contract event: status=%s created_at=%s",
+				status, createdAt),
 		})
 	}
 	return out, rows.Err()
