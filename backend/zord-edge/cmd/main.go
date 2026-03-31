@@ -107,7 +107,7 @@ func main() {
 	defer kafkaProducer.Close()
 
 	// Start outbox poller — durability guarantee for PENDING rows.
-	go services.StartOutboxPoller(ctx, kafkaProducer, 5*time.Second)
+	go services.StartOutboxPoller(ctx, kafkaProducer, 100*time.Millisecond)
 
 	h := &handler.Handler{
 		S3store: s3store,
