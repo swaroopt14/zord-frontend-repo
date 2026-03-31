@@ -25,7 +25,6 @@ type EntitiesFound struct {
 type QueryResponse struct {
 	Answer        string        `json:"answer"`
 	Confidence    string        `json:"confidence"`
-	ModelUsed     string        `json:"model_used"`
 	EntitiesFound EntitiesFound `json:"entities_found"`
 	Citations     []Citation    `json:"citations"`
 	NextActions   []string      `json:"next_actions"`
