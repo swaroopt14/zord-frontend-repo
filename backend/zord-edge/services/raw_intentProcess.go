@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"log"
+	"time"
 
 	"zord-edge/model"
 	"zord-edge/storage"
@@ -10,15 +11,19 @@ import (
 
 func ProcessRawIntent(
 	ctx context.Context,
-	msg model.RawIntentMessage,
+	rawIntent model.RawIntentMessage,
 	s3store *storage.S3Store,
+	envelopeID string,
+	receivedAt time.Time,
 ) (*model.AckMessage, error) {
 
-	envelopeID, receivedAt, objRef, err := s3store.StoreRawPayload(
+	objRef, err := s3store.StoreRawPayload(
 		ctx,
-		[]byte(msg.Payload),
-		msg.TenantID,
-		msg.TenantName,
+		envelopeID,
+		receivedAt,
+		[]byte(rawIntent.Payload),
+		rawIntent.TenantID,
+		rawIntent.TenantName,
 	)
 	if err != nil {
 		log.Println("S3 Upload Failed", err)
