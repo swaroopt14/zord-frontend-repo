@@ -69,12 +69,26 @@ CREATE INDEX IF NOT EXISTS idx_proj_tenant_key
 -- Tracks Kafka event IDs already processed by ZPI handlers.
 -- Used for idempotency to avoid double-counting on retries/replays.
 CREATE TABLE IF NOT EXISTS processed_events (
-    event_id     TEXT        PRIMARY KEY,
+    tenant_id    TEXT        NOT NULL,
+    event_id     TEXT        NOT NULL,
+    PRIMARY KEY (tenant_id, event_id),
     processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_processed_events_at
     ON processed_events (processed_at DESC);
+
+-- TABLE 1C: processed_finality
+-- Business-level idempotency for finality certificates per tenant.
+CREATE TABLE IF NOT EXISTS processed_finality (
+    tenant_id      TEXT        NOT NULL,
+    certificate_id TEXT        NOT NULL,
+    processed_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant_id, certificate_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_processed_finality_at
+    ON processed_finality (processed_at DESC);
 
 
 -- TABLE 2: policy_registry
@@ -441,4 +455,27 @@ false),
 THEN ACTION ESCALATE severity=HIGH',
 false)
 
+ON CONFLICT (policy_id) DO NOTHING;
+
+-- ── SEED: ML-driven policies ─────────────────────────────────────────────
+-- Makes ML projections actionable via the existing policy engine.
+INSERT INTO policy_registry
+    (policy_id, version, scope_type, trigger_type, trigger_value, dsl, enabled)
+VALUES
+('P_ANOMALY_DETECTED', 1, 'corridor', 'cron', '*/5 * * * *',
+'WHEN corridor.anomaly_score > 0.70
+THEN ACTION ESCALATE severity=HIGH',
+false),
+('P_SLA_BREACH_RISK_HIGH', 1, 'corridor', 'cron', '*/5 * * * *',
+'WHEN corridor.sla_breach_risk > 0.70
+THEN ACTION NOTIFY severity=HIGH',
+false),
+('P_FAILURE_PATTERN_SHIFT', 1, 'corridor', 'event', 'outcome.event.normalized',
+'WHEN corridor.failure_cluster_shift_score > 0.60
+THEN ACTION ESCALATE severity=MEDIUM',
+false),
+('P_SLA_BREACH', 1, 'tenant', 'cron', '*/5 * * * *',
+'WHEN tenant.sla_breach_rate > 0.00
+THEN ACTION ESCALATE severity=HIGH',
+false)
 ON CONFLICT (policy_id) DO NOTHING;

@@ -26,6 +26,9 @@ func (s *MLFeaturesService) RefreshForPair(
 	ctx context.Context,
 	tenantID, corridorID string,
 ) error {
+	if s.wasComputedRecently(ctx, tenantID, corridorID, 15*time.Second) {
+		return nil
+	}
 	if err := s.computeAnomaly(ctx, tenantID, corridorID); err != nil {
 		return err
 	}
@@ -36,6 +39,22 @@ func (s *MLFeaturesService) RefreshForPair(
 		return err
 	}
 	return nil
+}
+
+func (s *MLFeaturesService) wasComputedRecently(
+	ctx context.Context,
+	tenantID, corridorID string,
+	withIn time.Duration,
+) bool {
+	p, err := s.projectionRepo.GetLatest(ctx, tenantID, fmt.Sprintf("corridor.anomaly_score.%s", corridorID))
+	if err != nil || p == nil {
+		return false
+	}
+	age := time.Since(p.ComputedAt.UTC())
+	if age < 0 {
+		return false
+	}
+	return age < withIn
 }
 
 type mlProjectionValue struct {
@@ -52,6 +71,13 @@ func (s *MLFeaturesService) computeAnomaly(
 	if err := s.projectionRepo.GetValueAs(ctx, tenantID,
 		fmt.Sprintf("corridor.success_rate.%s", corridorID), &successVal); err != nil {
 		return fmt.Errorf("ml_features.computeAnomaly success_rate corridor=%s: %w", corridorID, err)
+	}
+	if successVal.TotalCount < 10 {
+		return s.upsertScore(ctx, tenantID,
+			fmt.Sprintf("corridor.anomaly_score.%s", corridorID),
+			0.0,
+			"insufficient_data",
+		)
 	}
 
 	var latencyVal models.FinalityLatencyValue

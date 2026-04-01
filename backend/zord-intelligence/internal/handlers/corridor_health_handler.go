@@ -29,7 +29,7 @@ func (h *CorridorHealthHandler) HandleCorridorHealthTick(
 		return nil
 	}
 
-	processed, err := h.projectionRepo.IsProcessed(ctx, e.EventID)
+	processed, err := h.projectionRepo.IsProcessed(ctx, e.TenantID, e.EventID)
 	if err != nil {
 		return fmt.Errorf("HandleCorridorHealthTick IsProcessed event_id=%s: %w", e.EventID, err)
 	}
@@ -58,7 +58,7 @@ func (h *CorridorHealthHandler) HandleCorridorHealthTick(
 		return err
 	}
 
-	if err := h.projectionRepo.MarkProcessed(ctx, e.EventID); err != nil {
+	if err := h.projectionRepo.MarkProcessed(ctx, e.TenantID, e.EventID); err != nil {
 		return fmt.Errorf("HandleCorridorHealthTick MarkProcessed event_id=%s: %w", e.EventID, err)
 	}
 
