@@ -74,7 +74,7 @@ func (r *PaymentIntentRepo) Save(
     constraints, beneficiary_type, pii_tokens, beneficiary,
     status, confidence_score,
     canonical_snapshot_ref, nir_snapshot_ref, governance_snapshot_ref,
-    canonical_hash, prev_hash,
+    canonical_hash,
     created_at,
     client_payout_ref, request_fingerprint, routing_hints_json,
     governance_state, business_state, duplicate_risk_flag,
@@ -92,7 +92,7 @@ VALUES (
     $26,
     $27,$28,$29,
     $30,$31,$32,
-    $33,$34
+    $33
 )`
 
 	_, err = tx.ExecContext(
@@ -128,18 +128,17 @@ VALUES (
 		intent.NIRSnapshotRef,        // $22
 		intent.GovernanceSnapshotRef, // $23
 		intent.CanonicalHash,         // $24
-		intent.PrevHash,              // $25
 
-		intent.CreatedAt, // $26
+		intent.CreatedAt, // $25
 
-		intent.ClientPayoutRef,       // $27
-		intent.RequestFingerprint,    // $28
-		intent.RoutingHintsJSON,      // $29
-		intent.GovernanceState,       // $30
-		intent.BusinessState,         // $31
-		intent.DuplicateRiskFlag,     // $32
-		intent.MappingProfileVersion, // $33
-		intent.UpdatedAt,             // $34
+		intent.ClientPayoutRef,       // $26
+		intent.RequestFingerprint,    // $27
+		intent.RoutingHintsJSON,      // $28
+		intent.GovernanceState,       // $29
+		intent.BusinessState,         // $30
+		intent.DuplicateRiskFlag,     // $31
+		intent.MappingProfileVersion, // $32
+		intent.UpdatedAt,             // $33
 	)
 
 	if err != nil {
@@ -308,11 +307,48 @@ func (r *PaymentIntentRepo) UpdateSnapshotRefs(
 	SET canonical_snapshot_ref = $1,
 	    nir_snapshot_ref = $2,
 	    governance_snapshot_ref = $3,
-	    canonical_hash = $4,
-	    prev_hash = $5
-	WHERE intent_id = $6
+	    canonical_hash = $4
+	WHERE intent_id = $5
 	`
 
-	_, err := r.db.ExecContext(ctx, query, canonicalRef, nirRef, govRef, hash, prevHash, intentID)
+	if _, err := r.db.ExecContext(ctx, query, canonicalRef, nirRef, govRef, hash, intentID); err != nil {
+		return err
+	}
+
+	insertVersionQuery := `
+	INSERT INTO intent_versions (intent_id, version_no, prev_hash, created_at)
+	VALUES ($1, $2, $3, now())
+	ON CONFLICT (intent_id, version_no) DO NOTHING
+	`
+
+	_, err := r.db.ExecContext(ctx, insertVersionQuery, intentID, 1, prevHash)
+
 	return err
+}
+func (r *PaymentIntentRepo) GetPreviousTenantCanonicalHash(
+	ctx context.Context,
+	tenantID string,
+	intentID string,
+) (string, error) {
+	var prevHash string
+
+	err := r.db.QueryRowContext(ctx, `
+		SELECT canonical_hash
+		FROM payment_intents
+		WHERE tenant_id = $1
+		  AND intent_id <> $2
+		  AND canonical_hash IS NOT NULL
+		  AND canonical_hash <> ''
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, tenantID, intentID).Scan(&prevHash)
+
+	if err == sql.ErrNoRows {
+		return "GENESIS", nil
+	}
+	if err != nil {
+		return "", err
+	}
+
+	return prevHash, nil
 }

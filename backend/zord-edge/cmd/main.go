@@ -6,8 +6,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"zord-edge/config"
@@ -15,6 +17,7 @@ import (
 	"zord-edge/handler"
 	"zord-edge/kafka"
 	"zord-edge/routes"
+	"zord-edge/services"
 	"zord-edge/storage"
 	"zord-edge/vault"
 
@@ -53,6 +56,10 @@ func init() {
 }
 
 func main() {
+	// Shutdown context — cancelled on SIGTERM/SIGINT.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+
 	// Initialize tracing
 	cleanup := tracing.InitTracing("zord-edge")
 	defer cleanup()
@@ -75,13 +82,7 @@ func main() {
 	if err != nil {
 		log.Println("No .env file found")
 	}
-	brokers := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
-	producer, err := kafka.NewProducer(brokers)
-	if err != nil {
-		log.Fatal("Kafka producer creation failure: ", err)
-	}
 
-	defer producer.Close()
 
 	bucket := os.Getenv("S3_BUCKET")
 	region := os.Getenv("AWS_REGION")
@@ -95,9 +96,21 @@ func main() {
 		log.Fatal("Failed to init S3", err)
 	}
 
+	kafkaBrokers := os.Getenv("KAFKA_BROKERS")
+	if kafkaBrokers == "" {
+		log.Fatal("KAFKA_BROKERS not set in environment")
+	}
+	kafkaProducer, err := kafka.NewProducer(strings.Split(kafkaBrokers, ","))
+	if err != nil {
+		log.Fatal("Failed to init Kafka producer:", err)
+	}
+	defer kafkaProducer.Close()
+
+	// Start outbox poller — durability guarantee for PENDING rows.
+	go services.StartOutboxPoller(ctx, kafkaProducer, 100*time.Millisecond)
+
 	h := &handler.Handler{
 		S3store: s3store,
-		Kafka:   producer,
 	}
 	cfg := config.LoadConfig()
 

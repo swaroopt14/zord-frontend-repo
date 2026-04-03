@@ -87,7 +87,92 @@ type ProviderAckedPayload struct {
 	AckedAt           string  `json:"acked_at"`
 }
 
-// DispatchFailedEvent is published when the PSP call fails after AttemptSent.
+// DispatchGovernanceEvaluatedEvent is emitted after the governance check in Step 1.5.
+// It records what decision was made and why — for audit and replay.
+type DispatchGovernanceEvaluatedEvent struct {
+	EventID       string                            `json:"event_id"`
+	EventType     string                            `json:"event_type"` // "DispatchGovernanceEvaluated"
+	TenantID      string                            `json:"tenant_id"`
+	IntentID      string                            `json:"intent_id"`
+	ContractID    string                            `json:"contract_id"`
+	DispatchID    string                            `json:"dispatch_id"`
+	TraceID       string                            `json:"trace_id"`
+	SchemaVersion string                            `json:"schema_version"`
+	CreatedAt     time.Time                         `json:"created_at"`
+	Payload       DispatchGovernanceEvaluatedPayload `json:"payload"`
+}
+
+type DispatchGovernanceEvaluatedPayload struct {
+	DispatchID  string   `json:"dispatch_id"`
+	Decision    string   `json:"decision"`
+	ReasonCodes []string `json:"reason_codes"`
+}
+
+// DispatchHeldEvent is emitted when governance blocks execution.
+type DispatchHeldEvent struct {
+	EventID       string              `json:"event_id"`
+	EventType     string              `json:"event_type"` // "DispatchHeld"
+	TenantID      string              `json:"tenant_id"`
+	IntentID      string              `json:"intent_id"`
+	ContractID    string              `json:"contract_id"`
+	DispatchID    string              `json:"dispatch_id"`
+	TraceID       string              `json:"trace_id"`
+	SchemaVersion string              `json:"schema_version"`
+	CreatedAt     time.Time           `json:"created_at"`
+	Payload       DispatchHeldPayload `json:"payload"`
+}
+
+type DispatchHeldPayload struct {
+	DispatchID  string   `json:"dispatch_id"`
+	Reason      string   `json:"reason"`
+	ReasonCodes []string `json:"reason_codes"`
+}
+
+// DispatchAwaitingProviderSignalEvent is emitted when the PSP call timed out
+// or returned an uncertain response. The money may have already moved.
+// Service 4 will poll or wait for a webhook before taking any further action.
+type DispatchAwaitingProviderSignalEvent struct {
+	EventID       string                                `json:"event_id"`
+	EventType     string                                `json:"event_type"` // "DispatchAwaitingProviderSignal"
+	TenantID      string                                `json:"tenant_id"`
+	IntentID      string                                `json:"intent_id"`
+	ContractID    string                                `json:"contract_id"`
+	DispatchID    string                                `json:"dispatch_id"`
+	TraceID       string                                `json:"trace_id"`
+	SchemaVersion string                                `json:"schema_version"`
+	CreatedAt     time.Time                             `json:"created_at"`
+	Payload       DispatchAwaitingProviderSignalPayload `json:"payload"`
+}
+
+type DispatchAwaitingProviderSignalPayload struct {
+	DispatchID           string    `json:"dispatch_id"`
+	ProviderIdempotencyKey string  `json:"provider_idempotency_key"`
+	Reason               string    `json:"reason"`
+	SentAt               time.Time `json:"sent_at"`
+}
+
+// DispatchRetryScheduledEvent is emitted when Service 4 schedules a retry.
+type DispatchRetryScheduledEvent struct {
+	EventID       string                       `json:"event_id"`
+	EventType     string                       `json:"event_type"` // "DispatchRetryScheduled"
+	TenantID      string                       `json:"tenant_id"`
+	IntentID      string                       `json:"intent_id"`
+	ContractID    string                       `json:"contract_id"`
+	DispatchID    string                       `json:"dispatch_id"`
+	TraceID       string                       `json:"trace_id"`
+	SchemaVersion string                       `json:"schema_version"`
+	CreatedAt     time.Time                    `json:"created_at"`
+	Payload       DispatchRetryScheduledPayload `json:"payload"`
+}
+
+type DispatchRetryScheduledPayload struct {
+	DispatchID      string    `json:"dispatch_id"`
+	RetryClass      string    `json:"retry_class"`
+	NextAttemptAt   time.Time `json:"next_attempt_at"`
+	AttemptCount    int       `json:"attempt_count"`
+	FailureReason   string    `json:"failure_reason"`
+}
+
 // It carries the failure reason so Service 5 can update dispatch_index.
 type DispatchFailedEvent struct {
 	EventID      string               `json:"event_id"`

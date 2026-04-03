@@ -13,7 +13,7 @@ import (
 )
 
 type Producer struct {
-	producer sarama.AsyncProducer
+	producer sarama.SyncProducer
 }
 
 func NewProducer(brokers []string) (*Producer, error) {
@@ -38,35 +38,26 @@ func NewProducer(brokers []string) (*Producer, error) {
 	// Compression reduces network overhead
 	config.Producer.Compression = sarama.CompressionSnappy
 
-	// Required for async producer
-	config.Producer.Return.Successes = false
+	// SyncProducer requires Successes to be true.
+	config.Producer.Return.Successes = true
 	config.Producer.Return.Errors = true
 
-	var producer sarama.AsyncProducer
+	var producer sarama.SyncProducer
 	var err error
 
 	for i := 0; i < 30; i++ {
-		producer, err = sarama.NewAsyncProducer(brokers, config)
+		producer, err = sarama.NewSyncProducer(brokers, config)
 		if err == nil {
 			break
 		}
-		log.Printf("Failed to create Kafka async producer (attempt %d/30): %v. Retrying in 2s...", i+1, err)
+		log.Printf("Failed to create Kafka sync producer (attempt %d/30): %v. Retrying in 2s...", i+1, err)
 		time.Sleep(2 * time.Second)
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	p := &Producer{producer: producer}
-
-	//Handle asyn errors
-
-	go func() {
-		for err := range producer.Errors() {
-			log.Printf("Kafka Asyn Errors:%v", err)
-		}
-	}()
-	return p, nil
+	return &Producer{producer: producer}, nil
 }
 
 func (p *Producer) Publish(ctx context.Context, topic string, key string, event interface{}) error {
@@ -80,19 +71,12 @@ func (p *Producer) Publish(ctx context.Context, topic string, key string, event 
 		Value: sarama.ByteEncoder(payload),
 	}
 
-	select {
-	case p.producer.Input() <- msg:
-		return nil
-
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-
+	_, _, err = p.producer.SendMessage(msg)
+	return err
 }
 
 
 func SendRawIntentMessage(ctx context.Context, Event model.Event, pro *Producer) error {
-
 	topic := os.Getenv("KAFKA_TOPIC")
 
 	err := pro.Publish(ctx,
@@ -101,11 +85,10 @@ func SendRawIntentMessage(ctx context.Context, Event model.Event, pro *Producer)
 		Event,
 	)
 	if err != nil {
-		log.Printf("Kafka Publish Failed %v", err)
 		return err
 	}
 
-	log.Println("Kafka Event queued for async publish")
+	log.Printf("Kafka Event published successfully for envelope_id=%s", Event.EnvelopeID)
 	return nil
 }
 
@@ -116,10 +99,5 @@ func (p *Producer) Close() error {
 		return nil
 	}
 
-	// AsyncClose flushes pending messages before shutdown
-	p.producer.AsyncClose()
-
-	log.Println("Kafka producer shutdown initiated")
-
-	return nil
+	return p.producer.Close()
 }

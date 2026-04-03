@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS payment_intents (
     contract_id UUID NOT NULL,
     idempotency_key TEXT,
     salient_hash TEXT NOT NULL,
+    payload_hash BYTEA NOT NULL,
 
     intent_type TEXT NOT NULL,
     canonical_version TEXT NOT NULL,
@@ -35,10 +36,21 @@ CREATE TABLE IF NOT EXISTS payment_intents (
     status TEXT NOT NULL,
     confidence_score NUMERIC(5,2),
     canonical_hash TEXT NOT NULL,
-    prev_hash TEXT,
-    canonical_ref TEXT NOT NULL,
+    canonical_snapshot_ref TEXT NOT NULL,
+    nir_snapshot_ref TEXT,
+    governance_snapshot_ref TEXT,
 
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    client_payout_ref TEXT,
+    request_fingerprint TEXT,
+    routing_hints_json JSONB,
+    governance_state TEXT,
+    business_state TEXT,
+    duplicate_risk_flag BOOLEAN,
+    mapping_profile_version TEXT,
+    updated_at TIMESTAMPTZ DEFAULT now()
+
+
 );
 
 -- Create indexes for performance
@@ -65,6 +77,7 @@ CREATE TABLE IF NOT EXISTS outbox (
     schema_version TEXT,
 
     payload JSONB NOT NULL,     -- downstream message body (no raw PII)
+    payload_hash BYTEA NOT NULL,
     amount NUMERIC,
     currency CHAR(3),
 
@@ -126,6 +139,31 @@ CREATE INDEX IF NOT EXISTS idx_dlq_items_reason_code ON dlq_items(reason_code);
 CREATE INDEX IF NOT EXISTS idx_dlq_items_replayable ON dlq_items(replayable);
 CREATE INDEX IF NOT EXISTS idx_dlq_items_created_at ON dlq_items(created_at);
 
+
+
+-- ============================================================================
+-- INTENT VERSIONS TABLE
+-- Stores immutable version-chain linkage for intents
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS intent_versions (
+    version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    intent_id UUID NOT NULL,
+    version_no INT NOT NULL,
+    prev_hash TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT fk_intent_versions_intent
+        FOREIGN KEY (intent_id)
+        REFERENCES payment_intents(intent_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_intent_versions_intent_version
+        UNIQUE (intent_id, version_no)
+);
+
+CREATE INDEX IF NOT EXISTS idx_intent_versions_intent_id ON intent_versions(intent_id);
+CREATE INDEX IF NOT EXISTS idx_intent_versions_intent_version ON intent_versions(intent_id, version_no);
+
 -- ============================================================================
 -- VERIFICATION QUERIES
 -- Run these to verify tables were created successfully
@@ -153,7 +191,12 @@ BEGIN
     ELSE
         RAISE EXCEPTION '❌ dlq_items table creation failed';
     END IF;
-    
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'intent_versions') THEN
+    RAISE NOTICE '✅ intent_versions table created successfully';
+    ELSE
+        RAISE EXCEPTION '❌ intent_versions table creation failed';
+    END IF;
+
     RAISE NOTICE '🎉 All zord-intent-engine tables created successfully!';
 END $$;
 
@@ -167,5 +210,5 @@ SELECT
     hasrules,
     hastriggers
 FROM pg_tables 
-WHERE tablename IN ('payment_intents', 'outbox', 'dlq_items')
+WHERE tablename IN ('payment_intents', 'intent_versions','outbox', 'dlq_items')
 ORDER BY tablename;

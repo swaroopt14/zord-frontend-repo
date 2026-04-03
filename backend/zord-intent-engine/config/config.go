@@ -36,14 +36,14 @@ func InitDB() {
 	if err != nil {
 		log.Fatalf("Database Ping Error %v", err)
 	}
-	db.DB.SetMaxOpenConns(100)
-	db.DB.SetMaxIdleConns(50)
+	db.DB.SetMaxOpenConns(1000)
+	db.DB.SetMaxIdleConns(500)
 	db.DB.SetConnMaxLifetime(5 * time.Minute)
 
 }
 
 func GetWorkerPoolSize() int {
-	size := 50
+	size := 512
 	if val := os.Getenv("WORKER_POOL_SIZE"); val != "" {
 		fmt.Sscanf(val, "%d", &size)
 	}

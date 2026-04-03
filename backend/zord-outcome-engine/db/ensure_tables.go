@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS fused_outcomes(
 	current_state TEXT NOT NULL,
 	finality_certificate_id UUID,
 	final_state TEXT,
-	finality_confidence INT NOT NULL DEFAULT 0,
+	finality_confidence NUMERIC(5,4) NOT NULL DEFAULT 0,
 	finality_basis TEXT,
 	rule_version TEXT NOT NULL,
 	divergence_flags JSONB,

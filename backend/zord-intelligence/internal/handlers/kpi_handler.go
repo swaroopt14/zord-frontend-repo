@@ -17,6 +17,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/zord/zord-intelligence/internal/models"
@@ -135,6 +136,7 @@ func (h *KPIHandler) GetCorridorHealth(w http.ResponseWriter, r *http.Request) {
 		FinalityP95Seconds float64 `json:"finality_p95_seconds"`
 		TotalPending       int     `json:"total_pending"`
 		TotalCount         int     `json:"total_count"`
+		AnomalyScore       float64 `json:"anomaly_score"`
 	}
 
 	corridorMap := make(map[string]*corridorData)
@@ -172,6 +174,13 @@ func (h *KPIHandler) GetCorridorHealth(w http.ResponseWriter, r *http.Request) {
 			if err := json.Unmarshal([]byte(p.ValueJSON), &v); err == nil {
 				entry.TotalPending = v.TotalPending
 			}
+		case isKeyType(p.ProjectionKey, "anomaly_score"):
+			var v struct {
+				Value float64 `json:"value"`
+			}
+			if err := json.Unmarshal([]byte(p.ValueJSON), &v); err == nil {
+				entry.AnomalyScore = v.Value
+			}
 		}
 	}
 
@@ -206,17 +215,79 @@ func (h *KPIHandler) GetTopFailures(w http.ResponseWriter, r *http.Request) {
 		key = "corridor.failure_taxonomy" // all corridors
 	}
 
-	var val models.FailureTaxonomyValue
+	var val struct {
+		TopReasons []models.ReasonCount `json:"top_reasons"`
+		TotalFails int                  `json:"total_fails"`
+		Reasons    map[string]int       `json:"reasons"`
+	}
 	if err := h.projRepo.GetValueAs(r.Context(), tenantID, key, &val); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to fetch failures")
 		return
+	}
+	topReasons := make([]models.ReasonCount, 0)
+	if len(val.TopReasons) > 0 {
+		topReasons = append(topReasons, val.TopReasons...)
+	} else if len(val.Reasons) > 0 {
+		for reason, count := range val.Reasons {
+			entry := models.ReasonCount{
+				ReasonCode: reason,
+				Count:      count,
+			}
+			if val.TotalFails > 0 {
+				entry.Rate = float64(count) / float64(val.TotalFails)
+			}
+			topReasons = append(topReasons, entry)
+		}
+		sort.Slice(topReasons, func(i, j int) bool {
+			if topReasons[i].Count == topReasons[j].Count {
+				return topReasons[i].ReasonCode < topReasons[j].ReasonCode
+			}
+			return topReasons[i].Count > topReasons[j].Count
+		})
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"tenant_id":   tenantID,
 		"corridor_id": corridorID,
-		"top_reasons": val.TopReasons,
+		"top_reasons": topReasons,
 		"total_fails": val.TotalFails,
+	})
+}
+
+func (h *KPIHandler) GetMLAnomaly(w http.ResponseWriter, r *http.Request) {
+	h.getMLScore(w, r, "corridor.anomaly_score.")
+}
+
+func (h *KPIHandler) GetMLSlaRisk(w http.ResponseWriter, r *http.Request) {
+	h.getMLScore(w, r, "corridor.sla_breach_risk.")
+}
+
+func (h *KPIHandler) GetMLFailureShift(w http.ResponseWriter, r *http.Request) {
+	h.getMLScore(w, r, "corridor.failure_cluster_shift_score.")
+}
+
+func (h *KPIHandler) getMLScore(w http.ResponseWriter, r *http.Request, keyPrefix string) {
+	tenantID := r.URL.Query().Get("tenant_id")
+	corridorID := r.URL.Query().Get("corridor_id")
+	if tenantID == "" {
+		writeError(w, http.StatusBadRequest, "tenant_id is required")
+		return
+	}
+	if corridorID == "" {
+		writeError(w, http.StatusBadRequest, "corridor_id is required")
+		return
+	}
+
+	var score struct {
+		Value float64 `json:"value"`
+	}
+	if err := h.projRepo.GetValueAs(r.Context(), tenantID, keyPrefix+corridorID, &score); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch ml score")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]float64{
+		"value": score.Value,
 	})
 }
 

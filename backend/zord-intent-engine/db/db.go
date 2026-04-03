@@ -33,7 +33,6 @@ func CreateTables() error {
     confidence_score NUMERIC(5,2),
     -- 🆕 WORM / Tamper-evidence fields
     canonical_hash TEXT NOT NULL,
-    prev_hash TEXT,
     canonical_snapshot_ref TEXT NOT NULL,
     nir_snapshot_ref TEXT,
     governance_snapshot_ref TEXT,
@@ -165,6 +164,38 @@ func CreateTables() error {
 	}
 
 	if _, err := DB.Exec(`CREATE INDEX IF NOT EXISTS idx_nirs_envelope_id ON normalized_ingest_records(envelope_id);`); err != nil {
+		return err
+	}
+	intentVersions := `
+CREATE TABLE IF NOT EXISTS intent_versions (
+    version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    intent_id UUID NOT NULL,
+    version_no INT NOT NULL,
+    prev_hash TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_intent_versions_intent
+        FOREIGN KEY (intent_id)
+        REFERENCES payment_intents(intent_id)
+        ON DELETE CASCADE,
+    CONSTRAINT uq_intent_versions_intent_version
+        UNIQUE (intent_id, version_no)
+);`
+
+	if _, err := DB.Exec(intentVersions); err != nil {
+		return err
+	}
+
+	if _, err := DB.Exec(`
+CREATE INDEX IF NOT EXISTS idx_intent_versions_intent_id
+    ON intent_versions (intent_id);
+`); err != nil {
+		return err
+	}
+
+	if _, err := DB.Exec(`
+CREATE INDEX IF NOT EXISTS idx_intent_versions_intent_version
+    ON intent_versions (intent_id, version_no);
+`); err != nil {
 		return err
 	}
 

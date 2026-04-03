@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// DispatchLoopConfig holds all tuning parameters for the dispatch loop.
 type DispatchLoopConfig struct {
 	WorkerCount  int
 	BatchSize    int
@@ -22,32 +24,28 @@ type DispatchLoopConfig struct {
 	LeaseTTLSecs int
 	ConnectorID  string
 	CorridorID   string
-	// PSPCircuitBreaker: consecutive PSP failures before the loop pauses leasing.
-	// When the circuit opens, the loop stops consuming from Service 2's outbox
-	// entirely — preserving retry budget until PSP recovers.
-	// Default: 5 consecutive failures opens the circuit.
-	// Circuit resets after PSPCircuitResetSecs seconds of no new attempts.
+
+	// Circuit breaker: consecutive PSP failures before pausing new leases.
+	// Default threshold: 5. Default reset: 60 seconds.
 	PSPCircuitBreakerThreshold int
 	PSPCircuitResetSecs        int
 }
 
-// DispatchLoop polls Service 2's outbox, dispatches each event through the
-// five-step lifecycle, and writes all state transitions atomically to
-// Service 4's own DB before acking/nacking back to Service 2.
+// ─────────────────────────────────────────────────────────────────────────────
+// Corrected lifecycle — per architecture review document:
 //
-// The five steps per event:
-//
-//	Step 1 — DispatchCreated:  mint dispatch_id (idempotent), write dispatches row
-//	                           + DispatchCreated outbox event atomically.
-//	Step 2 — Detokenize:       call Service 3 JIT to resolve PII tokens.
-//	                           If this fails → FAILED + nack. No PSP call made.
-//	Step 3 — AttemptSent:      write AttemptSent outbox event + mark dispatches SENT
-//	                           atomically. Must happen BEFORE the PSP HTTP call.
-//	Step 4 — PSP call:         call the PSP with real PII in memory only.
-//	                           Discard PII immediately after call returns.
-//	                           On failure → DispatchFailed outbox + FAILED + nack.
-//	Step 5 — ProviderAcked:    write ProviderAcked outbox event + mark PROVIDER_ACKED
-//	                           atomically. Then ack back to Service 2.
+//   Step 0  — Lease from Service 2
+//   Step 1  — DispatchCreated: durably accept work, write dispatches row + event.
+//             ACK Service 2 immediately after this commits.
+//             Service 2 is now out of the picture. All retries owned by Service 4.
+//   Step 1.5— Governance evaluation: check connector health, circuit breaker,
+//             execution window, retry budget. Outputs ALLOW / HOLD / FAIL.
+//   Step 2  — Detokenize JIT: call Service 3 with tokens. PII in memory only.
+//   Step 3  — AttemptSent: persist before PSP call. Crash-recovery anchor.
+//   Step 4  — PSP call: submit payout. Classify outcome.
+//   Step 5  — ProviderAcked / AwaitingSignal / FailedRetryable / FailedTerminal
+// ─────────────────────────────────────────────────────────────────────────────
+
 type DispatchLoop struct {
 	db           *sql.DB
 	intentClient IntentClientIface
@@ -57,11 +55,10 @@ type DispatchLoop struct {
 	tokenClient  TokenClient
 	cfg          *DispatchLoopConfig
 
-	// Circuit breaker state — protects Service 2's retry budget when PSP is down.
-	// When consecutive PSP failures exceed threshold, the poller pauses leasing.
+	// Circuit breaker — tracks consecutive PSP failures.
 	cbMu       sync.Mutex
-	cbFailures int       // consecutive PSP failures across all workers
-	cbOpenAt   time.Time // when circuit opened (zero = closed)
+	cbFailures int
+	cbOpenAt   time.Time
 }
 
 func NewDispatchLoop(
@@ -84,16 +81,9 @@ func NewDispatchLoop(
 	}
 }
 
-// Start launches the dispatch loop with a worker pool.
-// The WaitGroup is used for graceful shutdown — Start adds cfg.WorkerCount
-// to wg, and each worker calls wg.Done when it exits.
-// Shutdown sequence: cancel ctx → workers finish in-flight event → wg.Wait().
 func (l *DispatchLoop) Start(ctx context.Context, wg *sync.WaitGroup) {
-	// The poller runs in a single goroutine and distributes work
-	// to a pool of workers via a buffered channel.
-	workCh := make(chan leaseWork, l.cfg.WorkerCount*2)
+	workCh := make(chan model.OutboxEvent, l.cfg.WorkerCount*2)
 
-	// Start workers.
 	for i := 0; i < l.cfg.WorkerCount; i++ {
 		wg.Add(1)
 		go func(workerID int) {
@@ -102,33 +92,18 @@ func (l *DispatchLoop) Start(ctx context.Context, wg *sync.WaitGroup) {
 		}(i)
 	}
 
-	// Start poller in its own goroutine.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		defer close(workCh) // signals workers to drain and exit
+		defer close(workCh)
 		l.poller(ctx, workCh)
 	}()
 }
 
-// leaseWork is the unit of work dispatched from the poller to a worker.
-type leaseWork struct {
-	leaseID string
-	event   model.OutboxEvent
-	// resultCh receives the event_id back with a boolean:
-	// true = ack, false = nack.
-	resultCh chan<- dispatchResult
-}
-
-type dispatchResult struct {
-	eventID string
-	ack     bool
-}
-
-// poller fetches lease batches from Service 2 and distributes them to workers.
-// It collects results from all workers in the batch before sending ack/nack,
-// so Service 2 receives a single ack and a single nack call per batch.
-func (l *DispatchLoop) poller(ctx context.Context, workCh chan<- leaseWork) {
+// poller leases batches from Service 2 and fans events out to workers.
+// It no longer waits for worker results to decide ack/nack —
+// that decision is made inside the worker immediately after Step 1.
+func (l *DispatchLoop) poller(ctx context.Context, workCh chan<- model.OutboxEvent) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -136,11 +111,8 @@ func (l *DispatchLoop) poller(ctx context.Context, workCh chan<- leaseWork) {
 		default:
 		}
 
-		// Circuit breaker check: if PSP is consistently down,
-		// stop leasing from Service 2 to preserve retry budget.
-		// Events stay safely PENDING in Service 2's outbox.
 		if l.circuitOpen() {
-			utils.Logger.Warn("dispatch_loop: circuit open — skipping lease poll",
+			utils.Logger.Warn("dispatch_loop: circuit open — pausing lease",
 				zap.Int("reset_after_seconds", func() int {
 					if l.cfg.PSPCircuitResetSecs > 0 {
 						return l.cfg.PSPCircuitResetSecs
@@ -148,7 +120,7 @@ func (l *DispatchLoop) poller(ctx context.Context, workCh chan<- leaseWork) {
 					return 60
 				}()),
 			)
-			l.sleep(ctx, l.cfg.PollInterval*5) // back off longer when circuit is open
+			l.sleep(ctx, l.cfg.PollInterval*5)
 			continue
 		}
 
@@ -158,7 +130,6 @@ func (l *DispatchLoop) poller(ctx context.Context, workCh chan<- leaseWork) {
 			l.sleep(ctx, l.cfg.PollInterval)
 			continue
 		}
-
 		if len(lease.Events) == 0 {
 			l.sleep(ctx, l.cfg.PollInterval)
 			continue
@@ -169,75 +140,30 @@ func (l *DispatchLoop) poller(ctx context.Context, workCh chan<- leaseWork) {
 			zap.Int("count", len(lease.Events)),
 		)
 
-		// Create a result channel for this batch.
-		resultCh := make(chan dispatchResult, len(lease.Events))
-
-		// Send all events to workers.
 		for _, e := range lease.Events {
 			select {
 			case <-ctx.Done():
-				// Context cancelled mid-batch — nack everything we haven't sent yet.
-				// Workers that already received work will send their results.
-				break
-			case workCh <- leaseWork{leaseID: lease.LeaseID, event: e, resultCh: resultCh}:
+				return
+			case workCh <- e:
 			}
 		}
-
-		// Collect results from all events in the batch.
-		var ackIDs, nackIDs []string
-		for range lease.Events {
-			r := <-resultCh
-			if r.ack {
-				ackIDs = append(ackIDs, r.eventID)
-			} else {
-				nackIDs = append(nackIDs, r.eventID)
-			}
-		}
-
-		// Send ack/nack back to Service 2.
-		// These are best-effort — if they fail, Service 2 will re-lease
-		// after the lease TTL expires. The idempotency check in Step 1
-		// protects against duplicate dispatch on re-lease.
-		if len(ackIDs) > 0 {
-			if err := l.intentClient.Ack(ctx, lease.LeaseID, ackIDs); err != nil {
-				utils.Logger.Error("dispatch_loop: ack failed",
-					zap.String("lease_id", lease.LeaseID),
-					zap.Int("count", len(ackIDs)),
-					zap.Error(err),
-				)
-			}
-		}
-		if len(nackIDs) > 0 {
-			if err := l.intentClient.Nack(ctx, lease.LeaseID, nackIDs); err != nil {
-				utils.Logger.Error("dispatch_loop: nack failed",
-					zap.String("lease_id", lease.LeaseID),
-					zap.Int("count", len(nackIDs)),
-					zap.Error(err),
-				)
-			}
-		}
-
-		utils.Logger.Info("dispatch_loop: batch complete",
-			zap.String("lease_id", lease.LeaseID),
-			zap.Int("acked", len(ackIDs)),
-			zap.Int("nacked", len(nackIDs)),
-		)
 	}
 }
 
-// worker receives events from the work channel and processes each one
-// through the five-step dispatch lifecycle.
-func (l *DispatchLoop) worker(ctx context.Context, workerID int, workCh <-chan leaseWork) {
-	for work := range workCh {
-		ack := l.processEvent(ctx, workerID, work.event)
-		work.resultCh <- dispatchResult{eventID: work.event.ID, ack: ack}
+// worker processes each event through the full lifecycle.
+func (l *DispatchLoop) worker(ctx context.Context, workerID int, workCh <-chan model.OutboxEvent) {
+	for e := range workCh {
+		l.processEvent(ctx, workerID, e)
 	}
 }
 
-// processEvent runs the five-step dispatch lifecycle for a single event.
-// Returns true if the event should be acked (ProviderAcked committed),
-// false if it should be nacked (any earlier failure).
-func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.OutboxEvent) (ack bool) {
+// processEvent runs the corrected lifecycle for a single outbox event.
+//
+// KEY CHANGE from previous design:
+// Service 2 is ACKed immediately after Step 1 commits — not at the end.
+// All failures after Step 1 are owned entirely by Service 4.
+// Service 2 is ONLY nacked if Step 1 itself fails (i.e. we never took ownership).
+func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.OutboxEvent) {
 	log := utils.Logger.With(
 		zap.Int("worker_id", workerID),
 		zap.String("event_id", e.ID),
@@ -247,17 +173,13 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 		zap.String("trace_id", e.TraceID),
 	)
 
-	// Parse the outbox payload using the real structure Service 2 sends.
-	// amount is a top-level string, currency is a top-level string.
-	// PII tokens are under pii_tokens, not beneficiary.
 	var payload model.OutboxPayload
 	if err := json.Unmarshal(e.Payload, &payload); err != nil {
 		log.Error("dispatch_loop: failed to parse outbox payload", zap.Error(err))
-		return false
+		l.nackEvent(ctx, e.LeaseID, e.ID, log)
+		return
 	}
 
-	// Routing fields come from loop config defaults.
-	// Refine corridor based on instrument kind when present.
 	connectorID := l.cfg.ConnectorID
 	corridorID := l.cfg.CorridorID
 	switch payload.Beneficiary.Instrument.Kind {
@@ -273,42 +195,65 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 	traceID := e.TraceID
 
 	// =========================================================
-	// STEP 1: DispatchCreated — idempotency check first
+	// STEP 1: DispatchCreated — take ownership
+	// Idempotency check: reuse existing dispatch_id on re-lease.
+	// After this atomic commit, ACK Service 2 immediately.
 	// =========================================================
 	existing, err := l.dispatchRepo.FindByContractAndAttempt(ctx, contractID, 1)
 	if err != nil {
 		log.Error("dispatch_loop: step1 idempotency check failed", zap.Error(err))
-		return false
+		l.nackEvent(ctx, e.LeaseID, e.ID, log)
+		return
 	}
 
 	var dispatchID string
+
 	if existing != nil {
 		dispatchID = existing.DispatchID
 		log.Info("dispatch_loop: step1 reusing existing dispatch_id",
 			zap.String("dispatch_id", dispatchID),
 			zap.String("existing_status", string(existing.Status)),
 		)
+		// Already took ownership before. ACK Service 2 and continue.
+		// If already PROVIDER_ACKED, nothing left to do.
+		l.ackEvent(ctx, e.LeaseID, e.ID, log)
 		if existing.Status == model.DispatchStatusProviderAcked {
-			log.Info("dispatch_loop: step1 already provider_acked, skipping re-dispatch")
-			return true
+			log.Info("dispatch_loop: step1 already provider_acked — skipping")
+			return
+		}
+		// For other terminal statuses, we've re-acked Service 2 but won't re-dispatch.
+		if existing.Status == model.DispatchStatusFailedTerminal ||
+			existing.Status == model.DispatchStatusRequiresManualReview {
+			log.Info("dispatch_loop: step1 terminal status — skipping re-dispatch",
+				zap.String("status", string(existing.Status)),
+			)
+			return
 		}
 	} else {
+		// First time — mint dispatch_id and take ownership.
 		dispatchID = uuid.New().String()
 
+		carriers := model.CorrelationCarriers{
+			ReferenceID: dispatchID,
+			Narration:   "ZRD:" + contractID,
+		}
+		carriersJSON, _ := json.Marshal(carriers)
+
 		d := &model.Dispatch{
-			DispatchID:   dispatchID,
-			ContractID:   contractID,
-			IntentID:     intentID,
-			TenantID:     tenantID,
-			TraceID:      traceID,
-			ConnectorID:  connectorID,
-			CorridorID:   corridorID,
-			AttemptCount: 1,
-			Status:       model.DispatchStatusPending,
-			CreatedAt:    time.Now().UTC(),
+			DispatchID:              dispatchID,
+			ContractID:              contractID,
+			IntentID:                intentID,
+			TenantID:                tenantID,
+			TraceID:                 traceID,
+			ConnectorID:             connectorID,
+			CorridorID:              corridorID,
+			AttemptCount:            1,
+			Status:                  model.DispatchStatusPending,
+			ProviderIdempotencyKey:  dispatchID,
+			CorrelationCarriersJSON: carriersJSON,
 		}
 
-		dcPayload := model.DispatchCreatedEvent{
+		dcEvent := model.DispatchCreatedEvent{
 			EventID:       uuid.New().String(),
 			EventType:     "DispatchCreated",
 			TenantID:      tenantID,
@@ -319,14 +264,11 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 			SchemaVersion: "v1",
 			CreatedAt:     time.Now().UTC(),
 			Payload: model.DispatchCreatedPayload{
-				DispatchID:   dispatchID,
-				ConnectorID:  connectorID,
-				CorridorID:   corridorID,
-				AttemptCount: 1,
-				CorrelationCarriers: model.CorrelationCarriers{
-					ReferenceID: dispatchID,
-					Narration:   "ZRD:" + contractID,
-				},
+				DispatchID:          dispatchID,
+				ConnectorID:         connectorID,
+				CorridorID:          corridorID,
+				AttemptCount:        1,
+				CorrelationCarriers: carriers,
 			},
 		}
 
@@ -335,24 +277,85 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 				return err
 			}
 			return l.outboxRepo.EnqueueTx(ctx, tx,
-				dcPayload.EventID, "DispatchCreated",
+				dcEvent.EventID, "DispatchCreated",
 				dispatchID, contractID, intentID, tenantID, traceID,
-				dcPayload,
+				dcEvent,
 			)
 		}); err != nil {
 			log.Error("dispatch_loop: step1 atomic write failed", zap.Error(err))
-			return false
+			// Step 1 failed — we never took ownership. Nack to Service 2.
+			l.nackEvent(ctx, e.LeaseID, e.ID, log)
+			return
 		}
 
-		log.Info("dispatch_loop: step1 DispatchCreated",
+		log.Info("dispatch_loop: step1 DispatchCreated — ownership taken",
 			zap.String("dispatch_id", dispatchID),
 		)
+
+		// ── ACK SERVICE 2 HERE ──────────────────────────────────────────────
+		// Ownership has been transferred to Service 4.
+		// Service 2 is now completely out of the retry picture.
+		// All subsequent failures are owned by Service 4.
+		// ────────────────────────────────────────────────────────────────────
+		l.ackEvent(ctx, e.LeaseID, e.ID, log)
 	}
 
 	// =========================================================
-	// STEP 2: Detokenize (JIT — Service 3)
-	// Send only the token fields present in the payload.
-	// Response fields are plaintext — zero them via defer rb.Zero().
+	// STEP 1.5: Dispatch Governance Evaluation
+	// Check connector health, circuit breaker, execution window.
+	// If not ALLOW_DISPATCH → persist decision, emit event, stop.
+	// =========================================================
+	decision, reasonCodes := l.evaluateGovernance(ctx, dispatchID, connectorID, payload)
+
+	govEvent := model.DispatchGovernanceEvaluatedEvent{
+		EventID:       uuid.New().String(),
+		EventType:     "DispatchGovernanceEvaluated",
+		TenantID:      tenantID,
+		IntentID:      intentID,
+		ContractID:    contractID,
+		DispatchID:    dispatchID,
+		TraceID:       traceID,
+		SchemaVersion: "v1",
+		CreatedAt:     time.Now().UTC(),
+		Payload: model.DispatchGovernanceEvaluatedPayload{
+			DispatchID:  dispatchID,
+			Decision:    string(decision),
+			ReasonCodes: reasonCodes,
+		},
+	}
+
+	if err := l.atomicStep(ctx, func(tx *sql.Tx) error {
+		if err := l.dispatchRepo.MarkGovernanceDecisionTx(ctx, tx, dispatchID, decision, reasonCodes); err != nil {
+			return err
+		}
+		return l.outboxRepo.EnqueueTx(ctx, tx,
+			govEvent.EventID, "DispatchGovernanceEvaluated",
+			dispatchID, contractID, intentID, tenantID, traceID,
+			govEvent,
+		)
+	}); err != nil {
+		log.Error("dispatch_loop: step1.5 governance write failed", zap.Error(err))
+		// Governance write failed — retry will re-evaluate.
+		// Service 2 is already acked. Service 4 retries internally.
+		return
+	}
+
+	if decision != model.GovernanceAllow {
+		log.Info("dispatch_loop: step1.5 governance blocked dispatch",
+			zap.String("dispatch_id", dispatchID),
+			zap.String("decision", string(decision)),
+			zap.Strings("reason_codes", reasonCodes),
+		)
+		return
+	}
+
+	log.Info("dispatch_loop: step1.5 governance ALLOW_DISPATCH",
+		zap.String("dispatch_id", dispatchID),
+	)
+
+	// =========================================================
+	// STEP 2: Detokenize JIT — Service 3
+	// PII in memory only. Zeroed by defer rb.Zero() on every exit.
 	// =========================================================
 	detokResp, err := l.tokenClient.Detokenize(ctx, DetokenizeRequest{
 		AccountNumber: payload.PIITokens.AccountNumber,
@@ -365,13 +368,11 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 			zap.String("dispatch_id", dispatchID),
 			zap.Error(err),
 		)
-		if mfErr := l.markFailedAndEnqueue(ctx, dispatchID, contractID, intentID, tenantID, traceID, 1, "DETOKENIZE_FAILED"); mfErr != nil {
-			log.Error("dispatch_loop: step2 mark failed write error", zap.Error(mfErr))
-		}
-		return false
+		l.markFailedRetryable(ctx, dispatchID, contractID, intentID, tenantID, traceID,
+			string(model.RetryClassRetryableTechnical), "DETOKENIZE_FAILED", err.Error(), log)
+		return
 	}
 
-	// PII is now in rb — zeroed by defer rb.Zero() on every exit path.
 	rb := &model.ResolvedBeneficiary{
 		AccountNumber: detokResp.AccountNumber,
 		Name:          detokResp.Name,
@@ -383,17 +384,19 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 		log.Error("dispatch_loop: step2 detokenize returned empty values",
 			zap.String("dispatch_id", dispatchID),
 		)
-		if mfErr := l.markFailedAndEnqueue(ctx, dispatchID, contractID, intentID, tenantID, traceID, 1, "DETOKENIZE_EMPTY"); mfErr != nil {
-			log.Error("dispatch_loop: step2 mark failed write error", zap.Error(mfErr))
-		}
-		return false
+		l.markFailedTerminal(ctx, dispatchID, contractID, intentID, tenantID, traceID,
+			"DETOKENIZE_EMPTY", log)
+		return
 	}
 
 	// =========================================================
-	// STEP 3: AttemptSent — must fire BEFORE PSP call
+	// STEP 3: AttemptSent — crash-recovery anchor
+	// Written BEFORE PSP call. If process dies after this,
+	// we know a PSP call may have been in-flight for this dispatch_id.
 	// =========================================================
+	fingerprint := buildRequestFingerprint(dispatchID, e.Amount.String(), corridorID)
 	asSentAt := time.Now().UTC()
-	asPayload := model.AttemptSentEvent{
+	asEvent := model.AttemptSentEvent{
 		EventID:       uuid.New().String(),
 		EventType:     "AttemptSent",
 		TenantID:      tenantID,
@@ -409,8 +412,6 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 			CorridorID:   corridorID,
 			AttemptCount: 1,
 			SentAt:       asSentAt,
-			// CorrelationCarriers must match exactly what was sent to the PSP.
-			// Service 5 uses these to correlate incoming webhook/statement signals.
 			CorrelationCarriers: model.CorrelationCarriers{
 				ReferenceID: dispatchID,
 				Narration:   "ZRD:" + contractID,
@@ -420,16 +421,18 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 
 	if err := l.atomicStep(ctx, func(tx *sql.Tx) error {
 		if err := l.outboxRepo.EnqueueTx(ctx, tx,
-			asPayload.EventID, "AttemptSent",
+			asEvent.EventID, "AttemptSent",
 			dispatchID, contractID, intentID, tenantID, traceID,
-			asPayload,
+			asEvent,
 		); err != nil {
 			return err
 		}
-		return l.dispatchRepo.MarkSentTx(ctx, tx, dispatchID)
+		return l.dispatchRepo.MarkSentTx(ctx, tx, dispatchID, dispatchID, fingerprint)
 	}); err != nil {
 		log.Error("dispatch_loop: step3 AttemptSent write failed", zap.Error(err))
-		return false
+		l.markFailedRetryable(ctx, dispatchID, contractID, intentID, tenantID, traceID,
+			string(model.RetryClassRetryableTechnical), "ATTEMPT_SENT_WRITE_FAILED", err.Error(), log)
+		return
 	}
 
 	log.Info("dispatch_loop: step3 AttemptSent written",
@@ -438,7 +441,7 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 
 	// =========================================================
 	// STEP 4: PSP call
-	// rb fields are PII — zeroed by defer rb.Zero() above.
+	// rb contains PII — zeroed by defer rb.Zero() after this returns.
 	// Do NOT log rb.AccountNumber or rb.Name at any level.
 	// =========================================================
 	pspReq := psp.PayoutRequest{
@@ -454,24 +457,37 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 	}
 
 	pspResp, pspErr := l.pspClient.Do(ctx, pspReq)
-	// defer rb.Zero() runs here — PII cleared regardless of outcome.
+	// defer rb.Zero() fires here — PII gone from memory.
 
 	if pspErr != nil {
+		// Classify the failure before deciding next action.
+		retryClass, isFatal, isUncertain := classifyPSPError(pspErr)
+
 		log.Error("dispatch_loop: step4 PSP call failed",
 			zap.String("dispatch_id", dispatchID),
+			zap.String("retry_class", retryClass),
+			zap.Bool("is_fatal", isFatal),
+			zap.Bool("is_uncertain", isUncertain),
 			zap.Error(pspErr),
 		)
-		// Record failure — may open the circuit breaker if threshold exceeded.
-		// When circuit opens, the poller stops consuming from Service 2
-		// entirely, preserving the retry budget for all pending events.
+
 		l.recordPSPFailure()
-		if err := l.markFailedAndEnqueue(ctx, dispatchID, contractID, intentID, tenantID, traceID, 1, pspErr.Error()); err != nil {
-			log.Error("dispatch_loop: step4 mark failed write error", zap.Error(err))
+
+		if isUncertain {
+			// Timeout or ambiguous response.
+			// The money MAY have already moved. Do NOT retry without querying PSP.
+			l.markAwaitingProviderSignal(ctx, dispatchID, contractID, intentID, tenantID, traceID, pspErr.Error(), log)
+			return
 		}
-		return false
+		if isFatal {
+			l.markFailedTerminal(ctx, dispatchID, contractID, intentID, tenantID, traceID, pspErr.Error(), log)
+			return
+		}
+		l.markFailedRetryable(ctx, dispatchID, contractID, intentID, tenantID, traceID,
+			retryClass, "PSP_CALL_FAILED", pspErr.Error(), log)
+		return
 	}
 
-	// PSP call succeeded — reset the circuit breaker.
 	l.recordPSPSuccess()
 
 	log.Info("dispatch_loop: step4 PSP acked",
@@ -481,12 +497,11 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 	)
 
 	// =========================================================
-	// STEP 5: ProviderAcked
-	// Write ProviderAcked outbox event + mark dispatch PROVIDER_ACKED
-	// atomically. On success, return true → poller acks to Service 2.
+	// STEP 5: ProviderAcked — persist immediate PSP acknowledgement.
+	// Not final — UTR and settlement truth arrive later via Service 5.
 	// =========================================================
 	ackedAt := time.Now().UTC()
-	paPayload := model.ProviderAckedEvent{
+	paEvent := model.ProviderAckedEvent{
 		EventID:       uuid.New().String(),
 		EventType:     "ProviderAcked",
 		TenantID:      tenantID,
@@ -499,7 +514,7 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 		Payload: model.ProviderAckedPayload{
 			DispatchID:        dispatchID,
 			ProviderAttemptID: pspResp.PayoutID,
-			ProviderReference: nil, // UTR arrives later via webhook (Service 5)
+			ProviderReference: nil,
 			Status:            pspResp.Status,
 			AckedAt:           ackedAt.Format(time.RFC3339),
 		},
@@ -507,35 +522,223 @@ func (l *DispatchLoop) processEvent(ctx context.Context, workerID int, e model.O
 
 	if err := l.atomicStep(ctx, func(tx *sql.Tx) error {
 		if err := l.outboxRepo.EnqueueTx(ctx, tx,
-			paPayload.EventID, "ProviderAcked",
+			paEvent.EventID, "ProviderAcked",
 			dispatchID, contractID, intentID, tenantID, traceID,
-			paPayload,
+			paEvent,
 		); err != nil {
 			return err
 		}
-		return l.dispatchRepo.MarkProviderAckedTx(ctx, tx, dispatchID, pspResp.PayoutID)
+		return l.dispatchRepo.MarkProviderAckedTx(ctx, tx, dispatchID, pspResp.PayoutID, pspResp.Status)
 	}); err != nil {
 		log.Error("dispatch_loop: step5 ProviderAcked write failed",
 			zap.String("dispatch_id", dispatchID),
 			zap.Error(err),
 		)
-		// PSP call succeeded but we failed to write the ack.
-		// Nacking here means Service 2 will re-lease. The idempotency
-		// check in Step 1 will detect the existing SENT dispatch row
-		// and attempt to recover by querying the PSP again.
-		return false
+		// PSP succeeded but write failed. Mark awaiting signal so the
+		// recovery sweeper can reconcile later without re-calling PSP.
+		l.markAwaitingProviderSignal(ctx, dispatchID, contractID, intentID, tenantID, traceID,
+			"PROVIDER_ACKED_WRITE_FAILED", log)
+		return
 	}
 
 	log.Info("dispatch_loop: step5 ProviderAcked written",
 		zap.String("dispatch_id", dispatchID),
 		zap.String("provider_attempt_id", pspResp.PayoutID),
 	)
-
-	return true
 }
 
-// atomicStep executes fn inside a single PostgreSQL transaction.
-// Rolls back automatically on any error returned by fn.
+// ─────────────────────────────────────────────────────────────────────────────
+// Governance evaluation (Step 1.5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// evaluateGovernance checks whether dispatch is allowed at this moment.
+// Returns the decision and a list of reason codes.
+func (l *DispatchLoop) evaluateGovernance(_ context.Context, dispatchID, connectorID string, _ model.OutboxPayload) (model.GovernanceDecision, []string) {
+	var reasonCodes []string
+
+	// Check circuit breaker state.
+	if l.circuitOpen() {
+		reasonCodes = append(reasonCodes, "CIRCUIT_BREAKER_OPEN")
+		return model.GovernanceHold, reasonCodes
+	}
+
+	// Connector must be configured.
+	if connectorID == "" {
+		reasonCodes = append(reasonCodes, "CONNECTOR_NOT_CONFIGURED")
+		return model.GovernanceTerminalFail, reasonCodes
+	}
+
+	// Future checks to add here:
+	// - connector_health_state table lookup
+	// - execution window validation (T+1 etc)
+	// - tenant policy check
+	// - retry budget check
+
+	return model.GovernanceAllow, reasonCodes
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PSP error classification
+// ─────────────────────────────────────────────────────────────────────────────
+
+// classifyPSPError returns (retryClass, isFatal, isUncertain).
+// isUncertain = true means the call may have succeeded (timeout/network).
+// isFatal = true means the PSP rejected the request explicitly.
+func classifyPSPError(err error) (retryClass string, isFatal bool, isUncertain bool) {
+	msg := err.Error()
+
+	// Context deadline or timeout — uncertain whether money moved.
+	for _, s := range []string{"context deadline", "timeout", "deadline exceeded", "i/o timeout"} {
+		if containsCI(msg, s) {
+			return string(model.RetryClassWaitForSignal), false, true
+		}
+	}
+
+	// PSP explicit business reject (4xx) — fatal, do not retry.
+	for _, s := range []string{"HTTP 4", "400", "422", "404", "403", "401"} {
+		if containsCI(msg, s) {
+			return string(model.RetryClassNeverRetry), true, false
+		}
+	}
+
+	// Transient server errors (5xx) — retryable.
+	return string(model.RetryClassRetryableAfterBackoff), false, false
+}
+
+func containsCI(s, sub string) bool {
+	return len(s) >= len(sub) && (s == sub || func() bool {
+		for i := 0; i <= len(s)-len(sub); i++ {
+			if s[i:i+len(sub)] == sub {
+				return true
+			}
+		}
+		return false
+	}())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Failure helpers — all owned by Service 4 after Step 1
+// ─────────────────────────────────────────────────────────────────────────────
+
+func (l *DispatchLoop) markFailedRetryable(
+	ctx context.Context,
+	dispatchID, contractID, intentID, tenantID, traceID string,
+	retryClass, failureCode, reason string,
+	log *zap.Logger,
+) {
+	nextAttempt := time.Now().UTC().Add(30 * time.Second) // basic backoff; sweeper can refine
+	failedAt := time.Now().UTC()
+
+	dfEvent := model.DispatchFailedEvent{
+		EventID: uuid.New().String(), EventType: "DispatchFailed",
+		TenantID: tenantID, IntentID: intentID, ContractID: contractID,
+		DispatchID: dispatchID, TraceID: traceID, SchemaVersion: "v1",
+		CreatedAt: failedAt,
+		Payload: model.DispatchFailedPayload{
+			DispatchID: dispatchID, AttemptCount: 1,
+			Reason: fmt.Sprintf("%s: %s", failureCode, reason), FailedAt: failedAt,
+		},
+	}
+
+	if err := l.atomicStep(ctx, func(tx *sql.Tx) error {
+		if err := l.outboxRepo.EnqueueTx(ctx, tx,
+			dfEvent.EventID, "DispatchFailed",
+			dispatchID, contractID, intentID, tenantID, traceID, dfEvent,
+		); err != nil {
+			return err
+		}
+		return l.dispatchRepo.MarkFailedRetryableTx(ctx, tx, dispatchID, retryClass, nextAttempt)
+	}); err != nil {
+		log.Error("dispatch_loop: mark failed retryable write error",
+			zap.String("dispatch_id", dispatchID), zap.Error(err))
+	}
+}
+
+func (l *DispatchLoop) markFailedTerminal(
+	ctx context.Context,
+	dispatchID, contractID, intentID, tenantID, traceID, reason string,
+	log *zap.Logger,
+) {
+	failedAt := time.Now().UTC()
+	dfEvent := model.DispatchFailedEvent{
+		EventID: uuid.New().String(), EventType: "DispatchFailed",
+		TenantID: tenantID, IntentID: intentID, ContractID: contractID,
+		DispatchID: dispatchID, TraceID: traceID, SchemaVersion: "v1",
+		CreatedAt: failedAt,
+		Payload: model.DispatchFailedPayload{
+			DispatchID: dispatchID, AttemptCount: 1,
+			Reason: reason, FailedAt: failedAt,
+		},
+	}
+
+	if err := l.atomicStep(ctx, func(tx *sql.Tx) error {
+		if err := l.outboxRepo.EnqueueTx(ctx, tx,
+			dfEvent.EventID, "DispatchFailed",
+			dispatchID, contractID, intentID, tenantID, traceID, dfEvent,
+		); err != nil {
+			return err
+		}
+		return l.dispatchRepo.MarkFailedTerminalTx(ctx, tx, dispatchID)
+	}); err != nil {
+		log.Error("dispatch_loop: mark failed terminal write error",
+			zap.String("dispatch_id", dispatchID), zap.Error(err))
+	}
+}
+
+func (l *DispatchLoop) markAwaitingProviderSignal(
+	ctx context.Context,
+	dispatchID, contractID, intentID, tenantID, traceID, reason string,
+	log *zap.Logger,
+) {
+	awaitEvent := model.DispatchAwaitingProviderSignalEvent{
+		EventID: uuid.New().String(), EventType: "DispatchAwaitingProviderSignal",
+		TenantID: tenantID, IntentID: intentID, ContractID: contractID,
+		DispatchID: dispatchID, TraceID: traceID, SchemaVersion: "v1",
+		CreatedAt: time.Now().UTC(),
+		Payload: model.DispatchAwaitingProviderSignalPayload{
+			DispatchID:             dispatchID,
+			ProviderIdempotencyKey: dispatchID,
+			Reason:                 reason,
+			SentAt:                 time.Now().UTC(),
+		},
+	}
+
+	if err := l.atomicStep(ctx, func(tx *sql.Tx) error {
+		if err := l.outboxRepo.EnqueueTx(ctx, tx,
+			awaitEvent.EventID, "DispatchAwaitingProviderSignal",
+			dispatchID, contractID, intentID, tenantID, traceID, awaitEvent,
+		); err != nil {
+			return err
+		}
+		return l.dispatchRepo.MarkAwaitingProviderSignalTx(ctx, tx, dispatchID)
+	}); err != nil {
+		log.Error("dispatch_loop: mark awaiting signal write error",
+			zap.String("dispatch_id", dispatchID), zap.Error(err))
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ack / Nack helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+func (l *DispatchLoop) ackEvent(ctx context.Context, leaseID, eventID string, log *zap.Logger) {
+	if err := l.intentClient.Ack(ctx, leaseID, []string{eventID}); err != nil {
+		log.Error("dispatch_loop: ack failed — will retry on lease expiry",
+			zap.String("event_id", eventID), zap.Error(err))
+	}
+}
+
+func (l *DispatchLoop) nackEvent(ctx context.Context, leaseID, eventID string, log *zap.Logger) {
+	if err := l.intentClient.Nack(ctx, leaseID, []string{eventID}); err != nil {
+		log.Error("dispatch_loop: nack failed",
+			zap.String("event_id", eventID), zap.Error(err))
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
 func (l *DispatchLoop) atomicStep(ctx context.Context, fn func(*sql.Tx) error) error {
 	tx, err := l.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -551,46 +754,6 @@ func (l *DispatchLoop) atomicStep(ctx context.Context, fn func(*sql.Tx) error) e
 	return nil
 }
 
-// markFailedAndEnqueue writes a DispatchFailed outbox event and marks
-// the dispatch row FAILED in a single atomic transaction.
-func (l *DispatchLoop) markFailedAndEnqueue(
-	ctx context.Context,
-	dispatchID, contractID, intentID, tenantID, traceID string,
-	attemptCount int,
-	reason string,
-) error {
-	failedAt := time.Now().UTC()
-	dfPayload := model.DispatchFailedEvent{
-		EventID:       uuid.New().String(),
-		EventType:     "DispatchFailed",
-		TenantID:      tenantID,
-		IntentID:      intentID,
-		ContractID:    contractID,
-		DispatchID:    dispatchID,
-		TraceID:       traceID,
-		SchemaVersion: "v1",
-		CreatedAt:     failedAt,
-		Payload: model.DispatchFailedPayload{
-			DispatchID:   dispatchID,
-			AttemptCount: attemptCount,
-			Reason:       reason,
-			FailedAt:     failedAt,
-		},
-	}
-
-	return l.atomicStep(ctx, func(tx *sql.Tx) error {
-		if err := l.outboxRepo.EnqueueTx(ctx, tx,
-			dfPayload.EventID, "DispatchFailed",
-			dispatchID, contractID, intentID, tenantID, traceID,
-			dfPayload,
-		); err != nil {
-			return err
-		}
-		return l.dispatchRepo.MarkFailedTx(ctx, tx, dispatchID)
-	})
-}
-
-// sleep pauses for d unless ctx is cancelled.
 func (l *DispatchLoop) sleep(ctx context.Context, d time.Duration) {
 	select {
 	case <-ctx.Done():
@@ -598,14 +761,18 @@ func (l *DispatchLoop) sleep(ctx context.Context, d time.Duration) {
 	}
 }
 
-// amountFromOutbox converts the outbox amount to int64 for the PSP request.
-// The value is passed through exactly as stored in Service 2's outbox —
-// no unit conversion is applied. Whatever unit the tenant sent is what
-// the PSP receives. Service 4 is not responsible for unit decisions.
+// buildRequestFingerprint creates a non-PII hash for audit/replay purposes.
+// Contains only dispatch_id, amount, and corridor — no account numbers or names.
+func buildRequestFingerprint(dispatchID, amount, corridor string) string {
+	h := sha256.Sum256([]byte(dispatchID + "|" + amount + "|" + corridor))
+	return fmt.Sprintf("%x", h)
+}
+
+// amountFromOutbox passes the amount through exactly as stored in Service 2.
+// No unit conversion. Service 4 is not responsible for amount semantics.
 func amountFromOutbox(amount json.Number) int64 {
 	value, err := amount.Int64()
 	if err != nil {
-		// Float fallback for amounts like "5000.00"
 		f, ferr := amount.Float64()
 		if ferr != nil {
 			return 0
@@ -616,20 +783,9 @@ func amountFromOutbox(amount json.Number) int64 {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Circuit breaker — protects Service 2's retry budget when PSP is down.
-//
-// Problem without this: if PSP is down for 30 minutes and retry budget is 7,
-// the dispatch loop nacks every event on every poll cycle. After 7 nacks
-// the event is FAILED in Service 2's outbox and permanently unrecoverable —
-// even though nothing was wrong with the intent itself.
-//
-// Solution: after N consecutive PSP failures, stop leasing from Service 2
-// entirely. Events stay safely in Service 2's PENDING outbox untouched.
-// When PSP recovers (circuit resets after timeout), leasing resumes and
-// the events are processed with their retry budget fully intact.
+// Circuit breaker
 // ─────────────────────────────────────────────────────────────────────────────
 
-// recordPSPSuccess resets the circuit breaker after a successful PSP call.
 func (l *DispatchLoop) recordPSPSuccess() {
 	l.cbMu.Lock()
 	defer l.cbMu.Unlock()
@@ -637,50 +793,36 @@ func (l *DispatchLoop) recordPSPSuccess() {
 	l.cbOpenAt = time.Time{}
 }
 
-// recordPSPFailure increments the failure counter and opens the circuit
-// if the threshold is exceeded.
 func (l *DispatchLoop) recordPSPFailure() {
 	threshold := l.cfg.PSPCircuitBreakerThreshold
 	if threshold <= 0 {
-		threshold = 5 // default: 5 consecutive failures
+		threshold = 5
 	}
-
 	l.cbMu.Lock()
 	defer l.cbMu.Unlock()
 	l.cbFailures++
 	if l.cbFailures >= threshold && l.cbOpenAt.IsZero() {
 		l.cbOpenAt = time.Now()
-		utils.Logger.Error("dispatch_loop: PSP circuit breaker OPENED — pausing lease",
-			zap.Int("consecutive_failures", l.cbFailures),
-			zap.Int("threshold", threshold),
-		)
+		utils.Logger.Error("dispatch_loop: circuit breaker OPENED",
+			zap.Int("consecutive_failures", l.cbFailures))
 	}
 }
 
-// circuitOpen returns true if the circuit breaker is open (PSP is down).
-// Also handles auto-reset after PSPCircuitResetSecs.
 func (l *DispatchLoop) circuitOpen() bool {
 	resetSecs := l.cfg.PSPCircuitResetSecs
 	if resetSecs <= 0 {
-		resetSecs = 60 // default: try again after 60 seconds
+		resetSecs = 60
 	}
-
 	l.cbMu.Lock()
 	defer l.cbMu.Unlock()
-
 	if l.cbOpenAt.IsZero() {
-		return false // circuit closed
+		return false
 	}
-
-	// Auto-reset: if enough time has passed, close the circuit and try again.
 	if time.Since(l.cbOpenAt) >= time.Duration(resetSecs)*time.Second {
-		utils.Logger.Info("dispatch_loop: PSP circuit breaker RESET — resuming lease",
-			zap.Int("after_seconds", resetSecs),
-		)
+		utils.Logger.Info("dispatch_loop: circuit breaker RESET")
 		l.cbFailures = 0
 		l.cbOpenAt = time.Time{}
 		return false
 	}
-
-	return true // circuit still open
+	return true
 }

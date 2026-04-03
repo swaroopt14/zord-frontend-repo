@@ -1,12 +1,12 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -24,8 +24,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
 )
-
-var mu sync.Mutex
 
 type BulkResult struct {
 	Row        int    `json:"row"`
@@ -59,6 +57,12 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 	fileBytes, err := io.ReadAll(src)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read file"})
+		return
+	}
+
+	// Reset file pointer for subsequent row parsing
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reset file pointer"})
 		return
 	}
 
@@ -104,16 +108,13 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 		SourceType:     "BULK_FILE",
 	}
 
-	_, err = services.ProcessRawIntent(context.Background(), fileMsg, h.S3store)
+	_, err = services.ProcessRawIntent(context.Background(), fileMsg, h.S3store, uuid.NewString(), time.Now().UTC())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "failed to store bulk file envelope",
 		})
 		return
 	}
-
-	// 🔄 New reader (clean)
-	reader := bytes.NewReader(fileBytes)
 
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 
@@ -123,7 +124,7 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 
 	case ".xlsx":
 
-		f, err := excelize.OpenReader(reader)
+		f, err := excelize.OpenReader(src)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid excel file"})
 			return
@@ -139,9 +140,9 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 
 	case ".csv":
 
-		csvReader := csv.NewReader(reader)
+		reader := csv.NewReader(src)
 
-		rows, err = csvReader.ReadAll()
+		rows, err = reader.ReadAll()
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid CSV file"})
 			return
@@ -171,6 +172,13 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 	}
 
 	headers := rows[0]
+	headersBytes, _ := json.Marshal(c.Request.Header)
+	headersHashSum := sha256.Sum256(headersBytes)
+	headersHash := headersHashSum[:]
+	sourceSystem := c.GetHeader("X-Zord-Source-System")
+	if sourceSystem == "" {
+		sourceSystem = "UNKNOWN"
+	}
 
 	results := make([]BulkResult, len(rows)-1)
 
@@ -178,7 +186,7 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 	jobs := make(chan BulkJob, len(rows))
 
 	// CPU based worker scaling
-	workerCount := runtime.NumCPU() * 4
+	workerCount := runtime.NumCPU() * 2
 
 	var wg sync.WaitGroup
 
@@ -195,35 +203,48 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 
 			for job := range jobs {
 
-				traceID := uuid.NewString()
-				idempotencyKey := uuid.NewString()
+				traceID := uuid.New().String()
+				idempotencyKey := uuid.New().String()
+				envelopeID := uuid.New().String()
+				receivedAt := time.Now().UTC()
 
-				data, duplicateID, err := h.processBulkIntentRow(
-					context.Background(),
+				storageAck, duplicateID, err := h.processBulkIntentRow(
+					c.Request.Context(),
 					job.Payload,
 					tenantID,
 					traceID,
 					idempotencyKey,
+					envelopeID,
+					receivedAt,
 					len(job.Payload),
 					"application/json",
 					"CSV",
+					headersHash,
+					sourceSystem,
 				)
 
 				if err != nil {
-					mu.Lock()
+					if errors.Is(err, services.ErrFingerprintMismatch) {
+						results[job.Row-1] = BulkResult{
+							Row:    job.Row,
+							Status: "CONFLICT",
+							Error:  "idempotency key reuse with different payload",
+						}
+						continue
+					}
+
 					results[job.Row-1] = BulkResult{
 						Row:     job.Row,
 						Status:  "FAILED",
 						TraceID: traceID,
 						Error:   err.Error(),
 					}
-					mu.Unlock()
 
 					continue
 				}
 
 				if duplicateID != uuid.Nil {
-					mu.Lock()
+
 					results[job.Row-1] = BulkResult{
 						Row:        job.Row,
 						Status:     "DUPLICATE",
@@ -231,18 +252,17 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 						EnvelopeID: duplicateID.String(),
 						Error:      "duplicate idempotency key",
 					}
-					mu.Unlock()
+
 					continue
 				}
-				mu.Lock()
+
 				results[job.Row-1] = BulkResult{
 					Row:        job.Row,
 					Status:     "Accepted",
 					TraceID:    traceID,
-					EnvelopeID: data.EnvelopeId,
-					ReceivedAt: data.ReceivedAt.Format(time.RFC3339Nano),
+					EnvelopeID: storageAck.EnvelopeId,
+					ReceivedAt: storageAck.ReceivedAt.Format(time.RFC3339Nano),
 				}
-				mu.Unlock()
 			}
 
 		}()
@@ -305,7 +325,6 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 
 	close(jobs)
 
-	// Run workers in background
 	wg.Wait()
 
 	c.JSON(http.StatusAccepted, gin.H{
@@ -317,58 +336,68 @@ func (h *Handler) BulkIntentHandler(c *gin.Context) {
 func (h *Handler) processBulkIntentRow(
 	ctx context.Context,
 	rawPayload []byte,
-	tenantId uuid.UUID,
-	traceId string,
+	tenantID uuid.UUID,
+	traceID string,
 	idempotencyKey string,
+	envelopeID string,
+	receivedAt time.Time,
 	payloadSize int,
 	contentType string,
 	sourceType string,
+	headersHash []byte,
+	sourceSystem string,
 ) (*model.AckMessage, uuid.UUID, error) {
 
 	encryptedPayload, err := vault.Encrypt(rawPayload)
 	if err != nil {
-		log.Printf("Error encrypting payload for bulk row, trace_id=%s: %v", traceId, err)
+		log.Printf("Error encrypting payload for bulk row, trace_id=%s: %v", traceID, err)
 		return nil, uuid.Nil, err
 	}
 
-	msg := model.RawIntentMessage{
-		TenantID:       tenantId.String(),
-		TraceID:        traceId,
-		IdempotencyKey: idempotencyKey,
-		PayloadSize:    payloadSize,
-		Payload:        encryptedPayload,
-		ContentType:    contentType,
-		SourceType:     sourceType,
+	// Compute fingerprint: Hash(payload + idempotencyKey + tenantID)
+	fingerprintInput := append(rawPayload, []byte(idempotencyKey+tenantID.String())...)
+	fingerprintSum := sha256.Sum256(fingerprintInput)
+	fingerprint := fingerprintSum[:]
+
+	rawIntent := model.RawIntentMessage{
+		TenantID:           tenantID.String(),
+		TraceID:            traceID,
+		IdempotencyKey:     idempotencyKey,
+		PayloadSize:        payloadSize,
+		Payload:            encryptedPayload,
+		ContentType:        contentType,
+		SourceType:         sourceType,
+		SourceSystem:       sourceSystem,
+		RequestHeadersHash: headersHash,
+		RequestFingerprint: fingerprint,
+		SchemaHint:         nil,
 	}
 
-	id, err := services.PersistIdempotency(ctx, msg)
+	id, err := services.PersistIdempotency(ctx, rawIntent)
 	if err != nil {
-		log.Printf("Error persisting idempotency key for bulk row, trace_id=%s: %v", traceId, err)
 		return nil, uuid.Nil, err
 	}
 	if id != uuid.Nil {
 		return nil, id, nil
 	}
 
-	data, err := services.ProcessRawIntent(ctx, msg, h.S3store)
+	storageAck, err := services.ProcessRawIntent(ctx, rawIntent, h.S3store, envelopeID, receivedAt)
 	if err != nil {
-		log.Printf("Error processing raw intent for bulk row, trace_id=%s: %v", traceId, err)
+		log.Printf("Error processing raw intent for bulk row, trace_id=%s: %v", traceID, err)
 		return nil, uuid.Nil, err
 	}
-	if data == nil {
-		log.Printf("S3 data is nil for bulk row, trace_id=%s", traceId)
-		return nil, uuid.Nil, err
-	}
-
-	hash := sha256.Sum256(rawPayload)
-	msg.PayloadHash = hash[:]
-
-	if err := services.RawIntent(ctx, msg, data); err != nil {
-		log.Printf("Error persisting raw intent for bulk row, trace_id=%s: %v", traceId, err)
+	if storageAck == nil {
+		log.Printf("S3 data is nil for bulk row, trace_id=%s", traceID)
 		return nil, uuid.Nil, err
 	}
 
-	go services.SendToIntentEngine(msg, data, h.Kafka)
+	payloadHashSum := sha256.Sum256(rawPayload)
+	rawIntent.PayloadHash = payloadHashSum[:]
 
-	return data, uuid.Nil, nil
+	if err := services.RawIntent(ctx, rawIntent, storageAck); err != nil {
+		log.Printf("Error persisting raw intent for bulk row, trace_id=%s: %v", traceID, err)
+		return nil, uuid.Nil, err
+	}
+
+	return storageAck, uuid.Nil, nil
 }

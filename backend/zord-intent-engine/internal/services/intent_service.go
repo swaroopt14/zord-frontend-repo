@@ -66,6 +66,12 @@ type CanonicalIntentRepository interface {
 		hash string,
 		prevHash string,
 	) error
+
+	GetPreviousTenantCanonicalHash(
+		ctx context.Context,
+		tenantID string,
+		intentID string,
+	) (string, error)
 }
 
 func NewIntentService(
@@ -397,9 +403,20 @@ func (s *IntentService) ProcessIncomingIntent(
 	// -------- STEP 11: WORM SNAPSHOT (S3) --------
 
 	version := 1
-	prevHash := ""
 
-	canonicalBytes, _ := json.Marshal(saved)
+	prevHash, err := s.repo.GetPreviousTenantCanonicalHash(
+		ctx,
+		saved.TenantID,
+		saved.IntentID,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	canonicalBytes, err := json.Marshal(saved)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	canonicalRef, hash, _ := s.s3.StoreSnapshot(
 		ctx,
@@ -420,7 +437,7 @@ func (s *IntentService) ProcessIncomingIntent(
 
 	// -------- STEP 12: UPDATE DB WITH WORM METADATA --------
 
-	s.repo.UpdateSnapshotRefs(
+	err = s.repo.UpdateSnapshotRefs(
 		ctx,
 		saved.IntentID,
 		canonicalRef,
@@ -429,12 +446,14 @@ func (s *IntentService) ProcessIncomingIntent(
 		hash,
 		prevHash,
 	)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	saved.CanonicalSnapshotRef = canonicalRef
 	saved.NIRSnapshotRef = nirRef
 	saved.GovernanceSnapshotRef = govRef
 	saved.CanonicalHash = hash
-	saved.PrevHash = prevHash
 
 	return &saved, nil, nil
 }
@@ -533,6 +552,77 @@ func (s *IntentService) ProcessTokenizeResult(
 	if err != nil {
 		return nil, err
 	}
+	version := 1
+
+	prevHash, err := s.repo.GetPreviousTenantCanonicalHash(
+		ctx,
+		saved.TenantID,
+		saved.IntentID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	canonicalBytes, err := json.Marshal(saved)
+	if err != nil {
+		return nil, err
+	}
+
+	canonicalRef, hash, err := s.s3.StoreSnapshot(
+		ctx,
+		"canonical",
+		saved.TenantID,
+		saved.IntentID,
+		version,
+		canonicalBytes,
+		prevHash,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	nirBytes := []byte(`{}`)
+	nirRef, _, err := s.s3.StoreSnapshot(
+		ctx,
+		"nir",
+		saved.TenantID,
+		saved.IntentID,
+		version,
+		nirBytes,
+		"",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	govBytes := []byte(`{"state":"` + intent.GovernanceState + `"}`)
+	govRef, _, err := s.s3.StoreSnapshot(
+		ctx,
+		"governance",
+		saved.TenantID,
+		saved.IntentID,
+		version,
+		govBytes,
+		"",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.repo.UpdateSnapshotRefs(
+		ctx,
+		saved.IntentID,
+		canonicalRef,
+		nirRef,
+		govRef,
+		hash,
+		prevHash,
+	)
+
+	saved.CanonicalSnapshotRef = canonicalRef
+	saved.NIRSnapshotRef = nirRef
+	saved.GovernanceSnapshotRef = govRef
+	saved.CanonicalHash = hash
 
 	return &saved, nil
 }
