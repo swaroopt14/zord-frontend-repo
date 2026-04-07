@@ -3,12 +3,14 @@ package routes
 import (
 	"github.com/gin-gonic/gin"
 
+	authhandler "zord-edge/auth/handler"
+	authsecurity "zord-edge/auth/security"
 	"zord-edge/handler"
 	"zord-edge/middleware"
 	"zord-edge/validator"
 )
 
-func Routes(router *gin.Engine, h *handler.Handler) {
+func Routes(router *gin.Engine, h *handler.Handler, authHandler *authhandler.Handler, tokenManager *authsecurity.TokenManager) {
 
 	public := router.Group("/v1")
 	{
@@ -16,6 +18,9 @@ func Routes(router *gin.Engine, h *handler.Handler) {
 		public.GET("/health", handler.HealthCheck)
 		public.GET("/tenants", handler.ListTenants) // NEW
 		public.GET("/tenants/:tenant_id", handler.GetTenantByID)
+		public.POST("/auth/login", authHandler.Login)
+		public.POST("/auth/refresh", authHandler.Refresh)
+		public.POST("/auth/logout", authHandler.Logout)
 	}
 
 	// Webhook routes
@@ -49,4 +54,17 @@ func Routes(router *gin.Engine, h *handler.Handler) {
 		h.BulkIntentHandler,
 	)
 
+	authProtected := router.Group("/v1/auth")
+	authProtected.Use(middleware.RequireUserSession(tokenManager))
+	{
+		authProtected.GET("/me", authHandler.Me)
+
+		authAdmin := authProtected.Group("/admin")
+		authAdmin.Use(middleware.RequireRole("ADMIN"))
+		{
+			authAdmin.POST("/users", authHandler.CreateUser)
+			authAdmin.GET("/users", authHandler.ListUsers)
+			authAdmin.PATCH("/users/:id/status", authHandler.UpdateUserStatus)
+		}
+	}
 }

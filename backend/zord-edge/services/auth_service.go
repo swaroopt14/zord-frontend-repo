@@ -6,8 +6,10 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 
+	"zord-edge/auth/workspacecode"
 	"zord-edge/security"
 
 	"github.com/google/uuid"
@@ -29,15 +31,22 @@ func TenantReg(ctx context.Context, db *sql.DB, merchantName string) (uuid.UUID,
 		return uuid.Nil, " ", err
 	}
 
+	tenantID := uuid.New()
+	workspaceCode, err := generateAvailableWorkspaceCode(ctx, db, merchantName, tenantID)
+	if err != nil {
+		return uuid.Nil, "", err
+	}
+
 	query := `INSERT INTO tenants (
+	tenant_id,
     tenant_name,
+	workspace_code,
     key_prefix,
     key_hash
 	)
-	VALUES ($1, $2, $3)
+	VALUES ($1, $2, $3, $4, $5)
 	RETURNING tenant_id;`
-	var tenantID uuid.UUID
-	err = db.QueryRowContext(ctx, query, merchantName, prefix, hashedKey).Scan(&tenantID)
+	err = db.QueryRowContext(ctx, query, tenantID, merchantName, workspaceCode, prefix, hashedKey).Scan(&tenantID)
 	if err != nil {
 		return uuid.Nil, "", err
 	}
@@ -90,4 +99,24 @@ func ValidateApiKey(ctx context.Context, db *sql.DB, rawapikey string) (*AuthRes
 	return &AuthResult{TenantId: tenantId,
 		TenantName: tenantName}, nil
 
+}
+
+func generateAvailableWorkspaceCode(ctx context.Context, db *sql.DB, merchantName string, tenantID uuid.UUID) (string, error) {
+	baseCode := workspacecode.Sanitize(merchantName)
+	candidates := []string{
+		baseCode,
+		workspacecode.WithDeterministicSuffix(baseCode, tenantID.String()),
+	}
+
+	for _, candidate := range candidates {
+		var count int
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM tenants WHERE workspace_code = $1`, candidate).Scan(&count); err != nil {
+			return "", fmt.Errorf("check workspace code uniqueness: %w", err)
+		}
+		if count == 0 {
+			return candidate, nil
+		}
+	}
+
+	return "", errors.New("could not generate a unique workspace code")
 }

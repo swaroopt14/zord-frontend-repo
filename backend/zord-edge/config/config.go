@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"zord-edge/db"
@@ -15,6 +16,25 @@ import (
 
 type Config struct {
 	VaultKey string
+	Auth     AuthConfig
+}
+
+type AuthConfig struct {
+	Issuer                 string
+	Audience               string
+	AccessTokenTTL         time.Duration
+	RefreshTokenTTL        time.Duration
+	SigningKeyPath         string
+	SigningKeyBase64       string
+	CookieDomain           string
+	CookieSecure           bool
+	LockoutThreshold       int
+	LockoutDuration        time.Duration
+	BootstrapAdminName     string
+	BootstrapAdminEmail    string
+	BootstrapAdminPassword string
+	BootstrapAdminTenantID string
+	BootstrapWorkspaceCode string
 }
 
 func InitDB() {
@@ -59,5 +79,70 @@ func InitDB() {
 func LoadConfig() *Config {
 	return &Config{
 		VaultKey: os.Getenv("ZORD_VAULT_KEY"),
+		Auth: AuthConfig{
+			Issuer:                 firstNonEmpty(os.Getenv("JWT_ISSUER"), "zord-edge"),
+			Audience:               firstNonEmpty(os.Getenv("JWT_AUDIENCE"), "zord-console"),
+			AccessTokenTTL:         envDuration("JWT_ACCESS_TOKEN_TTL", 15*time.Minute),
+			RefreshTokenTTL:        envDuration("JWT_REFRESH_TOKEN_TTL", 30*24*time.Hour),
+			SigningKeyPath:         firstNonEmpty(os.Getenv("JWT_SIGNING_PRIVATE_KEY_PATH"), os.Getenv("SIGNING_KEY_PATH"), "ed25519_private.pem"),
+			SigningKeyBase64:       os.Getenv("JWT_SIGNING_PRIVATE_KEY_BASE64"),
+			CookieDomain:           os.Getenv("AUTH_COOKIE_DOMAIN"),
+			CookieSecure:           envBool("AUTH_COOKIE_SECURE", false),
+			LockoutThreshold:       envInt("JWT_LOCKOUT_THRESHOLD", 5),
+			LockoutDuration:        envDuration("JWT_LOCKOUT_DURATION", 15*time.Minute),
+			BootstrapAdminName:     os.Getenv("BOOTSTRAP_ADMIN_NAME"),
+			BootstrapAdminEmail:    os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),
+			BootstrapAdminPassword: os.Getenv("BOOTSTRAP_ADMIN_PASSWORD"),
+			BootstrapAdminTenantID: os.Getenv("BOOTSTRAP_ADMIN_TENANT_ID"),
+			BootstrapWorkspaceCode: os.Getenv("BOOTSTRAP_ADMIN_WORKSPACE_CODE"),
+		},
 	}
+}
+
+func envDuration(key string, fallback time.Duration) time.Duration {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(raw)
+	if err != nil {
+		log.Printf("invalid duration for %s: %v; using fallback %v", key, err, fallback)
+		return fallback
+	}
+	return parsed
+}
+
+func envBool(key string, fallback bool) bool {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(raw)
+	if err != nil {
+		log.Printf("invalid boolean for %s: %v; using fallback %v", key, err, fallback)
+		return fallback
+	}
+	return parsed
+}
+
+func envInt(key string, fallback int) int {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(raw)
+	if err != nil {
+		log.Printf("invalid integer for %s: %v; using fallback %d", key, err, fallback)
+		return fallback
+	}
+	return parsed
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

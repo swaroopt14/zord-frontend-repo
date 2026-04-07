@@ -338,9 +338,9 @@ function buildDemoMockAnswer(prompt: string): CopilotResponse {
 }
 
 function kpiToneClass(tone: TenantReviewKpiTone): string {
-  if (tone === 'good') return 'border-emerald-200 bg-emerald-50 text-emerald-700'
-  if (tone === 'warn') return 'border-amber-200 bg-amber-50 text-amber-700'
-  return 'border-slate-200 bg-slate-50 text-slate-700'
+  if (tone === 'good') return 'border-[#4CAF50]/45 bg-[#4CAF50]/18 text-[#d8f6df]'
+  if (tone === 'warn') return 'border-[#FFA726]/45 bg-[#FFA726]/18 text-[#ffe7c2]'
+  return 'border-white/20 bg-white/8 text-[#E6E6E6]'
 }
 
 function MiniTrendChart({ series }: { series: TenantReviewPoint[] }) {
@@ -365,27 +365,27 @@ function MiniTrendChart({ series }: { series: TenantReviewPoint[] }) {
     <svg viewBox={`0 0 ${width} ${height}`} className="h-[170px] w-full">
       <defs>
         <linearGradient id="cx-review-area" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="rgba(99,102,241,0.26)" />
-          <stop offset="100%" stopColor="rgba(99,102,241,0.02)" />
+          <stop offset="0%" stopColor="rgba(255,255,255,0.20)" />
+          <stop offset="100%" stopColor="rgba(255,255,255,0.02)" />
         </linearGradient>
       </defs>
 
       {ticks.map((tick) => (
         <g key={tick}>
-          <line x1={pad.left} x2={width - pad.right} y1={y(tick)} y2={y(tick)} stroke="#e2e8f0" strokeWidth="1" />
-          <text x={width - pad.right - 2} y={y(tick) - 4} fill="#64748b" fontSize="10" textAnchor="end">
+          <line x1={pad.left} x2={width - pad.right} y1={y(tick)} y2={y(tick)} stroke="rgba(255,255,255,0.16)" strokeWidth="1" />
+          <text x={width - pad.right - 2} y={y(tick) - 4} fill="#7A7A7A" fontSize="10" textAnchor="end">
             {tick}%
           </text>
         </g>
       ))}
 
       <polygon points={area} fill="url(#cx-review-area)" />
-      <polyline points={line} fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points={line} fill="none" stroke="#E6E6E6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
 
       {series.map((point, index) => (
         <g key={point.label}>
-          <circle cx={x(index)} cy={y(point.value)} r="2.8" fill="#4f46e5" />
-          <text x={x(index)} y={height - 8} fill="#6b7280" fontSize="10" textAnchor="middle">
+          <circle cx={x(index)} cy={y(point.value)} r="2.8" fill="#4CAF50" />
+          <text x={x(index)} y={height - 8} fill="#A6A6A6" fontSize="10" textAnchor="middle">
             {point.label}
           </text>
         </g>
@@ -397,21 +397,21 @@ function MiniTrendChart({ series }: { series: TenantReviewPoint[] }) {
 function MockTenantReviewCard({ review, intro }: { review: TenantReviewPayload; intro?: string }) {
   return (
     <div className="space-y-3">
-      {intro ? <p className="text-sm leading-6 text-slate-700">{intro}</p> : null}
+      {intro ? <p className="text-sm leading-6 text-[#A6A6A6]">{intro}</p> : null}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
-        <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3">
+      <div className="overflow-hidden rounded-2xl border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02)),rgba(255,255,255,0.05)] shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_10px_40px_rgba(0,0,0,0.5)]">
+        <div className="border-b border-white/12 bg-white/[0.03] px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600">AI Companion</p>
-              <h4 className="text-sm font-semibold text-slate-900">{review.headline}</h4>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#7A7A7A]">AI Companion</p>
+              <h4 className="text-sm font-semibold text-[#E6E6E6]">{review.headline}</h4>
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-slate-600">
-              <span className="rounded-md border border-slate-200 bg-white px-2 py-1">Tenant: {review.tenant}</span>
-              <span className="rounded-md border border-slate-200 bg-white px-2 py-1">{review.windowLabel}</span>
+            <div className="flex items-center gap-2 text-[11px] text-[#A6A6A6]">
+              <span className="rounded-md border border-white/12 bg-white/5 px-2 py-1">Tenant: {review.tenant}</span>
+              <span className="rounded-md border border-white/12 bg-white/5 px-2 py-1">{review.windowLabel}</span>
             </div>
           </div>
-          <p className="mt-2 text-xs text-slate-600">{review.summary}</p>
+          <p className="mt-2 text-xs text-[#A6A6A6]">{review.summary}</p>
         </div>
 
         <div className="space-y-3 p-4">
@@ -426,17 +426,17 @@ function MockTenantReviewCard({ review, intro }: { review: TenantReviewPayload; 
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 bg-white p-3">
-              <div className="mb-1 text-xs font-semibold text-slate-700">Authorization Trend</div>
+            <div className="rounded-xl border border-white/12 bg-white/5 p-3">
+              <div className="mb-1 text-xs font-semibold text-[#A6A6A6]">Authorization Trend</div>
               <MiniTrendChart series={review.trend} />
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-3">
-              <div className="mb-2 text-xs font-semibold text-slate-700">Provider Performance</div>
+            <div className="rounded-xl border border-white/12 bg-white/5 p-3">
+              <div className="mb-2 text-xs font-semibold text-[#A6A6A6]">Provider Performance</div>
               <div className="overflow-auto">
                 <table className="w-full min-w-[340px] text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 text-slate-500">
+                    <tr className="border-b border-white/12 text-[#7A7A7A]">
                       <th className="pb-2">Provider</th>
                       <th className="pb-2">Success</th>
                       <th className="pb-2">P95</th>
@@ -445,11 +445,11 @@ function MockTenantReviewCard({ review, intro }: { review: TenantReviewPayload; 
                   </thead>
                   <tbody>
                     {review.providers.map((row) => (
-                      <tr key={row.provider} className="border-b border-slate-100 last:border-0">
-                        <td className="py-1.5 font-medium text-slate-700">{row.provider}</td>
-                        <td className="py-1.5 text-slate-700">{row.successRate.toFixed(2)}%</td>
-                        <td className="py-1.5 text-slate-700">{row.p95LatencyMs}ms</td>
-                        <td className="py-1.5 text-right text-slate-700">{row.volume.toLocaleString('en-IN')}</td>
+                      <tr key={row.provider} className="border-b border-white/8 last:border-0">
+                        <td className="py-1.5 font-medium text-[#E6E6E6]">{row.provider}</td>
+                        <td className="py-1.5 text-[#A6A6A6]">{row.successRate.toFixed(2)}%</td>
+                        <td className="py-1.5 text-[#A6A6A6]">{row.p95LatencyMs}ms</td>
+                        <td className="py-1.5 text-right text-[#A6A6A6]">{row.volume.toLocaleString('en-IN')}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -459,33 +459,33 @@ function MockTenantReviewCard({ review, intro }: { review: TenantReviewPayload; 
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 bg-white p-3">
-              <div className="mb-2 text-xs font-semibold text-slate-700">Top Reason Codes</div>
+            <div className="rounded-xl border border-white/12 bg-white/5 p-3">
+              <div className="mb-2 text-xs font-semibold text-[#A6A6A6]">Top Reason Codes</div>
               <div className="space-y-2">
                 {review.reasons.map((reason) => (
                   <div key={reason.code}>
-                    <div className="mb-1 flex items-center justify-between text-[11px] text-slate-600">
-                      <span className="font-medium text-slate-700">{reason.code}</span>
+                    <div className="mb-1 flex items-center justify-between text-[11px] text-[#A6A6A6]">
+                      <span className="font-medium text-[#E6E6E6]">{reason.code}</span>
                       <span>{reason.events} events</span>
                     </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                      <div className="h-full rounded-full bg-indigo-500" style={{ width: `${reason.share}%` }} />
+                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                      <div className="h-full rounded-full bg-[#4CAF50]" style={{ width: `${reason.share}%` }} />
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-3">
-              <div className="mb-2 text-xs font-semibold text-slate-700">Recommended Actions</div>
+            <div className="rounded-xl border border-white/12 bg-white/5 p-3">
+              <div className="mb-2 text-xs font-semibold text-[#A6A6A6]">Recommended Actions</div>
               <ul className="space-y-1.5">
                 {review.actions.map((action, index) => (
-                  <li key={action} className="text-xs leading-5 text-slate-700">
+                  <li key={action} className="text-xs leading-5 text-[#A6A6A6]">
                     {index + 1}. {action}
                   </li>
                 ))}
               </ul>
-              <p className="mt-3 text-[11px] text-slate-500">Generated: {review.generatedAt}</p>
+              <p className="mt-3 text-[11px] text-[#7A7A7A]">Generated: {review.generatedAt}</p>
             </div>
           </div>
         </div>
@@ -695,17 +695,163 @@ export function CopilotChatCore({
   const contentWidth = compact ? 'max-w-none' : 'max-w-3xl'
 
   return (
-    <div className="flex h-full flex-col">
-      <div className={densityPad} style={{ borderBottom: '1px solid var(--glass-border)' }}>
+    <div className="copilot-liquid-root flex h-full flex-col">
+      <style jsx>{`
+        .copilot-liquid-root {
+          position: relative;
+          overflow: hidden;
+          background:
+            radial-gradient(620px 260px at 8% 0%, rgba(255, 255, 255, 0.08), transparent 62%),
+            radial-gradient(520px 240px at 95% 10%, rgba(255, 255, 255, 0.06), transparent 66%),
+            linear-gradient(180deg, #0b0b0c 0%, #141416 50%, #1c1c1f 100%);
+          color: #e6e6e6;
+        }
+
+        .copilot-liquid-root::before {
+          content: '';
+          position: absolute;
+          inset: -20%;
+          background:
+            radial-gradient(420px 180px at 20% 20%, rgba(255, 255, 255, 0.08), transparent 65%),
+            radial-gradient(380px 180px at 78% 14%, rgba(255, 255, 255, 0.06), transparent 70%);
+          filter: blur(18px);
+          pointer-events: none;
+        }
+
+        .copilot-liquid-root::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(110deg, rgba(255, 255, 255, 0.04), transparent 35%, rgba(255, 255, 255, 0.02) 60%, transparent 85%);
+          pointer-events: none;
+        }
+
+        .copilot-liquid-root > * {
+          position: relative;
+          z-index: 1;
+        }
+
+        .copilot-header {
+          border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+            rgba(255, 255, 255, 0.04);
+          backdrop-filter: blur(25px);
+          -webkit-backdrop-filter: blur(25px);
+        }
+
+        .copilot-title {
+          color: #e6e6e6;
+          text-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        .copilot-subtitle {
+          color: #a6a6a6;
+        }
+
+        .copilot-action-btn {
+          border-radius: 12px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+            rgba(255, 255, 255, 0.05);
+          color: #e6e6e6;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 10px 40px rgba(0, 0, 0, 0.5);
+          transition: all 0.2s ease;
+        }
+
+        .copilot-action-btn:hover {
+          transform: scale(1.02);
+          background: rgba(255, 255, 255, 0.1);
+        }
+
+        .copilot-badge-live {
+          background: rgba(76, 175, 80, 0.2);
+          color: #d5f4dc;
+          border: 1px solid rgba(76, 175, 80, 0.45);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+        }
+
+        .copilot-close-btn {
+          color: #a6a6a6;
+          border: 1px solid transparent;
+          background: transparent;
+          transition: all 0.2s ease;
+        }
+
+        .copilot-close-btn:hover {
+          color: #e6e6e6;
+          border-color: rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.08);
+        }
+
+        .copilot-suggestion {
+          border-radius: 999px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+            rgba(255, 255, 255, 0.05);
+          color: #e6e6e6;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 10px 40px rgba(0, 0, 0, 0.5);
+          transition: all 0.2s ease;
+        }
+
+        .copilot-suggestion:hover {
+          transform: scale(1.02);
+          background: rgba(255, 255, 255, 0.1);
+        }
+
+        .copilot-compose {
+          border-top: 1px solid rgba(255, 255, 255, 0.12);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+            rgba(15, 15, 18, 0.7);
+          backdrop-filter: blur(25px);
+          -webkit-backdrop-filter: blur(25px);
+        }
+
+        .copilot-input {
+          border-radius: 14px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+            rgba(255, 255, 255, 0.05);
+          color: #e6e6e6;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 10px 40px rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(25px);
+          -webkit-backdrop-filter: blur(25px);
+        }
+
+        .copilot-input::placeholder {
+          color: #7a7a7a;
+        }
+
+        .copilot-send {
+          border-radius: 12px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+            rgba(255, 255, 255, 0.05);
+          color: #e6e6e6;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 10px 40px rgba(0, 0, 0, 0.5);
+          transition: all 0.2s ease;
+        }
+
+        .copilot-send:hover:enabled {
+          transform: scale(1.02);
+          background: rgba(255, 255, 255, 0.1);
+        }
+      `}</style>
+      <div className={`copilot-header ${densityPad}`}>
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <div className={compact ? 'text-sm font-extrabold tracking-tight' : 'text-base font-extrabold tracking-tight'} style={{ color: 'var(--text)' }}>
+            <div className={`copilot-title ${compact ? 'text-sm font-extrabold tracking-tight' : 'text-base font-extrabold tracking-tight'}`}>
               <span className="inline-flex items-center gap-2">
                 <span className="text-lg font-extrabold tracking-tighter">Z</span>
                 <span>Ask me anything about Zord Vault</span>
               </span>
             </div>
-            <div className="text-[11px] font-medium" style={{ color: 'var(--glass-item-text)' }}>
+            <div className="copilot-subtitle text-[11px] font-medium">
               {variant === 'page' ? 'This is a full-page prompt workspace.' : 'Cmd/Ctrl + Space to open.'} Shift+Enter for newline.
             </div>
           </div>
@@ -713,12 +859,7 @@ export function CopilotChatCore({
             {variant === 'glass' ? (
               <Link
                 href="/customer/copilot"
-                className="rounded-[12px] px-2.5 py-1.5 text-[11px] font-semibold"
-                style={{
-                  background: 'transparent',
-                  border: '1px solid var(--glass-border)',
-                  color: 'var(--glass-item-text)',
-                }}
+                className="copilot-action-btn rounded-[12px] px-2.5 py-1.5 text-[11px] font-semibold"
                 title="Open the full prompt workspace"
               >
                 Open page
@@ -727,39 +868,19 @@ export function CopilotChatCore({
             <button
               type="button"
               onClick={clear}
-              className="rounded-[12px] px-2.5 py-1.5 text-[11px] font-semibold"
-              style={{
-                background: 'var(--glass-item-hover-bg)',
-                border: '1px solid var(--glass-border)',
-                color: 'var(--glass-item-active)',
-              }}
+              className="copilot-action-btn rounded-[12px] px-2.5 py-1.5 text-[11px] font-semibold"
               title="Clear chat"
             >
               New chat
             </button>
-            <div className="rounded-full px-2 py-1 text-[10px] font-bold" style={{ background: 'var(--glass-badge-bg)', color: 'var(--glass-badge-text)' }} title="Connected to Prompt Layer">
+            <div className="copilot-badge-live rounded-full px-2 py-1 text-[10px] font-bold" title="Connected to Prompt Layer">
               LIVE
             </div>
             {onRequestClose ? (
               <button
                 type="button"
                 onClick={onRequestClose}
-                className="flex h-8 w-8 items-center justify-center rounded-full"
-                style={{
-                  background: 'transparent',
-                  color: 'var(--glass-item-text)',
-                  border: '1px solid transparent',
-                }}
-                onMouseEnter={(event) => {
-                  event.currentTarget.style.background = 'var(--glass-item-hover-bg)'
-                  event.currentTarget.style.borderColor = 'var(--glass-border)'
-                  event.currentTarget.style.color = 'var(--glass-item-hover)'
-                }}
-                onMouseLeave={(event) => {
-                  event.currentTarget.style.background = 'transparent'
-                  event.currentTarget.style.borderColor = 'transparent'
-                  event.currentTarget.style.color = 'var(--glass-item-text)'
-                }}
+                className="copilot-close-btn flex h-8 w-8 items-center justify-center rounded-full"
                 aria-label="Close"
                 title="Close"
               >
@@ -778,26 +899,15 @@ export function CopilotChatCore({
           {!hasUserMessages && (
             <div className="py-4 sm:py-6">
               <div className="flex flex-wrap items-center justify-center gap-2.5">
-                {suggestions.map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() => applySuggestion(suggestion)}
-                    className="rounded-full px-4 py-2 text-sm font-medium transition-colors"
-                    style={{
-                      background: 'var(--glass-panel)',
-                      border: '1px solid var(--glass-border)',
-                      color: 'var(--glass-item-active)',
-                    }}
-                    onMouseEnter={(event) => {
-                      event.currentTarget.style.background = 'var(--glass-item-hover-bg)'
-                    }}
-                    onMouseLeave={(event) => {
-                      event.currentTarget.style.background = 'var(--glass-panel)'
-                    }}
-                  >
-                    {suggestion}
-                  </button>
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => applySuggestion(suggestion)}
+                  className="copilot-suggestion rounded-full px-4 py-2 text-sm font-medium transition-colors"
+                >
+                  {suggestion}
+                </button>
                 ))}
               </div>
             </div>
@@ -809,9 +919,9 @@ export function CopilotChatCore({
                 <div
                   className="flex h-7 w-7 items-center justify-center rounded-[12px] text-xs font-black"
                   style={{
-                    background: item.type === 'user' ? 'rgba(124,58,237,0.14)' : 'var(--glass-badge-bg)',
-                    border: '1px solid var(--glass-border)',
-                    color: item.type === 'user' ? 'var(--cx-primary)' : 'var(--glass-badge-text)',
+                    background: item.type === 'user' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#E6E6E6',
                   }}
                   title={item.type === 'user' ? 'You' : 'System'}
                 >
@@ -820,21 +930,25 @@ export function CopilotChatCore({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs font-semibold" style={{ color: 'var(--glass-item-text)' }}>
+                  <div className="text-xs font-semibold" style={{ color: '#A6A6A6' }}>
                     {item.type === 'user' ? 'You' : 'System'}
                   </div>
-                  <div className="text-[10px] font-mono" style={{ color: 'var(--glass-item-disabled)' }} suppressHydrationWarning>
+                  <div className="text-[10px] font-mono" style={{ color: '#7A7A7A' }} suppressHydrationWarning>
                     {mounted ? (item.created_at ?? '') : ''}
                   </div>
                 </div>
                 <div
                   className="mt-1 rounded-[16px] px-3 py-2.5 text-sm"
                   style={{
-                    background: item.type === 'user' ? 'rgba(124,58,237,0.08)' : 'var(--glass-panel)',
-                    border: '1px solid var(--glass-border)',
-                    color: 'var(--text)',
-                    boxShadow: item.type === 'user' ? 'none' : 'var(--glass-shadow-sm)',
+                    background: item.type === 'user'
+                      ? 'linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)), rgba(255,255,255,0.08)'
+                      : 'linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)), rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#E6E6E6',
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15), 0 10px 40px rgba(0,0,0,0.5)',
                     whiteSpace: item.type === 'system' && item.mockReview ? 'normal' : 'pre-wrap',
+                    backdropFilter: 'blur(25px)',
+                    WebkitBackdropFilter: 'blur(25px)',
                   }}
                 >
                   {item.type === 'system' && item.mockReview ? <MockTenantReviewCard review={item.mockReview} intro={item.text} /> : item.text}
@@ -847,19 +961,14 @@ export function CopilotChatCore({
         </div>
       </div>
 
-      <div className="border-t p-4" style={{ borderColor: 'var(--glass-border)' }}>
+      <div className="copilot-compose p-4">
         <div className="flex items-end gap-2">
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder="Type a prompt (live query to Prompt Layer)..."
-            className="flex-1 resize-none rounded-xl px-3 py-2 text-sm outline-none"
-            style={{
-              background: 'var(--glass-panel)',
-              border: '1px solid var(--glass-border)',
-              color: 'var(--text)',
-              minHeight: 72,
-            }}
+            className="copilot-input flex-1 resize-none rounded-xl px-3 py-2 text-sm outline-none"
+            style={{ minHeight: 72 }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault()
@@ -871,11 +980,9 @@ export function CopilotChatCore({
             type="button"
             onClick={submit}
             disabled={!canSend}
-            className="rounded-xl px-4 py-2 text-sm font-semibold"
+            className="copilot-send rounded-xl px-4 py-2 text-sm font-semibold"
             style={{
-              background: canSend ? 'var(--cx-primary, #6d5efc)' : 'var(--glass-item-hover-bg)',
-              color: canSend ? '#fff' : 'var(--glass-item-disabled)',
-              border: '1px solid var(--glass-border)',
+              opacity: canSend ? 1 : 0.6,
             }}
           >
             Send

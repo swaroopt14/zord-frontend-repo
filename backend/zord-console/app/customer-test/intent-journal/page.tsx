@@ -1,884 +1,665 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+export const dynamic = 'force-dynamic'
+
 import Image from 'next/image'
+import { useSearchParams } from 'next/navigation'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 
-type TableType = 'intents' | 'dlq' | 'envelopes' | 'contracts'
+type PayoutStatus = 'SUCCESS' | 'PROCESSING' | 'PENDING' | 'FAILED' | 'DLQ' | 'REPLAY_SCHEDULED'
 
-type BaseRow = {
-  kind: TableType
-  rowId: string
-  createdAt: string
-  createdAtDate: Date
-}
-
-type IntentRow = BaseRow & {
-  kind: 'intents'
+type PayoutRow = {
   intentId: string
-  envelopeId: string
+  sellerId: string
+  sellerName: string
+  amount: number
+  psp: string
+  rail: 'IMPS' | 'NEFT' | 'RTGS' | 'UPI'
+  status: PayoutStatus
+  bankRef: string
+  lastUpdated: string
+  updatedHoursAgo: number
   traceId: string
-  source: string
-  sourceLogo: string
-  stage: 'Canonical' | 'Relay' | 'Fusion' | 'Evidence'
-  status: string
-  amount: string
-  confidence: number
-  schema: string
+  failureReason?: string
+  dlqError?: string
 }
 
-type DlqRow = BaseRow & {
-  kind: 'dlq'
-  dlqId: string
-  envelopeId: string
-  source: string
-  sourceLogo: string
-  stage: string
-  reasonCode: string
-  replayable: boolean
+const SOURCE_LOGOS: Record<string, string> = {
+  Razorpay: '/sources/razorpay-clean-clean.png',
+  Cashfree: '/sources/cashfree-clean.png',
+  PayPal: '/sources/paypal-clean.png',
+  Stripe: '/sources/stripe-clean.png',
+  PhonePe: '/sources/phonepe-clean.png',
+  'Google Pay': '/sources/gpay-clean.png',
+  BHIM: '/sources/bhim-clean.png',
+  'HDFC Bank': '/sources/hdfc-bank-clean.png',
 }
 
-type EnvelopeRow = BaseRow & {
-  kind: 'envelopes'
-  envelopeId: string
-  source: string
-  parseStatus: string
-  signatureStatus: string
-  tenantId: string
-  payloadHash: string
+const STATUS_OPTIONS = ['All', 'Success', 'Processing', 'Pending', 'Failed', 'DLQ', 'Replay Scheduled']
+
+const STATUS_FILTER_MAP: Record<string, PayoutStatus | ''> = {
+  All: '',
+  Success: 'SUCCESS',
+  Processing: 'PROCESSING',
+  Pending: 'PENDING',
+  Failed: 'FAILED',
+  DLQ: 'DLQ',
+  'Replay Scheduled': 'REPLAY_SCHEDULED',
 }
 
-type ContractRow = BaseRow & {
-  kind: 'contracts'
-  contractId: string
-  intentId: string
-  envelopeId: string
-  status: string
-  traceId: string
-  tenantId: string
+const STATUS_LABEL_MAP: Record<PayoutStatus, string> = {
+  SUCCESS: 'SUCCESS',
+  PROCESSING: 'PROCESSING',
+  PENDING: 'PENDING',
+  FAILED: 'FAILED',
+  DLQ: 'DLQ',
+  REPLAY_SCHEDULED: 'REPLAY',
 }
 
-type JournalRow = IntentRow | DlqRow | EnvelopeRow | ContractRow
-
-type ApiIntent = {
-  intent_id?: string
-  envelope_id?: string
-  status?: string
-  amount?: string | number
-  currency?: string
-  confidence_score?: number
-  created_at?: string
-  schema_version?: string
-  canonical_version?: string
+const DATE_RANGE_HOURS: Record<string, number> = {
+  '24h': 24,
+  '7d': 24 * 7,
+  '30d': 24 * 30,
 }
 
-type ApiDLQ = {
-  dlq_id?: string
-  envelope_id?: string
-  stage?: string
-  reason_code?: string
-  replayable?: boolean
-  created_at?: string
-}
-
-type ApiEnvelope = {
-  envelope_id?: string
-  source?: string
-  parse_status?: string
-  signature_status?: string
-  received_at?: string
-  tenant_id?: string
-  sha256?: string
-}
-
-type ApiContract = {
-  contract_id?: string
-  intent_id?: string
-  envelope_id?: string
-  status?: string
-  trace_id?: string
-  tenant_id?: string
-  created_at?: string
-}
-
-type ApiPagedResponse<T> = {
-  items?: T[]
-  pagination?: {
-    page?: number
-    page_size?: number
-    total?: number
-  }
-  error?: string
-}
-
-type MockIntentSeed = {
-  intentId: string
-  envelopeId: string
-  traceId: string
-  source: string
-  sourceLogo: string
-  stage: 'Canonical' | 'Relay' | 'Fusion' | 'Evidence'
-  status: string
-  amount: string
-  confidence: number
-  createdAt: string
-  schema: string
-}
-
-const mockIntentSeeds: MockIntentSeed[] = [
-  { intentId: 'in_01JZ3A8N9R7T', envelopeId: 'env_8f2b8', traceId: 'tr_0af90', source: 'PayPal', sourceLogo: '/sources/paypal-clean.png', stage: 'Relay', status: 'READY_FOR_RELAY', amount: '₹4,120', confidence: 0.96, createdAt: '2026-03-04 08:39', schema: 'v3.2.0' },
-  { intentId: 'in_01JZ3ABH2P1M', envelopeId: 'env_8f2bf', traceId: 'tr_0af96', source: 'Cashfree', sourceLogo: '/sources/cashfree.png', stage: 'Fusion', status: 'EXCEPTION', amount: '₹8,900', confidence: 0.82, createdAt: '2026-03-04 07:31', schema: 'v3.2.0' },
-  { intentId: 'in_01JZ3ADN0A7C', envelopeId: 'env_8f2d2', traceId: 'tr_0af99', source: 'Razorpay', sourceLogo: '/sources/razorpay-clean-clean.png', stage: 'Canonical', status: 'CANONICALIZED', amount: '₹2,375', confidence: 0.95, createdAt: '2026-03-04 06:27', schema: 'v3.2.0' },
-  { intentId: 'in_01JZ3AEE6M8N', envelopeId: 'env_8f2f0', traceId: 'tr_0afA2', source: 'PayPal', sourceLogo: '/sources/paypal-clean.png', stage: 'Evidence', status: 'EVIDENCE_READY', amount: '₹18,220', confidence: 0.98, createdAt: '2026-03-03 23:22', schema: 'v3.2.0' },
-  { intentId: 'in_01JZ3AFR8Q1K', envelopeId: 'env_8f301', traceId: 'tr_0afA8', source: 'Cashfree', sourceLogo: '/sources/cashfree.png', stage: 'Relay', status: 'OUTCOME_RECEIVED', amount: '₹6,540', confidence: 0.91, createdAt: '2026-03-03 20:17', schema: 'v3.1.9' },
-  { intentId: 'in_01JZ3AGX6Y8D', envelopeId: 'env_8f315', traceId: 'tr_0afB0', source: 'Razorpay', sourceLogo: '/sources/razorpay-clean-clean.png', stage: 'Canonical', status: 'PENDING', amount: '₹3,780', confidence: 0.89, createdAt: '2026-03-03 19:11', schema: 'v3.2.0' },
-  { intentId: 'in_01JZ3AHH3W2F', envelopeId: 'env_8f320', traceId: 'tr_0afB4', source: 'PayPal', sourceLogo: '/sources/paypal-clean.png', stage: 'Fusion', status: 'FUSED_SUCCESS', amount: '₹9,210', confidence: 0.97, createdAt: '2026-03-03 17:05', schema: 'v3.2.0' },
-  { intentId: 'in_01JZ3AJK1N5R', envelopeId: 'env_8f329', traceId: 'tr_0afB9', source: 'Cashfree', sourceLogo: '/sources/cashfree.png', stage: 'Relay', status: 'DLQ', amount: '₹5,030', confidence: 0.76, createdAt: '2026-03-03 15:59', schema: 'v3.1.9' },
-  { intentId: 'in_01JZ3AKM7L2S', envelopeId: 'env_8f332', traceId: 'tr_0afC2', source: 'Razorpay', sourceLogo: '/sources/razorpay-clean-clean.png', stage: 'Evidence', status: 'EVIDENCE_READY', amount: '₹11,980', confidence: 0.98, createdAt: '2026-03-03 14:54', schema: 'v3.2.0' },
-  { intentId: 'in_01JZ3AMN9Q3T', envelopeId: 'env_8f33a', traceId: 'tr_0afC9', source: 'PayPal', sourceLogo: '/sources/paypal-clean.png', stage: 'Canonical', status: 'CANONICALIZED', amount: '₹1,940', confidence: 0.94, createdAt: '2026-03-01 09:47', schema: 'v3.2.0' },
-  { intentId: 'in_01JZ3ANP5D1V', envelopeId: 'env_8f341', traceId: 'tr_0afD3', source: 'Cashfree', sourceLogo: '/sources/cashfree.png', stage: 'Fusion', status: 'EXCEPTION', amount: '₹7,420', confidence: 0.84, createdAt: '2026-03-01 09:42', schema: 'v3.1.9' },
+const PAYOUT_ROWS: PayoutRow[] = [
+  { intentId: 'INT-8841', sellerId: 'SELL7741', sellerName: 'Rajesh Sharma', amount: 47500, psp: 'Razorpay', rail: 'IMPS', status: 'SUCCESS', bankRef: 'ICICI26092024011958', lastUpdated: '08:30 AM', updatedHoursAgo: 1, traceId: 'ZRD-TRACE-3f8a9b2c' },
+  { intentId: 'INT-8842', sellerId: 'SELL4421', sellerName: 'Aman Verma', amount: 31200, psp: 'Razorpay', rail: 'IMPS', status: 'FAILED', bankRef: '—', lastUpdated: '18:47 PM', updatedHoursAgo: 3, traceId: 'ZRD-TRACE-0ab22fd1', failureReason: 'Gateway Timeout' },
+  { intentId: 'INT-8843', sellerId: 'SELL3921', sellerName: 'Kavita Singh', amount: 12800, psp: 'Cashfree', rail: 'NEFT', status: 'PROCESSING', bankRef: '—', lastUpdated: '09:10 AM', updatedHoursAgo: 2, traceId: 'ZRD-TRACE-27f6be22' },
+  { intentId: 'INT-8844', sellerId: 'SELL9982', sellerName: 'Ravi Kumar', amount: 9200, psp: 'Razorpay', rail: 'IMPS', status: 'DLQ', bankRef: '—', lastUpdated: '07:52 AM', updatedHoursAgo: 4, traceId: 'ZRD-TRACE-fbb14ce9', dlqError: 'Missing IFSC' },
+  { intentId: 'INT-8845', sellerId: 'SELL1192', sellerName: 'Priya Nair', amount: 54200, psp: 'PayPal', rail: 'RTGS', status: 'SUCCESS', bankRef: 'HDFC45092024099117', lastUpdated: '07:28 AM', updatedHoursAgo: 5, traceId: 'ZRD-TRACE-c28bb0d5' },
+  { intentId: 'INT-8846', sellerId: 'SELL2207', sellerName: 'Nitesh Shah', amount: 8700, psp: 'Cashfree', rail: 'UPI', status: 'PENDING', bankRef: '—', lastUpdated: '06:56 AM', updatedHoursAgo: 6, traceId: 'ZRD-TRACE-95e74bc1' },
+  { intentId: 'INT-8847', sellerId: 'SELL7344', sellerName: 'Anjali Patil', amount: 16800, psp: 'Stripe', rail: 'NEFT', status: 'REPLAY_SCHEDULED', bankRef: '—', lastUpdated: '06:15 AM', updatedHoursAgo: 7, traceId: 'ZRD-TRACE-bf62ad33', failureReason: 'Webhook mismatch' },
+  { intentId: 'INT-8848', sellerId: 'SELL5549', sellerName: 'Farhan Ali', amount: 13100, psp: 'Razorpay', rail: 'IMPS', status: 'SUCCESS', bankRef: 'AXIS26092024022049', lastUpdated: '05:48 AM', updatedHoursAgo: 8, traceId: 'ZRD-TRACE-9f8e11dc' },
+  { intentId: 'INT-8849', sellerId: 'SELL1015', sellerName: 'Neha Kapoor', amount: 20250, psp: 'Cashfree', rail: 'RTGS', status: 'FAILED', bankRef: '—', lastUpdated: '05:22 AM', updatedHoursAgo: 9, traceId: 'ZRD-TRACE-4f09c62a', failureReason: 'Bank API timeout' },
+  { intentId: 'INT-8850', sellerId: 'SELL4002', sellerName: 'Harish Iyer', amount: 6950, psp: 'Razorpay', rail: 'UPI', status: 'PROCESSING', bankRef: '—', lastUpdated: '05:01 AM', updatedHoursAgo: 10, traceId: 'ZRD-TRACE-a14d9871' },
+  { intentId: 'INT-8851', sellerId: 'SELL7810', sellerName: 'Mohan Das', amount: 8800, psp: 'PayPal', rail: 'IMPS', status: 'SUCCESS', bankRef: 'SBI26092024002411', lastUpdated: '04:37 AM', updatedHoursAgo: 11, traceId: 'ZRD-TRACE-749bcf10' },
+  { intentId: 'INT-8852', sellerId: 'SELL5538', sellerName: 'Aditi Rao', amount: 22700, psp: 'Stripe', rail: 'NEFT', status: 'DLQ', bankRef: '—', lastUpdated: '04:15 AM', updatedHoursAgo: 12, traceId: 'ZRD-TRACE-8bc61a45', dlqError: 'Invalid beneficiary account' },
+  { intentId: 'INT-8853', sellerId: 'SELL8912', sellerName: 'Suresh Jain', amount: 15990, psp: 'Cashfree', rail: 'IMPS', status: 'SUCCESS', bankRef: 'ICICI26092024111958', lastUpdated: '03:50 AM', updatedHoursAgo: 13, traceId: 'ZRD-TRACE-46ce2042' },
+  { intentId: 'INT-8854', sellerId: 'SELL1120', sellerName: 'Deepika Roy', amount: 30400, psp: 'Razorpay', rail: 'RTGS', status: 'PENDING', bankRef: '—', lastUpdated: '03:18 AM', updatedHoursAgo: 14, traceId: 'ZRD-TRACE-f2a65d73' },
+  { intentId: 'INT-8855', sellerId: 'SELL4771', sellerName: 'Vikram Joshi', amount: 11950, psp: 'PhonePe', rail: 'UPI', status: 'FAILED', bankRef: '—', lastUpdated: '02:42 AM', updatedHoursAgo: 15, traceId: 'ZRD-TRACE-026ac389', failureReason: 'Insufficient payer balance' },
+  { intentId: 'INT-8856', sellerId: 'SELL3309', sellerName: 'Megha Kulkarni', amount: 24000, psp: 'Google Pay', rail: 'UPI', status: 'SUCCESS', bankRef: 'YES26092024911751', lastUpdated: '02:12 AM', updatedHoursAgo: 16, traceId: 'ZRD-TRACE-98de447a' },
+  { intentId: 'INT-8857', sellerId: 'SELL6421', sellerName: 'Arjun Reddy', amount: 7450, psp: 'BHIM', rail: 'UPI', status: 'REPLAY_SCHEDULED', bankRef: '—', lastUpdated: '01:44 AM', updatedHoursAgo: 17, traceId: 'ZRD-TRACE-531ec92f', failureReason: 'Webhook delayed' },
+  { intentId: 'INT-8858', sellerId: 'SELL0031', sellerName: 'Isha Menon', amount: 28600, psp: 'HDFC Bank', rail: 'NEFT', status: 'SUCCESS', bankRef: 'HDFC26092024441189', lastUpdated: '01:19 AM', updatedHoursAgo: 18, traceId: 'ZRD-TRACE-e61aa91b' },
+  { intentId: 'INT-8859', sellerId: 'SELL2380', sellerName: 'Nikhil Bose', amount: 9400, psp: 'Razorpay', rail: 'IMPS', status: 'PROCESSING', bankRef: '—', lastUpdated: '00:57 AM', updatedHoursAgo: 20, traceId: 'ZRD-TRACE-9cc4df55' },
+  { intentId: 'INT-8860', sellerId: 'SELL7291', sellerName: 'Shalini Gupta', amount: 12100, psp: 'Cashfree', rail: 'NEFT', status: 'DLQ', bankRef: '—', lastUpdated: '00:20 AM', updatedHoursAgo: 22, traceId: 'ZRD-TRACE-1ca9f807', dlqError: 'Beneficiary name mismatch' },
+  { intentId: 'INT-8861', sellerId: 'SELL5828', sellerName: 'Rohit S.', amount: 19100, psp: 'Stripe', rail: 'RTGS', status: 'SUCCESS', bankRef: 'KOTAK26092024517871', lastUpdated: '23:41 PM', updatedHoursAgo: 25, traceId: 'ZRD-TRACE-f90d1e1f' },
+  { intentId: 'INT-8862', sellerId: 'SELL9466', sellerName: 'Tanya Malhotra', amount: 10150, psp: 'Razorpay', rail: 'IMPS', status: 'FAILED', bankRef: '—', lastUpdated: '22:58 PM', updatedHoursAgo: 27, traceId: 'ZRD-TRACE-2a34bc63', failureReason: 'Gateway rejected beneficiary' },
+  { intentId: 'INT-8863', sellerId: 'SELL1862', sellerName: 'Pooja Agarwal', amount: 6500, psp: 'Cashfree', rail: 'UPI', status: 'PENDING', bankRef: '—', lastUpdated: '22:11 PM', updatedHoursAgo: 29, traceId: 'ZRD-TRACE-5ee74a9b' },
+  { intentId: 'INT-8864', sellerId: 'SELL4208', sellerName: 'Rahul Chawla', amount: 21990, psp: 'PayPal', rail: 'RTGS', status: 'SUCCESS', bankRef: 'IDFC26092024870114', lastUpdated: '21:39 PM', updatedHoursAgo: 32, traceId: 'ZRD-TRACE-c0ab6b29' },
+  { intentId: 'INT-8865', sellerId: 'SELL2717', sellerName: 'Komal Desai', amount: 7800, psp: 'Razorpay', rail: 'IMPS', status: 'REPLAY_SCHEDULED', bankRef: '—', lastUpdated: '20:56 PM', updatedHoursAgo: 38, traceId: 'ZRD-TRACE-c9fc3287', failureReason: 'Bank host unavailable' },
 ]
 
-type SourceMeta = { source: string; sourceLogo: string }
-
-const SOURCE_SEQUENCE: SourceMeta[] = [
-  { source: 'Razorpay', sourceLogo: '/sources/razorpay-clean-clean.png' },
-  { source: 'PayPal', sourceLogo: '/sources/paypal-clean.png' },
-  { source: 'Cashfree', sourceLogo: '/sources/cashfree-clean.png' },
-  { source: 'PhonePe', sourceLogo: '/sources/phonepe-clean.png' },
-  { source: 'SBI', sourceLogo: '/sources/sbi-clean.png' },
-  { source: 'Google Pay', sourceLogo: '/sources/gpay-clean.png' },
-  { source: 'BHIM', sourceLogo: '/sources/bhim-clean.png' },
-  { source: 'Stripe', sourceLogo: '/sources/stripe-clean.png' },
-  { source: 'HDFC Bank', sourceLogo: '/sources/hdfc-bank-clean.png' },
-  { source: 'Visa', sourceLogo: '/sources/visa-clean.png' },
-  { source: 'Mastercard', sourceLogo: '/sources/mastercard-clean.png' },
-]
-
-function sourceForKey(key: string): SourceMeta {
-  const total = key.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0)
-  return SOURCE_SEQUENCE[total % SOURCE_SEQUENCE.length]
+const statusClass = (status: PayoutStatus) => {
+  if (status === 'SUCCESS') return 'border-[#4CAF50]/45 bg-[#4CAF50]/18 text-[#d8f6df]'
+  if (status === 'PROCESSING') return 'border-[#FFA726]/45 bg-[#FFA726]/18 text-[#ffe7c2]'
+  if (status === 'PENDING') return 'border-[#FFD54F]/45 bg-[#FFD54F]/18 text-[#fff5cc]'
+  if (status === 'FAILED') return 'border-[#FF5252]/45 bg-[#FF5252]/18 text-[#ffe1e1]'
+  if (status === 'DLQ') return 'border-white/24 bg-white/10 text-[var(--ij-text-primary)]'
+  return 'border-[#FFA726]/45 bg-[#FFA726]/18 text-[#ffe7c2]'
 }
 
-const EXCLUDED_INTENT_IDS = new Set(['6339e5ff-1267-4135-bfe3-07b0f4518ef5'])
-
-const statusStyles: Record<string, string> = {
-  FUSED_SUCCESS: 'border-[#0D9488] bg-[#2DD4BF]/25 text-[#134E4A]',
-  READY_FOR_RELAY: 'border-[#6366F1] bg-[#A5B4FC]/40 text-[#312E81]',
-  EXCEPTION: 'border-[#0F172A] bg-[#0F172A]/15 text-[#0F172A]',
-  CANONICALIZED: 'border-[#6366F1] bg-[#A5B4FC]/35 text-[#312E81]',
-  EVIDENCE_READY: 'border-[#0D9488] bg-[#2DD4BF]/25 text-[#134E4A]',
-  OUTCOME_RECEIVED: 'border-[#0D9488] bg-[#2DD4BF]/25 text-[#134E4A]',
-  PENDING: 'border-[#F59E0B] bg-[#F59E0B]/25 text-[#78350F]',
-  DLQ: 'border-[#F59E0B] bg-[#F59E0B]/25 text-[#78350F]',
-  RECEIVED: 'border-slate-300 bg-slate-100 text-slate-700',
-  REJECTED_PREACC: 'border-[#0F172A] bg-[#0F172A]/15 text-[#0F172A]',
-  QUEUED_ACC: 'border-[#6366F1] bg-[#A5B4FC]/40 text-[#312E81]',
-  RAW_STORED: 'border-slate-300 bg-slate-100 text-slate-700',
+const rowActionLabel = (row: PayoutRow) => {
+  if (row.status === 'FAILED') return 'Replay'
+  if (row.status === 'DLQ') return 'Fix'
+  return 'View'
 }
 
-function getStatusStyle(status: string) {
-  return statusStyles[status] || 'border-slate-300 bg-slate-100 text-slate-700'
-}
+const formatAmount = (value: number) =>
+  new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(value)
 
-function getReasonCodeStyle(reasonCode: string) {
-  const code = reasonCode.toUpperCase()
-  if (code.includes('TIMEOUT')) return 'border-[#F59E0B] bg-[#F59E0B]/25 text-[#78350F]'
-  if (code.includes('DELIVERY') || code.includes('RATE_LIMIT')) return 'border-[#6366F1] bg-[#A5B4FC]/40 text-[#312E81]'
-  if (code.includes('SIGNATURE') || code.includes('AUTH') || code.includes('CONFLICT')) return 'border-[#0F172A] bg-[#0F172A]/15 text-[#0F172A]'
-  if (code.includes('MERKLE') || code.includes('MISMATCH')) return 'border-[#0D9488] bg-[#2DD4BF]/25 text-[#134E4A]'
-  return 'border-slate-300 bg-slate-100 text-slate-700'
-}
-
-function parseDate(value?: string) {
-  if (!value) return new Date(0)
-  const direct = new Date(value)
-  if (!Number.isNaN(direct.getTime())) return direct
-  const withOffset = value.includes(' ') ? new Date(`${value.replace(' ', 'T')}+05:30`) : new Date(value)
-  if (!Number.isNaN(withOffset.getTime())) return withOffset
-  return new Date(0)
-}
-
-function formatDateTime(value?: string) {
-  const date = parseDate(value)
-  if (date.getTime() === 0) return '—'
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${year}-${month}-${day} ${hours}:${minutes}`
-}
-
-function formatAmount(amount?: string | number, currency?: string) {
-  const numericAmount = Number(amount)
-  const normalizedCurrency = (currency || 'INR').toUpperCase()
-  if (Number.isFinite(numericAmount)) {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: normalizedCurrency,
-      maximumFractionDigits: 2,
-    }).format(numericAmount)
-  }
-  if (amount === undefined || amount === null || amount === '') return '—'
-  return `${normalizedCurrency} ${amount}`
-}
-
-function normalizeEnvelopeId(value?: string) {
-  if (!value) return 'env_unknown'
-  if (value.toLowerCase().startsWith('env_')) return value
-  const compact = value.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
-  return `env_${compact.slice(0, 8) || 'unknown'}`
-}
-
-function normalizeIntentStatus(status?: string) {
-  const normalized = (status || '').trim().toUpperCase()
-  const alias: Record<string, string> = {
-    RECEIVED: 'CANONICALIZED',
-    QUEUED_ACC: 'READY_FOR_RELAY',
-    REJECTED_PREACC: 'EXCEPTION',
-  }
-  return alias[normalized] || normalized || 'PENDING'
-}
-
-function deriveStage(status: string): IntentRow['stage'] {
-  if (status.includes('EVIDENCE')) return 'Evidence'
-  if (status.includes('RELAY') || status.includes('OUTCOME') || status.includes('QUEUED')) return 'Relay'
-  if (status.includes('FUSED') || status.includes('CONFLICT') || status.includes('FAILED') || status.includes('FINAL')) return 'Fusion'
-  return 'Canonical'
-}
-
-function toIntentRow(intent: ApiIntent): IntentRow {
-  const intentId = intent.intent_id || `in_missing_${Math.random().toString(36).slice(2, 8)}`
-  const normalizedStatus = normalizeIntentStatus(intent.status)
-  const createdAt = formatDateTime(intent.created_at)
-  return {
-    kind: 'intents',
-    rowId: intentId,
-    intentId,
-    envelopeId: intent.envelope_id || 'env_unknown',
-    traceId: `tr_${intentId.slice(-6)}`,
-    ...sourceForKey(intentId),
-    stage: deriveStage(normalizedStatus),
-    status: normalizedStatus,
-    amount: formatAmount(intent.amount, intent.currency),
-    confidence: Number(intent.confidence_score ?? 0.9),
-    createdAt,
-    createdAtDate: parseDate(createdAt),
-    schema: intent.schema_version || intent.canonical_version || 'v3.2.0',
-  }
-}
-
-function toDlqRow(item: ApiDLQ): DlqRow {
-  const dlqId = item.dlq_id || `dlq_${Math.random().toString(36).slice(2, 8)}`
-  const createdAt = formatDateTime(item.created_at)
-  return {
-    kind: 'dlq',
-    rowId: dlqId,
-    dlqId,
-    envelopeId: normalizeEnvelopeId(item.envelope_id),
-    ...sourceForKey(dlqId),
-    stage: item.stage || 'Validation',
-    reasonCode: item.reason_code || 'UNKNOWN',
-    replayable: Boolean(item.replayable),
-    createdAt,
-    createdAtDate: parseDate(createdAt),
-  }
-}
-
-function toEnvelopeRow(item: ApiEnvelope): EnvelopeRow {
-  const envelopeId = item.envelope_id || `env_${Math.random().toString(36).slice(2, 8)}`
-  const createdAt = formatDateTime(item.received_at)
-  return {
-    kind: 'envelopes',
-    rowId: envelopeId,
-    envelopeId,
-    source: item.source || 'API',
-    parseStatus: item.parse_status || 'UNKNOWN',
-    signatureStatus: item.signature_status || 'UNKNOWN',
-    tenantId: item.tenant_id || '—',
-    payloadHash: item.sha256 || '—',
-    createdAt,
-    createdAtDate: parseDate(createdAt),
-  }
-}
-
-function toContractRow(item: ApiContract): ContractRow {
-  const contractId = item.contract_id || `ctr_${Math.random().toString(36).slice(2, 8)}`
-  const createdAt = formatDateTime(item.created_at)
-  return {
-    kind: 'contracts',
-    rowId: contractId,
-    contractId,
-    intentId: item.intent_id || '—',
-    envelopeId: item.envelope_id || '—',
-    status: (item.status || 'UNKNOWN').toUpperCase(),
-    traceId: item.trace_id || `tr_${contractId.slice(-6)}`,
-    tenantId: item.tenant_id || '—',
-    createdAt,
-    createdAtDate: parseDate(createdAt),
-  }
-}
-
-const mockIntents: IntentRow[] = mockIntentSeeds.map((seed, index) => ({
-  kind: 'intents',
-  rowId: seed.intentId,
-  ...seed,
-  ...SOURCE_SEQUENCE[index % SOURCE_SEQUENCE.length],
-  createdAtDate: parseDate(seed.createdAt),
-}))
-
-const mockDlqSeeds = [
-  { dlqId: 'dlq_0dffdf61', envelopeId: 'env_0dffdf61', source: 'Razorpay', sourceLogo: '/sources/razorpay-clean-clean.png', stage: 'Relay', reasonCode: 'PROVIDER_TIMEOUT', replayable: true, createdAt: '2026-03-04 17:56' },
-  { dlqId: 'dlq_ce28601c', envelopeId: 'env_ce28601c', source: 'PayPal', sourceLogo: '/sources/paypal-clean.png', stage: 'Ingress', reasonCode: 'AUTH_FAILURE', replayable: false, createdAt: '2026-03-04 17:30' },
-  { dlqId: 'dlq_8cc0cbbd', envelopeId: 'env_8cc0cbbd', source: 'Cashfree', sourceLogo: '/sources/cashfree.png', stage: 'Validation', reasonCode: 'INVALID_SIGNATURE', replayable: true, createdAt: '2026-03-04 16:44' },
-  { dlqId: 'dlq_1ee6177c', envelopeId: 'env_1ee6177c', source: 'Razorpay', sourceLogo: '/sources/razorpay-clean-clean.png', stage: 'Canonical', reasonCode: 'SCHEMA_MISMATCH', replayable: false, createdAt: '2026-03-04 15:08' },
-  { dlqId: 'dlq_env_8f2bf', envelopeId: 'env_8f2bf', source: 'PayPal', sourceLogo: '/sources/paypal-clean.png', stage: 'Relay', reasonCode: 'DELIVERY_FAILED', replayable: true, createdAt: '2026-03-04 13:40' },
-  { dlqId: 'dlq_env_8f301', envelopeId: 'env_8f301', source: 'Cashfree', sourceLogo: '/sources/cashfree.png', stage: 'Fusion', reasonCode: 'CONFLICT_UNRESOLVED', replayable: false, createdAt: '2026-03-04 12:12' },
-  { dlqId: 'dlq_env_8f315', envelopeId: 'env_8f315', source: 'Razorpay', sourceLogo: '/sources/razorpay-clean-clean.png', stage: 'Evidence', reasonCode: 'MERKLE_BUILD_FAILURE', replayable: true, createdAt: '2026-03-04 11:57' },
-  { dlqId: 'dlq_env_8f329', envelopeId: 'env_8f329', source: 'PayPal', sourceLogo: '/sources/paypal-clean.png', stage: 'Relay', reasonCode: 'RATE_LIMIT', replayable: true, createdAt: '2026-03-04 10:21' },
-  { dlqId: 'dlq_env_8f341', envelopeId: 'env_8f341', source: 'Cashfree', sourceLogo: '/sources/cashfree.png', stage: 'Ingress', reasonCode: 'PAYLOAD_TOO_LARGE', replayable: false, createdAt: '2026-03-04 09:33' },
-  { dlqId: 'dlq_env_8f33a', envelopeId: 'env_8f33a', source: 'Razorpay', sourceLogo: '/sources/razorpay-clean-clean.png', stage: 'Canonical', reasonCode: 'IDEMPOTENCY_CONFLICT', replayable: true, createdAt: '2026-03-04 08:49' },
-  { dlqId: 'dlq_env_9a102', envelopeId: 'env_9a102', source: 'PayPal', sourceLogo: '/sources/paypal-clean.png', stage: 'Relay', reasonCode: 'ENDPOINT_UNREACHABLE', replayable: true, createdAt: '2026-03-03 22:19' },
-  { dlqId: 'dlq_env_9a109', envelopeId: 'env_9a109', source: 'Cashfree', sourceLogo: '/sources/cashfree.png', stage: 'Fusion', reasonCode: 'OUTCOME_MISMATCH', replayable: false, createdAt: '2026-03-03 20:02' },
-]
-
-const mockDlq: DlqRow[] = mockDlqSeeds.map((seed, index) => ({
-  kind: 'dlq',
-  rowId: seed.dlqId,
-  dlqId: seed.dlqId,
-  envelopeId: seed.envelopeId,
-  ...SOURCE_SEQUENCE[index % SOURCE_SEQUENCE.length],
-  stage: seed.stage,
-  reasonCode: seed.reasonCode,
-  replayable: seed.replayable,
-  createdAt: seed.createdAt,
-  createdAtDate: parseDate(seed.createdAt),
-}))
-
-const mockEnvelopes: EnvelopeRow[] = [
-  {
-    kind: 'envelopes',
-    rowId: 'ce28601c-3bdc-4254-9ea8-3548ef05caf9',
-    envelopeId: 'ce28601c-3bdc-4254-9ea8-3548ef05caf9',
-    source: 'REST',
-    parseStatus: 'RECEIVED',
-    signatureStatus: 'VERIFIED',
-    tenantId: '920d6a21-8e2d-4f18-9c23-7b9e2ea56107',
-    payloadHash: '8a32431beeb2f31d3176d884124ac85ad3a57b511d204b5afdc9bb78b4314e44',
-    createdAt: '2026-03-04 17:30',
-    createdAtDate: parseDate('2026-03-04 17:30'),
-  },
-  {
-    kind: 'envelopes',
-    rowId: '8cc0cbbd-0518-4be6-8601-997ab600ce6c',
-    envelopeId: '8cc0cbbd-0518-4be6-8601-997ab600ce6c',
-    source: 'REST',
-    parseStatus: 'RECEIVED',
-    signatureStatus: 'VERIFIED',
-    tenantId: '20c14c08-8ceb-442d-8980-9b42bd3ac258',
-    payloadHash: '8a32431beeb2f31d3176d884124ac85ad3a57b511d204b5afdc9bb78b4314e44',
-    createdAt: '2026-03-04 17:34',
-    createdAtDate: parseDate('2026-03-04 17:34'),
-  },
-  {
-    kind: 'envelopes',
-    rowId: '1ee6177c-a000-45b6-94ca-91b152894a84',
-    envelopeId: '1ee6177c-a000-45b6-94ca-91b152894a84',
-    source: 'INTENT_ENGINE',
-    parseStatus: 'CANONICALIZED',
-    signatureStatus: 'VERIFIED',
-    tenantId: '7533ca05-ca0c-49f3-8e99-72d1d667e68d',
-    payloadHash: 'bb9da523791eba214b18820c6aaba08eeed8253f4ef0c5ec0fe1bcb713ca3933',
-    createdAt: '2026-03-04 17:54',
-    createdAtDate: parseDate('2026-03-04 17:54'),
-  },
-]
-
-const mockContracts: ContractRow[] = [
-  {
-    kind: 'contracts',
-    rowId: 'ctr_6339e5ff',
-    contractId: 'ctr_6339e5ff',
-    intentId: '6339e5ff-1267-4135-bfe3-07b0f4518ef5',
-    envelopeId: '1ee6177c-a000-45b6-94ca-91b152894a84',
-    status: 'SENT',
-    traceId: '0a1e035f-33c8-4d2f-a7c7-34d02b378d6f',
-    tenantId: '7533ca05-ca0c-49f3-8e99-72d1d667e68d',
-    createdAt: '2026-03-04 17:56',
-    createdAtDate: parseDate('2026-03-04 17:56'),
-  },
-]
-
-const fallbackByTable: Record<TableType, JournalRow[]> = {
-  intents: mockIntents,
-  dlq: mockDlq,
-  envelopes: mockEnvelopes,
-  contracts: mockContracts,
-}
-
-function sourceLogoDimensions() {
-  return {
-    width: 112,
-    height: 32,
-    className: 'h-8 w-[112px] object-contain',
-  }
-}
-
-function rowSearchText(row: JournalRow) {
-  if (row.kind === 'intents') {
-    return `${row.intentId} ${row.envelopeId} ${row.traceId} ${row.source} ${row.status} ${row.schema}`.toLowerCase()
-  }
-  if (row.kind === 'dlq') {
-    return `${row.dlqId} ${row.envelopeId} ${row.source} ${row.stage} ${row.reasonCode}`.toLowerCase()
-  }
-  if (row.kind === 'envelopes') {
-    return `${row.envelopeId} ${row.source} ${row.parseStatus} ${row.signatureStatus} ${row.tenantId} ${row.payloadHash}`.toLowerCase()
-  }
-  return `${row.contractId} ${row.intentId} ${row.envelopeId} ${row.status} ${row.traceId} ${row.tenantId}`.toLowerCase()
-}
-
-function CustomerTestIntentJournalContent() {
+function CustomerTestIntentJournalPageContent() {
   const searchParams = useSearchParams()
-  const [tableType, setTableType] = useState<TableType>('intents')
-  const [rows, setRows] = useState<JournalRow[]>(mockIntents)
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [query, setQuery] = useState('')
-  const [timeRange, setTimeRange] = useState('24h')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [stageFilter, setStageFilter] = useState('all')
-  const [schemaFilter, setSchemaFilter] = useState('all')
+  const [dateRangeFilter, setDateRangeFilter] = useState('24h')
+  const [sellerFilter, setSellerFilter] = useState('')
+  const [pspFilter, setPspFilter] = useState('All')
+  const [railFilter, setRailFilter] = useState('All')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [searchFilter, setSearchFilter] = useState('')
   const [page, setPage] = useState(1)
-  const [selected, setSelected] = useState<string[]>([])
-  const rowsPerPage = 10
+  const rowsPerPage = 25
 
-  const fetchPaged = useCallback(async <T,>(endpoint: string) => {
-    const pageSize = 200
-    const maxPages = 5
-    let currentPage = 1
-    let total = 0
-    const collected: T[] = []
-
-    while (currentPage <= maxPages) {
-      const params = new URLSearchParams()
-      params.set('page', String(currentPage))
-      params.set('page_size', String(pageSize))
-
-      const response = await fetch(`${endpoint}?${params.toString()}`, { cache: 'no-store' })
-      if (!response.ok) throw new Error(`Failed to load data (${response.status})`)
-
-      const data = (await response.json()) as ApiPagedResponse<T>
-      const items = data.items || []
-      collected.push(...items)
-
-      total = Number(data.pagination?.total ?? collected.length)
-      if (items.length === 0 || collected.length >= total) break
-      currentPage += 1
-    }
-
-    return collected
-  }, [])
-
-  const loadTableData = useCallback(async () => {
-    setLoading(true)
-    setLoadError(null)
-    setSelected([])
-    setPage(1)
-
-    try {
-      if (tableType === 'intents') {
-        const items = await fetchPaged<ApiIntent>('/api/prod/intents')
-        const mapped = items.map(toIntentRow).filter((row) => !EXCLUDED_INTENT_IDS.has(row.intentId))
-        if (mapped.length === 0) {
-          setRows(fallbackByTable.intents)
-          setLoadError(null)
-        } else {
-          setRows(mapped)
-        }
-      } else if (tableType === 'dlq') {
-        const response = await fetch('/api/prod/dlq', { cache: 'no-store' })
-        if (!response.ok) throw new Error(`Failed to load DLQ (${response.status})`)
-        const data = (await response.json()) as ApiPagedResponse<ApiDLQ>
-        const mapped = (data.items || []).map(toDlqRow)
-        if (mapped.length === 0) {
-          setRows(fallbackByTable.dlq)
-          setLoadError(null)
-        } else {
-          setRows(mapped)
-        }
-      } else if (tableType === 'envelopes') {
-        const items = await fetchPaged<ApiEnvelope>('/api/prod/raw-envelopes')
-        setRows(items.map(toEnvelopeRow))
-      } else {
-        const response = await fetch('/api/prod/payout-contracts', { cache: 'no-store' })
-        if (!response.ok) throw new Error(`Failed to load contracts (${response.status})`)
-        const data = (await response.json()) as ApiPagedResponse<ApiContract>
-        setRows((data.items || []).map(toContractRow))
-      }
-    } catch (error) {
-      setRows(fallbackByTable[tableType])
-      setLoadError(error instanceof Error ? error.message : 'Unable to load backend data.')
-    } finally {
-      setLoading(false)
-    }
-  }, [fetchPaged, tableType])
+  const pspOptions = useMemo(() => ['All', ...Array.from(new Set(PAYOUT_ROWS.map((row) => row.psp)))], [])
+  const railOptions = useMemo(() => ['All', ...Array.from(new Set(PAYOUT_ROWS.map((row) => row.rail)))], [])
 
   useEffect(() => {
-    void loadTableData()
-  }, [loadTableData])
-
-  useEffect(() => {
-    const q = searchParams.get('q') ?? ''
-    if (q) setQuery(q)
+    const q = searchParams.get('q')
+    if (q) setSearchFilter(q)
   }, [searchParams])
 
   useEffect(() => {
     setPage(1)
-  }, [query, timeRange, statusFilter, stageFilter, schemaFilter, tableType])
+  }, [dateRangeFilter, sellerFilter, pspFilter, railFilter, statusFilter, searchFilter])
 
-  const referenceNow = useMemo(() => {
-    if (rows.length === 0) return new Date()
-    const timestamps = rows.map((row) => row.createdAtDate.getTime())
-    return new Date(Math.max(...timestamps) + 2 * 60 * 60 * 1000)
-  }, [rows])
+  const filteredRows = useMemo(() => {
+    const maxHours = DATE_RANGE_HOURS[dateRangeFilter] ?? 24
+    const selectedStatus = STATUS_FILTER_MAP[statusFilter] || ''
+    const sellerQuery = sellerFilter.trim().toLowerCase()
+    const searchQuery = searchFilter.trim().toLowerCase()
 
-  const availableSchemas = useMemo(() => {
-    if (tableType !== 'intents') return []
-    const intentRows = rows.filter((row): row is IntentRow => row.kind === 'intents')
-    return Array.from(new Set(intentRows.map((row) => row.schema))).sort()
-  }, [rows, tableType])
-
-  const filtered = useMemo(() => {
-    return rows.filter((row) => {
-      const normalizedQuery = query.trim().toLowerCase()
-      const matchQuery = normalizedQuery === '' || rowSearchText(row).includes(normalizedQuery)
-
-      const ageInHours = (referenceNow.getTime() - row.createdAtDate.getTime()) / (1000 * 60 * 60)
-      const matchTimeRange =
-        timeRange === 'all' ||
-        (timeRange === '24h' && ageInHours <= 24) ||
-        (timeRange === '7d' && ageInHours <= 24 * 7) ||
-        (timeRange === '30d' && ageInHours <= 24 * 30)
-
-      const matchStatus = statusFilter === 'all' || (row.kind === 'intents' && row.status === statusFilter)
-      const matchStage = stageFilter === 'all' || (row.kind === 'intents' && row.stage === stageFilter)
-      const matchSchema = schemaFilter === 'all' || (row.kind === 'intents' && row.schema === schemaFilter)
-
-      return matchQuery && matchTimeRange && matchStatus && matchStage && matchSchema
+    return PAYOUT_ROWS.filter((row) => {
+      const byDate = row.updatedHoursAgo <= maxHours
+      const bySeller =
+        sellerQuery === '' || `${row.sellerId} ${row.sellerName}`.toLowerCase().includes(sellerQuery)
+      const byPsp = pspFilter === 'All' || row.psp === pspFilter
+      const byRail = railFilter === 'All' || row.rail === railFilter
+      const byStatus = selectedStatus === '' || row.status === selectedStatus
+      const bySearch =
+        searchQuery === '' ||
+        `${row.intentId} ${row.bankRef} ${row.sellerId} ${row.sellerName}`.toLowerCase().includes(searchQuery)
+      return byDate && bySeller && byPsp && byRail && byStatus && bySearch
     })
-  }, [rows, query, referenceNow, timeRange, statusFilter, stageFilter, schemaFilter])
+  }, [dateRangeFilter, sellerFilter, pspFilter, railFilter, statusFilter, searchFilter])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage))
+  const isFailedOnly = statusFilter === 'Failed'
+  const isDlqOnly = statusFilter === 'DLQ'
 
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages)
-  }, [page, totalPages])
-
-  const paginated = useMemo(() => {
-    const start = (page - 1) * rowsPerPage
-    return filtered.slice(start, start + rowsPerPage)
-  }, [filtered, page])
-
-  const allCheckedOnPage = paginated.length > 0 && paginated.every((row) => selected.includes(row.rowId))
-
-  const toggleSelectAllOnPage = () => {
-    if (allCheckedOnPage) {
-      setSelected((prev) => prev.filter((id) => !paginated.some((row) => row.rowId === id)))
-      return
-    }
-    const next = new Set(selected)
-    paginated.forEach((row) => next.add(row.rowId))
-    setSelected(Array.from(next))
-  }
-
-  const toggleSelect = (id: string) => {
-    setSelected((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]))
-  }
-
-  const handleCreateReport = () => {
-    const headersByType: Record<TableType, string[]> = {
-      intents: ['intent_id', 'envelope_id', 'trace_id', 'source', 'stage', 'status', 'amount', 'confidence', 'created_at', 'schema'],
-      dlq: ['dlq_id', 'envelope_id', 'source', 'stage', 'reason_code', 'replayable', 'created_at'],
-      envelopes: ['envelope_id', 'source', 'parse_status', 'signature_status', 'tenant_id', 'hash', 'received_at'],
-      contracts: ['contract_id', 'intent_id', 'envelope_id', 'status', 'trace_id', 'tenant_id', 'created_at'],
-    }
-
-    const rowValues = filtered.map((row) => {
-      if (row.kind === 'intents') return [row.intentId, row.envelopeId, row.traceId, row.source, row.stage, row.status, row.amount, row.confidence.toFixed(2), row.createdAt, row.schema]
-      if (row.kind === 'dlq') return [row.dlqId, row.envelopeId, row.source, row.stage, row.reasonCode, row.replayable ? 'yes' : 'no', row.createdAt]
-      if (row.kind === 'envelopes') return [row.envelopeId, row.source, row.parseStatus, row.signatureStatus, row.tenantId, row.payloadHash, row.createdAt]
-      return [row.contractId, row.intentId, row.envelopeId, row.status, row.traceId, row.tenantId, row.createdAt]
-    })
-
-    const csvRows = [
-      headersByType[tableType].join(','),
-      ...rowValues.map((values) => values.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')),
-    ]
-
-    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.setAttribute('download', `journal-${tableType}-${new Date().toISOString().slice(0, 10)}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(link.href)
-  }
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / rowsPerPage))
+  const safePage = Math.min(page, totalPages)
+  const paginatedRows = filteredRows.slice((safePage - 1) * rowsPerPage, safePage * rowsPerPage)
+  const startIndex = filteredRows.length === 0 ? 0 : (safePage - 1) * rowsPerPage + 1
+  const endIndex = Math.min(safePage * rowsPerPage, filteredRows.length)
+  const successCount = filteredRows.filter((row) => row.status === 'SUCCESS').length
+  const inFlightCount = filteredRows.filter((row) => row.status === 'PROCESSING' || row.status === 'PENDING').length
+  const exceptionCount = filteredRows.filter((row) => row.status === 'FAILED' || row.status === 'DLQ').length
+  const successRate = filteredRows.length ? ((successCount / filteredRows.length) * 100).toFixed(1) : '0.0'
+  const systemDateTime = useMemo(
+    () =>
+      new Intl.DateTimeFormat('en-IN', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(new Date()),
+    []
+  )
 
   return (
-    <div className="w-full p-6 lg:p-8">
-      <main className="ct-main-panel mt-1 bg-gradient-to-b from-[#f9fbff] via-[#f7f8fa] to-[#f6f7fa] px-6 pb-7 pt-6">
-        <div className="border-b border-gray-200/80 pb-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[34px] font-semibold tracking-tight text-gray-900">Intent Journal</h2>
-            <div className="flex items-center gap-2">
-              <select value={tableType} onChange={(event) => setTableType(event.target.value as TableType)} className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 outline-none">
-                <option value="intents">Intent Table</option>
-                <option value="dlq">DLQ Table</option>
-                <option value="envelopes">Envelope Table</option>
-                <option value="contracts">Contract Table</option>
-              </select>
-              <select value={timeRange} onChange={(event) => setTimeRange(event.target.value)} className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 outline-none">
+    <>
+      <style jsx>{`
+        .ij-app-bg {
+          --ij-text-primary: #e6e6e6;
+          --ij-text-secondary: #a6a6a6;
+          --ij-text-muted: #7a7a7a;
+          --ij-focus-ring: rgba(255, 255, 255, 0.3);
+          --ij-hover-bg: rgba(255, 255, 255, 0.16);
+          --ij-page-active-bg: rgba(255, 255, 255, 0.14);
+          --ij-page-active-border: rgba(255, 255, 255, 0.3);
+          --ij-bg:
+            radial-gradient(circle at 80% 10%, rgba(28, 44, 68, 0.34) 0%, transparent 60%),
+            linear-gradient(180deg, #0b0b0c 0%, #141416 50%, #1c1c1f 100%);
+          --ij-shell-bg: rgba(20, 20, 22, 0.6);
+          --ij-shell-border: rgba(255, 255, 255, 0.08);
+          --ij-shell-shadow: 0 40px 80px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+          --ij-glass-bg:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+            rgba(255, 255, 255, 0.05);
+          --ij-glass-border: rgba(255, 255, 255, 0.12);
+          --ij-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 10px 40px rgba(0, 0, 0, 0.5);
+          --ij-input-placeholder: #7a7a7a;
+          --ij-row-hover: rgba(255, 255, 255, 0.08);
+          border-radius: 32px;
+          background: var(--ij-bg);
+        }
+
+        :global(html:not([data-theme='dark'])) .ij-app-bg {
+          --ij-text-primary: #1a1a1f;
+          --ij-text-secondary: #4a4a55;
+          --ij-text-muted: #8c8ca3;
+          --ij-focus-ring: rgba(124, 107, 255, 0.35);
+          --ij-hover-bg: rgba(124, 107, 255, 0.08);
+          --ij-page-active-bg: rgba(124, 107, 255, 0.15);
+          --ij-page-active-border: rgba(124, 107, 255, 0.35);
+          --ij-bg:
+            radial-gradient(circle at 20% 30%, rgba(228, 222, 255, 0.9) 0%, rgba(228, 222, 255, 0) 60%),
+            radial-gradient(circle at 80% 10%, rgba(201, 190, 255, 0.85) 0%, rgba(201, 190, 255, 0) 50%),
+            linear-gradient(180deg, #f4f1ff 0%, #e7e2ff 35%, #d8d1ff 70%, #cfc5ff 100%);
+          --ij-shell-bg: rgba(255, 255, 255, 0.55);
+          --ij-shell-border: rgba(124, 107, 255, 0.25);
+          --ij-shell-shadow: 0 10px 30px rgba(90, 70, 255, 0.15), 0 2px 6px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+          --ij-glass-bg:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.35)),
+            rgba(255, 255, 255, 0.55);
+          --ij-glass-border: rgba(124, 107, 255, 0.25);
+          --ij-glass-shadow: 0 10px 30px rgba(90, 70, 255, 0.15), 0 2px 6px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+          --ij-input-placeholder: #8c8ca3;
+          --ij-row-hover: rgba(124, 107, 255, 0.08);
+        }
+
+        .ij-backdrop {
+          position: relative;
+          overflow: hidden;
+          border-radius: 32px;
+          padding: 32px;
+          background: var(--ij-shell-bg);
+          border: 1px solid var(--ij-shell-border);
+          box-shadow: var(--ij-shell-shadow);
+          backdrop-filter: blur(40px);
+          -webkit-backdrop-filter: blur(40px);
+        }
+
+        .ij-shell {
+          max-width: 1280px;
+          margin: 4px auto 0;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+
+        .ij-backdrop::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(480px 240px at 8% 0%, rgba(255, 255, 255, 0.1), transparent 65%),
+            radial-gradient(460px 260px at 100% 12%, rgba(255, 255, 255, 0.08), transparent 65%);
+          pointer-events: none;
+        }
+
+        .ij-backdrop > * {
+          position: relative;
+          z-index: 1;
+        }
+
+        .ij-glass-card {
+          background: var(--ij-glass-bg);
+          border: 1px solid var(--ij-glass-border);
+          box-shadow: var(--ij-glass-shadow);
+          backdrop-filter: blur(25px);
+          -webkit-backdrop-filter: blur(25px);
+        }
+
+        .ij-system-bar {
+          min-height: 60px;
+          border-radius: 20px;
+          background: var(--ij-glass-bg);
+          border: 1px solid var(--ij-glass-border);
+          backdrop-filter: blur(18px);
+          -webkit-backdrop-filter: blur(18px);
+          box-shadow: var(--ij-glass-shadow);
+        }
+
+        .ij-system-chip {
+          border-radius: 12px;
+          border: 1px solid var(--ij-glass-border);
+          background: var(--ij-glass-bg);
+          padding: 8px 12px;
+          font-size: 12px;
+          color: var(--ij-text-secondary);
+        }
+
+        .ij-kpi-card {
+          height: 120px;
+          border-radius: 20px;
+          padding: 16px;
+          background: var(--ij-glass-bg);
+          border: 1px solid var(--ij-glass-border);
+          backdrop-filter: blur(25px);
+          -webkit-backdrop-filter: blur(25px);
+          box-shadow: var(--ij-glass-shadow);
+          transition: all 0.2s ease;
+        }
+
+        .ij-kpi-card:hover {
+          transform: scale(1.02);
+        }
+
+        .ij-header-card {
+          min-height: 120px;
+          display: flex;
+          align-items: center;
+        }
+
+        .ij-filter-card {
+          min-height: 120px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+
+        .ij-table-card {
+          border-radius: 22px;
+        }
+
+        .ij-control {
+          border: 1px solid var(--ij-glass-border);
+          background: var(--ij-glass-bg);
+          color: var(--ij-text-primary);
+          box-shadow: var(--ij-glass-shadow);
+          backdrop-filter: blur(25px);
+          -webkit-backdrop-filter: blur(25px);
+        }
+
+        .ij-control::placeholder {
+          color: var(--ij-input-placeholder);
+        }
+
+        .ij-control option {
+          color: #0f172a;
+        }
+
+        .ij-control:focus {
+          border-color: var(--ij-focus-ring);
+          box-shadow: 0 0 0 1px var(--ij-focus-ring), 0 10px 40px rgba(0, 0, 0, 0.35);
+        }
+
+        .ij-btn {
+          border: 1px solid var(--ij-glass-border);
+          background: var(--ij-glass-bg);
+          color: var(--ij-text-primary);
+          box-shadow: var(--ij-glass-shadow);
+          backdrop-filter: blur(25px);
+          -webkit-backdrop-filter: blur(25px);
+          transition: all 0.2s ease;
+        }
+
+        .ij-btn:hover {
+          background: var(--ij-hover-bg);
+          transform: scale(1.02);
+        }
+
+        .ij-btn-primary {
+          border: 1px solid rgba(124, 107, 255, 0.45);
+          background: linear-gradient(135deg, #7c6bff, #5b4bff);
+          color: #ffffff;
+          box-shadow: 0 6px 20px rgba(124, 107, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+          backdrop-filter: blur(25px);
+          -webkit-backdrop-filter: blur(25px);
+          transition: all 0.2s ease;
+        }
+
+        .ij-btn-primary:hover {
+          filter: brightness(1.08);
+          transform: scale(1.02);
+        }
+
+        .ij-table-head {
+          border-bottom: 1px solid var(--ij-glass-border);
+          background: var(--ij-glass-bg);
+        }
+
+        .ij-row {
+          border-bottom: 1px solid var(--ij-glass-border);
+        }
+
+        .ij-row:hover {
+          background: var(--ij-row-hover);
+        }
+
+        .ij-mini-btn {
+          border: 1px solid var(--ij-glass-border);
+          background: var(--ij-glass-bg);
+          color: var(--ij-text-primary);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+          transition: all 0.2s ease;
+        }
+
+        .ij-mini-btn:hover {
+          background: var(--ij-hover-bg);
+          transform: scale(1.02);
+        }
+
+        .ij-footer {
+          border-top: 1px solid var(--ij-glass-border);
+          background: var(--ij-glass-bg);
+        }
+
+        .ij-page-btn {
+          border: 1px solid var(--ij-glass-border);
+          background: var(--ij-glass-bg);
+          color: var(--ij-text-secondary);
+          transition: all 0.2s ease;
+        }
+
+        .ij-page-btn:hover {
+          background: var(--ij-hover-bg);
+        }
+
+        .ij-page-btn-active {
+          border-color: var(--ij-page-active-border);
+          background: var(--ij-page-active-bg);
+          color: var(--ij-text-primary);
+        }
+      `}</style>
+      <div className="ij-app-bg w-full p-6 lg:p-8">
+        <main className="ij-backdrop ij-shell">
+        <section className="ij-system-bar flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+          <span className="ij-system-chip">{systemDateTime}</span>
+          <span className="ij-system-chip">Rail Health: Normal</span>
+          <span className="ij-system-chip">Tenant: Bandhan Bank</span>
+          <span className="ij-system-chip">Profile: Rahul (Ops)</span>
+        </section>
+
+        <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <article className="ij-kpi-card">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ij-text-muted)]">Total Intents</p>
+            <p className="mt-2 text-[30px] font-semibold text-[var(--ij-text-primary)]">{filteredRows.length.toLocaleString()}</p>
+            <p className="text-xs text-[#4CAF50]">+4.2% today</p>
+          </article>
+          <article className="ij-kpi-card">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ij-text-muted)]">Success Rate</p>
+            <p className="mt-2 text-[30px] font-semibold text-[var(--ij-text-primary)]">{successRate}%</p>
+            <p className="text-xs text-[#4CAF50]">Stable</p>
+          </article>
+          <article className="ij-kpi-card">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ij-text-muted)]">In Flight</p>
+            <p className="mt-2 text-[30px] font-semibold text-[var(--ij-text-primary)]">{inFlightCount.toLocaleString()}</p>
+            <p className="text-xs text-[#FFA726]">Processing</p>
+          </article>
+          <article className="ij-kpi-card">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ij-text-muted)]">Exceptions</p>
+            <p className="mt-2 text-[30px] font-semibold text-[var(--ij-text-primary)]">{exceptionCount.toLocaleString()}</p>
+            <p className="text-xs text-[#FF5252]">Needs attention</p>
+          </article>
+        </section>
+
+        <section className="ij-glass-card ij-header-card rounded-2xl px-6 py-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-[var(--ij-text-primary)]">Payouts</h1>
+              <p className="text-sm text-[var(--ij-text-secondary)]">Seller Settlements</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button className="ij-btn-primary rounded-lg px-3 py-2 text-xs font-semibold">Run Payout Batch</button>
+              <button className="ij-btn rounded-lg px-3 py-2 text-xs font-semibold">Upload CSV</button>
+              <button className="ij-btn rounded-lg px-3 py-2 text-xs font-semibold">Export Report</button>
+            </div>
+          </div>
+        </section>
+
+        <section className="ij-glass-card ij-filter-card rounded-2xl px-6 py-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+            <label className="text-xs font-medium text-[var(--ij-text-secondary)]">
+              Date Range
+              <select value={dateRangeFilter} onChange={(event) => setDateRangeFilter(event.target.value)} className="ij-control mt-1 h-10 w-full rounded-lg px-3 text-xs outline-none">
                 <option value="24h">Last 24h</option>
                 <option value="7d">Last 7d</option>
                 <option value="30d">Last 30d</option>
-                <option value="all">All time</option>
               </select>
-              <button onClick={loadTableData} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 disabled:opacity-50" disabled={loading}>
-                {loading ? 'Refreshing…' : 'Refresh'}
-              </button>
-              <button onClick={handleCreateReport} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700">
-                Create Report
-              </button>
-            </div>
+            </label>
+
+            <label className="text-xs font-medium text-[var(--ij-text-secondary)]">
+              Seller ID
+              <input value={sellerFilter} onChange={(event) => setSellerFilter(event.target.value)} placeholder="Search seller..." className="ij-control mt-1 h-10 w-full rounded-lg px-3 text-xs outline-none" />
+            </label>
+
+            <label className="text-xs font-medium text-[var(--ij-text-secondary)]">
+              PSP
+              <select value={pspFilter} onChange={(event) => setPspFilter(event.target.value)} className="ij-control mt-1 h-10 w-full rounded-lg px-3 text-xs outline-none">
+                {pspOptions.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-xs font-medium text-[var(--ij-text-secondary)]">
+              Rail
+              <select value={railFilter} onChange={(event) => setRailFilter(event.target.value)} className="ij-control mt-1 h-10 w-full rounded-lg px-3 text-xs outline-none">
+                {railOptions.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-xs font-medium text-[var(--ij-text-secondary)]">
+              Status
+              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="ij-control mt-1 h-10 w-full rounded-lg px-3 text-xs outline-none">
+                {STATUS_OPTIONS.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-xs font-medium text-[var(--ij-text-secondary)]">
+              Search
+              <input value={searchFilter} onChange={(event) => setSearchFilter(event.target.value)} placeholder="Intent ID / UTR / Seller" className="ij-control mt-1 h-10 w-full rounded-lg px-3 text-xs outline-none" />
+            </label>
           </div>
 
-          <div className="mt-4 flex items-center gap-2">
-            <div className="relative w-[360px]">
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search intent_id, envelope_id, dlq_id, contract_id..."
-                className="h-10 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-3 text-sm text-gray-700 outline-none placeholder:text-gray-400"
-              />
-              <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
-              </svg>
-            </div>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 outline-none">
-              <option value="all">Status: All</option>
-            </select>
-            <select value={stageFilter} onChange={(event) => setStageFilter(event.target.value)} className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 outline-none">
-              <option value="all">Stage: All</option>
-            </select>
-            <select value={schemaFilter} onChange={(event) => setSchemaFilter(event.target.value)} className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 outline-none">
-              <option value="all">Schema: All</option>
-              {tableType === 'intents'
-                ? availableSchemas.map((schema) => (
-                  <option key={schema} value={schema}>
-                    {schema}
-                  </option>
-                ))
-                : null}
-            </select>
+          <div className="mt-3 flex justify-end">
+            <button
+              onClick={() => {
+                setDateRangeFilter('24h')
+                setSellerFilter('')
+                setPspFilter('All')
+                setRailFilter('All')
+                setStatusFilter('All')
+                setSearchFilter('')
+              }}
+              className="ij-btn rounded-lg px-3 py-2 text-xs font-semibold"
+            >
+              Reset Filters
+            </button>
           </div>
+        </section>
 
-          {loadError ? (
-            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              {loadError}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="mt-5 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-          <div className="ct-sidebar-scroll overflow-auto">
-            <table className="min-w-[1220px] w-full text-left text-sm">
-              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="w-[42px] px-3 py-3">
-                    <input checked={allCheckedOnPage} onChange={toggleSelectAllOnPage} type="checkbox" className="h-4 w-4 rounded border-gray-300 text-violet-600" />
-                  </th>
-                  {tableType === 'intents' ? (
-                    <>
-                      <th className="px-4 py-3">Intent ID</th>
-                      <th className="px-4 py-3">Envelope ID</th>
-                      <th className="px-4 py-3">Trace ID</th>
-                      <th className="px-4 py-3">Source</th>
-                      <th className="px-4 py-3">Stage</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Amount</th>
-                      <th className="px-4 py-3">Confidence</th>
-                      <th className="px-4 py-3">Created At</th>
-                      <th className="px-4 py-3">Schema</th>
-                    </>
-                  ) : null}
-                  {tableType === 'dlq' ? (
-                    <>
-                      <th className="px-4 py-3">DLQ ID</th>
-                      <th className="px-4 py-3">Envelope ID</th>
-                      <th className="px-4 py-3">Source</th>
-                      <th className="px-4 py-3">Stage</th>
-                      <th className="px-4 py-3">Reason Code</th>
-                      <th className="px-4 py-3">Replayable</th>
-                      <th className="px-4 py-3">Created At</th>
-                    </>
-                  ) : null}
-                  {tableType === 'envelopes' ? (
-                    <>
-                      <th className="px-4 py-3">Envelope ID</th>
-                      <th className="px-4 py-3">Source</th>
-                      <th className="px-4 py-3">Parse Status</th>
-                      <th className="px-4 py-3">Signature</th>
-                      <th className="px-4 py-3">Tenant</th>
-                      <th className="px-4 py-3">Hash</th>
-                      <th className="px-4 py-3">Received At</th>
-                    </>
-                  ) : null}
-                  {tableType === 'contracts' ? (
-                    <>
-                      <th className="px-4 py-3">Contract ID</th>
-                      <th className="px-4 py-3">Intent ID</th>
-                      <th className="px-4 py-3">Envelope ID</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Trace ID</th>
-                      <th className="px-4 py-3">Tenant</th>
-                      <th className="px-4 py-3">Created At</th>
-                    </>
-                  ) : null}
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td className="px-4 py-6 text-sm text-gray-500" colSpan={12}>
-                      Loading {tableType} from backend…
-                    </td>
+        <section className="ij-glass-card ij-table-card overflow-hidden rounded-2xl">
+          <div className="overflow-x-auto">
+            <table className={`w-full text-sm ${isFailedOnly || isDlqOnly ? 'min-w-[860px]' : 'min-w-[1260px]'}`}>
+              <thead>
+                {isFailedOnly ? (
+                  <tr className="ij-table-head">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Intent ID</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Seller</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Amount</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">PSP</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Failure Reason</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Action</th>
                   </tr>
-                ) : paginated.length ? (
-                  paginated.map((row) => (
-                    <tr key={row.rowId} className="border-t border-gray-100 hover:bg-gray-50/70">
-                      <td className="px-3 py-3">
-                        <input checked={selected.includes(row.rowId)} onChange={() => toggleSelect(row.rowId)} type="checkbox" className="h-4 w-4 rounded border-gray-300 text-violet-600" />
-                      </td>
-                      {row.kind === 'intents' ? (
+                ) : isDlqOnly ? (
+                  <tr className="ij-table-head">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Intent ID</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Seller</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Amount</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Error</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Action</th>
+                  </tr>
+                ) : (
+                  <tr className="ij-table-head">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Intent ID</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Seller</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Amount</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">PSP</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Rail</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Bank Ref (UTR)</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Last Updated</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ij-text-secondary)]">Action</th>
+                  </tr>
+                )}
+              </thead>
+
+              <tbody>
+                {paginatedRows.length ? (
+                  paginatedRows.map((row) => (
+                    <tr key={row.intentId} className="ij-row transition-colors">
+                      {isFailedOnly ? (
                         <>
-                          <td className="px-4 py-3 font-medium text-gray-900">{row.intentId}</td>
-                          <td className="px-4 py-3 text-gray-600">{row.envelopeId}</td>
-                          <td className="px-4 py-3 text-gray-600">{row.traceId}</td>
+                          <td className="px-4 py-3 text-xs font-semibold text-[var(--ij-text-primary)]">{row.intentId}</td>
+                          <td className="px-4 py-3 text-xs text-[var(--ij-text-secondary)]">{row.sellerId} {row.sellerName}</td>
+                          <td className="px-4 py-3 text-xs font-semibold text-[var(--ij-text-primary)]">{formatAmount(row.amount)}</td>
+                          <td className="px-4 py-3 text-xs text-[var(--ij-text-secondary)]">{row.psp}</td>
+                          <td className="px-4 py-3 text-xs text-[var(--ij-text-secondary)]">{row.failureReason || 'Gateway Timeout'}</td>
                           <td className="px-4 py-3">
-                            <div className="inline-flex h-12 min-w-[116px] items-center justify-center rounded-md border border-gray-200 bg-white px-2">
-                              <Image
-                                src={row.sourceLogo}
-                                alt={row.source}
-                                width={sourceLogoDimensions().width}
-                                height={sourceLogoDimensions().height}
-                                className={sourceLogoDimensions().className}
-                              />
-                            </div>
+                            <button className="rounded-lg border border-[#FFA726]/45 bg-[#FFA726]/18 px-2.5 py-1 text-xs font-semibold text-[#ffe7c2] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">Replay</button>
                           </td>
-                          <td className="px-4 py-3 text-gray-700">{row.stage}</td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex rounded border px-2 py-0.5 text-xs font-semibold ${getStatusStyle(row.status)}`}>{row.status}</span>
-                          </td>
-                          <td className="px-4 py-3 text-gray-700">{row.amount}</td>
-                          <td className="px-4 py-3 text-gray-700">{row.confidence.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-gray-600">{row.createdAt}</td>
-                          <td className="px-4 py-3 text-gray-600">{row.schema}</td>
                         </>
-                      ) : null}
-                      {row.kind === 'dlq' ? (
+                      ) : isDlqOnly ? (
                         <>
-                          <td className="px-4 py-3 font-medium text-gray-900">{row.dlqId}</td>
-                          <td className="px-4 py-3 text-gray-600">{row.envelopeId}</td>
+                          <td className="px-4 py-3 text-xs font-semibold text-[var(--ij-text-primary)]">{row.intentId}</td>
+                          <td className="px-4 py-3 text-xs text-[var(--ij-text-secondary)]">{row.sellerId} {row.sellerName}</td>
+                          <td className="px-4 py-3 text-xs font-semibold text-[var(--ij-text-primary)]">{formatAmount(row.amount)}</td>
+                          <td className="px-4 py-3 text-xs text-[var(--ij-text-secondary)]">{row.dlqError || 'Missing IFSC'}</td>
                           <td className="px-4 py-3">
-                            <div className="inline-flex h-12 min-w-[116px] items-center justify-center rounded-md border border-gray-200 bg-white px-2">
-                              <Image
-                                src={row.sourceLogo}
-                                alt={row.source}
-                                width={sourceLogoDimensions().width}
-                                height={sourceLogoDimensions().height}
-                                className={sourceLogoDimensions().className}
-                              />
+                            <button className="ij-mini-btn rounded-lg px-2.5 py-1 text-xs font-semibold">Fix Data</button>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-4 py-3 text-xs font-semibold text-[var(--ij-text-primary)]">{row.intentId}</td>
+                          <td className="px-4 py-3 text-xs text-[var(--ij-text-secondary)]"><span className="font-semibold text-[var(--ij-text-primary)]">{row.sellerId}</span> {row.sellerName}</td>
+                          <td className="px-4 py-3 text-xs font-semibold text-[var(--ij-text-primary)]">{formatAmount(row.amount)}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <Image src={SOURCE_LOGOS[row.psp] || '/sources/stripe-clean.png'} alt={row.psp} width={26} height={18} className="h-4 w-auto object-contain" />
+                              <span className="text-xs text-[var(--ij-text-secondary)]">{row.psp}</span>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-gray-700">{row.stage}</td>
+                          <td className="px-4 py-3 text-xs text-[var(--ij-text-secondary)]">{row.rail}</td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex rounded border px-2 py-0.5 text-xs font-semibold ${getReasonCodeStyle(row.reasonCode)}`}>
-                              {row.reasonCode}
+                            <span className={`inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-semibold ${statusClass(row.status)}`}>
+                              {STATUS_LABEL_MAP[row.status]}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-gray-700">{row.replayable ? 'Yes' : 'No'}</td>
-                          <td className="px-4 py-3 text-gray-600">{row.createdAt}</td>
-                        </>
-                      ) : null}
-                      {row.kind === 'envelopes' ? (
-                        <>
-                          <td className="px-4 py-3 font-medium text-gray-900">{row.envelopeId}</td>
-                          <td className="px-4 py-3 text-gray-700">{row.source}</td>
+                          <td className="px-4 py-3 text-xs text-[var(--ij-text-secondary)]">{row.bankRef}</td>
+                          <td className="px-4 py-3 text-xs text-[var(--ij-text-muted)]">{row.lastUpdated}</td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex rounded border px-2 py-0.5 text-xs font-semibold ${getStatusStyle(row.parseStatus.toUpperCase())}`}>{row.parseStatus}</span>
+                            <button className="ij-mini-btn rounded-lg px-2.5 py-1 text-xs font-semibold">{rowActionLabel(row)}</button>
                           </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex rounded border px-2 py-0.5 text-xs font-semibold ${getStatusStyle(row.signatureStatus.toUpperCase())}`}>{row.signatureStatus}</span>
-                          </td>
-                          <td className="px-4 py-3 text-gray-700">{row.tenantId}</td>
-                          <td className="px-4 py-3 font-mono text-xs text-gray-600">{row.payloadHash.slice(0, 18)}{row.payloadHash.length > 18 ? '…' : ''}</td>
-                          <td className="px-4 py-3 text-gray-600">{row.createdAt}</td>
                         </>
-                      ) : null}
-                      {row.kind === 'contracts' ? (
-                        <>
-                          <td className="px-4 py-3 font-medium text-gray-900">{row.contractId}</td>
-                          <td className="px-4 py-3 text-gray-700">{row.intentId}</td>
-                          <td className="px-4 py-3 text-gray-700">{row.envelopeId}</td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex rounded border px-2 py-0.5 text-xs font-semibold ${getStatusStyle(row.status)}`}>{row.status}</span>
-                          </td>
-                          <td className="px-4 py-3 text-gray-700">{row.traceId}</td>
-                          <td className="px-4 py-3 text-gray-700">{row.tenantId}</td>
-                          <td className="px-4 py-3 text-gray-600">{row.createdAt}</td>
-                        </>
-                      ) : null}
-                      <td className="px-4 py-3 text-right">
-                        <button className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100">View</button>
-                      </td>
+                      )}
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td className="px-4 py-6 text-sm text-gray-500" colSpan={12}>
-                      No records found for selected filters.
+                    <td className="px-4 py-10 text-center text-sm text-[var(--ij-text-secondary)]" colSpan={isFailedOnly ? 6 : isDlqOnly ? 5 : 9}>
+                      No payouts found for selected filters.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/80 px-4 py-3 text-xs text-gray-600">
-            <div>Rows per page: 10</div>
-            <div className="flex items-center gap-4">
-              <span>
-                {filtered.length === 0 ? '0-0' : `${(page - 1) * rowsPerPage + 1}-${Math.min(page * rowsPerPage, filtered.length)}`} of {filtered.length}
-              </span>
-              <div className="flex items-center gap-1">
-                <button onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page === 1} className="rounded-md border border-gray-200 bg-white px-2 py-1 disabled:opacity-40">
-                  ‹
-                </button>
-                <button onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={page === totalPages} className="rounded-md border border-gray-200 bg-white px-2 py-1 disabled:opacity-40">
-                  ›
-                </button>
-              </div>
+
+          <div className="ij-footer flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+            <p className="text-xs text-[var(--ij-text-secondary)]">Showing {startIndex}-{endIndex} of {filteredRows.length.toLocaleString()} payouts</p>
+            <div className="flex items-center gap-1 text-xs">
+              <button onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={safePage === 1} className="ij-mini-btn rounded-md px-2 py-1 disabled:opacity-40">Previous</button>
+              {Array.from({ length: Math.min(4, totalPages) }).map((_, index) => {
+                const pageNumber = index + 1
+                return (
+                  <button
+                    key={pageNumber}
+                    onClick={() => setPage(pageNumber)}
+                    className={`rounded-md px-2 py-1 ${safePage === pageNumber ? 'ij-page-btn-active' : 'ij-page-btn'}`}
+                  >
+                    {pageNumber}
+                  </button>
+                )
+              })}
+              <button onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={safePage === totalPages} className="ij-mini-btn rounded-md px-2 py-1 disabled:opacity-40">Next</button>
             </div>
           </div>
-        </div>
+        </section>
       </main>
-
-      <div className="mx-auto mt-24 max-w-md rounded-2xl border border-white/60 bg-white/70 p-6 text-center shadow-[0_20px_60px_rgba(0,0,0,0.08)] lg:hidden">
-        <p className="text-base font-semibold text-gray-800">Desktop View Recommended</p>
-      </div>
     </div>
+    </>
   )
 }
 
@@ -886,14 +667,14 @@ export default function CustomerTestIntentJournalPage() {
   return (
     <Suspense
       fallback={
-        <div className="w-full p-6 lg:p-8">
-          <main className="ct-main-panel mt-1 bg-gradient-to-b from-[#f9fbff] via-[#f7f8fa] to-[#f6f7fa] px-6 pb-7 pt-6">
-            <div className="rounded-xl border border-gray-200 bg-white px-4 py-6 text-sm text-gray-600">Loading intent journal...</div>
-          </main>
+        <div className="min-h-screen bg-[#0b0b0c] p-6 text-white">
+          <div className="mx-auto max-w-6xl rounded-[28px] border border-white/10 bg-white/5 p-6 text-sm text-white/70">
+            Loading intent journal...
+          </div>
         </div>
       }
     >
-      <CustomerTestIntentJournalContent />
+      <CustomerTestIntentJournalPageContent />
     </Suspense>
   )
 }

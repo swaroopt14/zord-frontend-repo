@@ -69,8 +69,9 @@ function FloatingCopilotButtonInner() {
         <div
           className="absolute inset-0"
           style={{
-            // Keep backdrop subtle and let the panel be the "frosted" element.
-            background: 'rgba(17, 24, 39, 0.22)',
+            background: 'rgba(8, 8, 10, 0.55)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
           }}
           onClick={() => setOpen(false)}
         />
@@ -82,11 +83,11 @@ function FloatingCopilotButtonInner() {
             aria-label="Zord copilot"
             className="w-full max-w-[860px] h-[78vh] sm:h-[72vh] max-h-[760px] min-h-[520px] rounded-[20px] overflow-hidden"
             style={{
-              background: 'var(--glass-panel)',
-              border: '1px solid var(--glass-border)',
-              boxShadow: 'var(--glass-shadow)',
-              backdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturation))',
-              WebkitBackdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturation))',
+              background: 'rgba(20, 20, 22, 0.6)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15), 0 20px 60px rgba(0,0,0,0.6)',
+              backdropFilter: 'blur(30px)',
+              WebkitBackdropFilter: 'blur(30px)',
             }}
           >
             <CopilotChatCore
@@ -108,12 +109,12 @@ function FloatingCopilotButtonInner() {
         type="button"
         className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-center w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all focus:outline-none"
         style={{
-          background: 'var(--glass-panel)',
-          border: '1px solid var(--glass-border)',
-          boxShadow: 'var(--glass-shadow)',
-          backdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturation))',
-          WebkitBackdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturation))',
-          color: 'var(--glass-item-active)',
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15), 0 10px 40px rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(25px)',
+          WebkitBackdropFilter: 'blur(25px)',
+          color: '#E6E6E6',
         }}
         onClick={() => setOpen(true)}
         aria-label="Open Zord copilot"

@@ -29,6 +29,9 @@ npm install
 # Run development server
 npm run dev
 
+# Run development server with full cache reset (use when Next chunk/module errors appear)
+npm run dev:fresh
+
 # Build for production
 npm run build
 
@@ -190,6 +193,25 @@ npm run dev
 # Application available at http://localhost:3000
 # Auto-reloads on file changes
 ```
+
+### Troubleshooting Dev 404 / Missing Chunk Errors
+
+If you see errors like `Cannot find module './8948.js'`, `MODULE_NOT_FOUND` from `.next/server/*`, or repeated 404s for `_next/static/*`:
+
+```bash
+# 1) Stop all running Next.js dev servers for this repo
+pkill -f "next dev" || true
+
+# 2) Reset caches
+npm run clean
+
+# 3) Start with clean cache
+npm run dev:fresh
+```
+
+Notes:
+- Avoid running two `next dev` processes from the same repo at once.
+- Use `npm run dev` (or `npm run dev:fresh`) from `backend/zord-console`.
 
 ## 📈 Scaling
 

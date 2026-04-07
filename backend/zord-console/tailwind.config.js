@@ -1,6 +1,5 @@
-import type { Config } from 'tailwindcss'
-
-const config: Config = {
+/** @type {import('tailwindcss').Config} */
+const config = {
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -9,43 +8,46 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Zord Blue - Primary Color System
         'zord-blue': {
-          50: '#EFF6FF',   // Selection background (lightest allowed)
-          500: '#3B82F6',  // Hover state, links
-          600: '#2563EB',   // Primary blue (Zord Blue)
-          700: '#1D4ED8',   // Pressed state
-          800: '#1E3A8A',   // Selected table rows (subtle)
+          50: '#EFF6FF',
+          500: '#3B82F6',
+          600: '#2563EB',
+          700: '#1D4ED8',
+          800: '#1E3A8A',
         },
-        // Neutral Base (90% of admin UI)
         'zord-base': {
-          main: '#0B1220',      // Background (main)
-          panel: '#111827',     // Panel background
-          table: '#0F172A',     // Table rows
-          border: '#1F2937',    // Borders / dividers
+          main: '#0B1220',
+          panel: '#111827',
+          table: '#0F172A',
+          border: '#1F2937',
           text: {
-            primary: '#E5E7EB',   // Primary text
-            secondary: '#9CA3AF', // Secondary text
+            primary: '#E5E7EB',
+            secondary: '#9CA3AF',
           },
         },
-        // Status Colors (Muted, Not Loud)
         'zord-status': {
-          healthy: '#16A34A',   // Muted green
-          degraded: '#CA8A04',  // Amber
-          failed: '#DC2626',     // Red
-          active: '#2563EB',     // Blue
-          neutral: '#9CA3AF',    // Gray
+          healthy: '#16A34A',
+          degraded: '#CA8A04',
+          failed: '#DC2626',
+          active: '#2563EB',
+          neutral: '#9CA3AF',
         },
-        // Destructive (Rare)
         'zord-destructive': {
           bg: '#7F1D1D',
           text: '#FECACA',
         },
-
-        // Customer UI palette (used by /customer/* pages)
-        // These are static hex values to ensure Tailwind generates the classes
-        // (e.g. bg-cx-purple-600). Customer dark-mode tokens are handled via
-        // CSS variables in app/customer/layout.tsx.
+        'zord-accent': {
+          50: '#F0EAFE',
+          100: '#E1D5FD',
+          200: '#C2AAFB',
+          300: '#A480F9',
+          400: '#8555F7',
+          500: '#6633EE',
+          600: '#5229BE',
+          700: '#3D1F8E',
+          800: '#29145F',
+          900: '#140A30',
+        },
         'cx-text': '#1F2937',
         'cx-neutral': '#6B7280',
         'cx-danger': {
@@ -89,10 +91,16 @@ const config: Config = {
         },
       },
       borderRadius: {
-        'zord': '4px', // Consistent 4px radius
+        zord: '4px',
+      },
+      backgroundImage: {
+        'glass-gradient': 'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 100%)',
+        'glow-primary': 'radial-gradient(circle, rgba(102, 51, 238, 0.4) 0%, transparent 70%)',
+        'glow-primary-strong': 'radial-gradient(circle, rgba(102, 51, 238, 0.7) 0%, transparent 70%)',
       },
     },
   },
   plugins: [],
 }
-export default config
+
+module.exports = config

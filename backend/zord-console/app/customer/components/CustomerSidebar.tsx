@@ -56,6 +56,7 @@ const sections: NavSection[] = [
   {
     id: 'overview', title: 'Ops Overview',
     items: [
+      { label: 'Zord Dashboard V1', href: '/customer/zord', icon: icons.dashboard },
       { label: 'Dashboard', href: '/customer/overview', icon: icons.chart },
       { label: 'Exceptions & SLA', href: '/customer/exceptions', icon: icons.warning, badge: 3 },
       { label: 'Work Queue', href: '/customer/work-queue', icon: icons.queue, badge: 12 },
