@@ -1,322 +1,264 @@
 'use client'
 
-const PALETTE = {
-  indigoPrimary: '#6366F1',
-  indigoSecondary: '#A5B4FC',
-  tealPrimary: '#0D9488',
-  tealSecondary: '#2DD4BF',
-  slateDeep: '#0F172A',
-  amber: '#F59E0B',
-} as const
-
-const proofCards = [
-  {
-    title: 'Payment Status',
-    value: 'SUCCESS',
-    subtitle: 'Confirmed',
-  },
-  {
-    title: 'Reference',
-    value: 'UTR: SBIN123456789',
-  },
-  {
-    title: 'Amount',
-    value: '₹1,500',
-  },
-  {
-    title: 'Completed',
-    value: '9 Mar 2026 · 12:02 PM',
-  },
+const activityBars = [
+  40, 58, 48, 70, 56, 46, 74, 52, 66, 82, 112, 128, 144, 164, 148, 156, 136, 116, 102, 86, 72, 60, 80, 68,
 ]
 
-const workflowCheckpoints = [
-  { title: 'Raw envelope stored (immutable)', desc: 'env_abc123 persisted before 202 ACK', severity: 'success' as const },
-  { title: 'Dispatch created + AttemptSent', desc: 'disp_789xyz on RazorpayX IMPS corridor', severity: 'success' as const },
-  { title: 'Webhook S2 received', desc: 'SUCCESS + UTR with confidence 1.0 at 10:20', severity: 'success' as const },
-  { title: 'Poll S3 corroborated', desc: 'Second-source confirmation, confidence 0.8', severity: 'warning' as const },
-  { title: 'Statement S4 matched', desc: 'Highest authority confirms same UTR', severity: 'success' as const },
-  { title: 'Certificate signed', desc: 'cert_123 generated with deterministic proof', severity: 'success' as const },
+const healthRows = [
+  { date: '12 Aug 2025', calories: '250 kcal', weight: '0.92', avgHr: '0.92', lowHr: '0.92', highHr: '0.92', cardio: '1.5h active' },
+  { date: '11 Aug 2025', calories: '228 kcal', weight: '0.89', avgHr: '0.88', lowHr: '0.84', highHr: '0.91', cardio: '1.2h active' },
 ]
 
-const signalAuthority = [
-  { label: 'S4 Statement', value: 100 },
-  { label: 'S2 Webhook', value: 82 },
-  { label: 'S3 Poll', value: 64 },
-  { label: 'L1/L2 Carrier Match', value: 92 },
-  { label: 'Fallback Fingerprint (L3)', value: 35 },
-]
-
-const phaseLabels = ['Ingest', 'Dispatch', 'Webhook S2', 'Poll S3', 'Statement S4', 'Certificate']
-const currentFlowConfidence = [20, 34, 100, 80, 100, 100]
-const replayFlowConfidence = [20, 34, 100, 92, 100, 100]
-
-function ConfidenceTraceChart() {
-  const width = 960
-  const height = 260
-  const padding = { top: 22, right: 54, bottom: 44, left: 18 }
-  const chartWidth = width - padding.left - padding.right
-  const chartHeight = height - padding.top - padding.bottom
-  const min = 0
-  const max = 100
-
-  const x = (index: number) => padding.left + (index / (phaseLabels.length - 1)) * chartWidth
-  const y = (value: number) => padding.top + chartHeight - ((value - min) / (max - min)) * chartHeight
-  const yTicks = [20, 40, 60, 80, 100]
-
-  const linePoints = (values: number[]) => values.map((value, index) => `${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(' ')
-  const areaPoints = (values: number[]) =>
-    `${linePoints(values)} ${x(values.length - 1).toFixed(1)},${y(min).toFixed(1)} ${x(0).toFixed(1)},${y(min).toFixed(1)}`
-
+export default function CustomerTestDashboardPage() {
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-[250px] w-full">
-      <defs>
-        <linearGradient id="ctConfidenceArea" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={PALETTE.indigoPrimary} stopOpacity="0.2" />
-          <stop offset="100%" stopColor={PALETTE.indigoPrimary} stopOpacity="0.01" />
-        </linearGradient>
-      </defs>
+    <main
+      className="min-h-screen p-3 lg:pr-3"
+      style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif' }}
+    >
+      <div className="overflow-hidden rounded-[14px] border border-slate-300/90 bg-[#eef0f3] shadow-[0_24px_44px_rgba(15,23,42,0.16)]">
+        <section className="relative overflow-hidden bg-[#090d13] text-white">
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                'radial-gradient(120% 95% at 18% 0%, rgba(148,163,184,0.16) 0%, transparent 45%), radial-gradient(130% 120% at 88% 22%, rgba(148,163,184,0.2) 0%, transparent 52%), repeating-radial-gradient(circle at 80% 42%, rgba(255,255,255,0.1) 0 1px, rgba(255,255,255,0.02) 1px 22px, transparent 22px 56px)',
+            }}
+          />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.08] via-transparent to-black/35 backdrop-blur-[2px]" />
 
-      {yTicks.map((tick) => (
-        <g key={tick}>
-          <line x1={padding.left} x2={width - padding.right} y1={y(tick)} y2={y(tick)} stroke="#e2e8f0" strokeWidth="1" />
-          <text x={width - padding.right + 8} y={y(tick) + 4} fill="#64748b" fontSize="11">
-            {tick}%
-          </text>
-        </g>
-      ))}
+          <div className="relative z-10 px-4 pb-0 pt-4 lg:px-5">
+            <div className="flex min-h-[250px] flex-col justify-between gap-4 lg:flex-row">
+              <div>
+                <p className="text-[17px] text-slate-300">Monday, 31 Mar 2026</p>
+                <h1 className="mt-2 leading-[0.94] tracking-tight">
+                  <span className="block text-[62px] font-medium">Good Morning,</span>
+                  <span className="block font-serif text-[62px] italic">Swaroop.</span>
+                </h1>
 
-      <polygon points={areaPoints(currentFlowConfidence)} fill="url(#ctConfidenceArea)" />
-      <polyline points={linePoints(replayFlowConfidence)} fill="none" stroke={PALETTE.tealPrimary} strokeWidth="2.2" strokeDasharray="5 4" />
-      <polyline points={linePoints(currentFlowConfidence)} fill="none" stroke={PALETTE.indigoPrimary} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={x(currentFlowConfidence.length - 1)} cy={y(currentFlowConfidence[currentFlowConfidence.length - 1])} r="4.5" fill={PALETTE.indigoPrimary} />
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {[
+                    { label: 'System Healthy', icon: '🟢' },
+                    { label: '3 Pending Signals', icon: '🟡' },
+                    { label: 'Evidence Ready', icon: '🟣' },
+                  ].map((status) => (
+                    <span
+                      key={status.label}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[12px] text-slate-100"
+                    >
+                      <span aria-hidden>{status.icon}</span>
+                      {status.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
 
-      {phaseLabels.map((label, index) => (
-        <text
-          key={label}
-          x={x(index)}
-          y={height - 10}
-          fill="#6b7280"
-          fontSize="11"
-          textAnchor={index === 0 ? 'start' : index === phaseLabels.length - 1 ? 'end' : 'middle'}
-        >
-          {label}
-        </text>
-      ))}
-    </svg>
-  )
-}
-
-export default function CustomerTestPage() {
-  return (
-    <div className="w-full p-6 lg:p-8">
-      <section className="relative z-10 mt-1 w-full overflow-hidden rounded-3xl border border-white/20 bg-[linear-gradient(180deg,rgba(44,49,57,0.94)_0%,rgba(35,39,46,0.96)_100%)] px-7 py-[30px] text-white shadow-[0_20px_48px_rgba(0,0,0,0.28)] transition-all duration-300 ease-out hover:z-30 hover:translate-y-1 hover:scale-[1.005] active:scale-[1.003]">
-        <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-b from-white/12 via-white/0 to-transparent" />
-        <div className="pointer-events-none absolute -left-10 -top-14 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-16 -right-10 h-64 w-64 rounded-full bg-slate-300/25 blur-3xl" />
-
-        <div className="relative z-[1] flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="inline-flex size-12 items-center justify-center rounded-xl bg-black text-white">Z</div>
-            <div>
-              <h1 className="text-[30px] font-semibold tracking-tight">Zord Vault Console</h1>
-              <div className="mt-2 flex items-center gap-2">
-                <span className="rounded-md border border-white/15 bg-white/10 px-2 py-1 text-xs backdrop-blur-sm">Tenant: megamart_prod</span>
-                <span className="rounded-md border border-white/15 bg-white/10 px-2 py-1 text-xs backdrop-blur-sm">Doc: Complete Walkthrough Traceability</span>
+              <div className="flex flex-col items-start gap-3 pb-3 lg:items-end">
+                <button className="rounded-full border border-white/25 bg-white/15 px-5 py-2.5 text-[16px] font-medium text-white shadow-[0_12px_24px_rgba(0,0,0,0.28)]">
+                  ✈ Create Test Intent
+                </button>
+                <div className="flex items-center gap-3 rounded-full border border-white/20 bg-white/12 px-3 py-2 text-[13px] text-slate-100">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-xs font-semibold text-white">Z</span>
+                  <span className="leading-tight">
+                    <span className="block text-slate-300">Monitored by</span>
+                    <span className="font-medium text-white">Zord Observability</span>
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="relative z-[1] mt-12 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {proofCards.map((card) => (
-            <article
-              key={card.title}
-              className="relative rounded-2xl border border-white/70 bg-[#f0f2f5]/95 p-4 backdrop-blur-xl shadow-[0_16px_32px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.75)]"
-            >
-              <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-b from-white/55 to-transparent" />
-              <p className="relative z-[1] text-sm text-slate-600">{card.title}</p>
-              <p className="relative z-[1] mt-2 text-2xl font-semibold leading-tight text-slate-900">{card.value}</p>
-              {'subtitle' in card ? <p className="relative z-[1] mt-2 text-xs text-slate-600">{card.subtitle}</p> : null}
+            <div className="h-3 border-t border-white/12" />
+          </div>
+        </section>
+
+        <section className="bg-[#f2f3f5] p-3">
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+              <div className="flex items-center justify-between text-[14px] text-slate-500">
+                <span>◔ Envelope Ingestion Tracker</span>
+                <span>•••</span>
+              </div>
+              <p className="mt-3 text-sm text-slate-500">Envelope ingestion</p>
+              <div className="mt-1 flex items-end gap-2.5">
+                <p className="text-[54px] font-semibold leading-none text-slate-900">28,953</p>
+                <p className="pb-1 text-[18px] text-slate-500">Raw Envelopes Received</p>
+              </div>
+              <p className="mt-1 text-sm font-medium text-[#8b5cf6]">+10% vs last hour</p>
+
+              <div className="relative mt-3 rounded-xl bg-[#fafafa] p-3">
+                <div className="absolute right-4 top-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-[0_12px_24px_rgba(15,23,42,0.08)]">
+                  <p className="font-semibold text-slate-800">Webhook Source</p>
+                  <p className="mt-1 text-slate-600">412 envelopes</p>
+                  <p className="text-slate-500">Tenant: <span className="font-semibold text-slate-700">merchant_A</span></p>
+                </div>
+
+                <div className="mt-7 flex h-[136px] items-end gap-[6px]">
+                  {activityBars.map((height, index) => {
+                    const highlighted = index >= 10 && index <= 16
+                    return (
+                      <span
+                        key={`${height}-${index}`}
+                        className={`w-[11px] rounded-t-[5px] ${highlighted ? 'bg-gradient-to-b from-[#ba8dfb] to-[#8b5cf6]' : 'bg-[#e7e9ee]'}`}
+                        style={{ height: `${height}px` }}
+                      />
+                    )
+                  })}
+                </div>
+
+                <div className="mt-2.5 flex justify-between px-1 text-xs text-slate-400">
+                  <span>API</span>
+                  <span>CSV</span>
+                  <span className="font-semibold text-[#8b5cf6]">Webhook</span>
+                  <span>File</span>
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <div className="rounded-xl border border-slate-200 bg-[#fafafa] p-3">
+                  <p className="text-xs text-slate-500">Hourly Avg</p>
+                  <p className="mt-1.5 text-[38px] leading-none text-slate-900">1,203</p>
+                  <p className="mt-1 text-xs text-slate-500">envelopes/hr</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-[#fafafa] p-3">
+                  <p className="text-xs text-slate-500">Processing Latency</p>
+                  <p className="mt-1.5 text-[38px] leading-none text-slate-900">242</p>
+                  <p className="mt-1 text-xs text-slate-500">ms</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-[#fafafa] p-3">
+                  <p className="text-xs text-slate-500">DLQ Events</p>
+                  <p className="mt-1.5 text-[38px] leading-none text-slate-900">11</p>
+                  <p className="mt-1 text-xs text-slate-500">events</p>
+                </div>
+              </div>
             </article>
-          ))}
-        </div>
-      </section>
 
-      <main className="ct-main-panel relative z-20 -mt-10 w-full px-6 pb-7 pt-6">
-        <div className="ct-clear-glass rounded-[20px] p-4">
-          <div className="flex items-center justify-between border-b border-gray-200/80 pb-5">
-            <h2 className="text-lg font-semibold text-gray-900">Your overview</h2>
-            <div className="flex items-center gap-2">
-              <button className="ct-clear-glass-pill rounded-full px-3 py-1.5 text-xs text-gray-700">Date range ▼</button>
-              <button className="ct-clear-glass-pill rounded-full px-3 py-1.5 text-xs text-gray-700">Daily ▼</button>
-              <button className="ct-clear-glass-pill rounded-full px-3 py-1.5 text-xs text-gray-700">Compare ▼</button>
-              <button className="ct-clear-glass-pill rounded-full px-3 py-1.5 text-xs font-medium text-gray-800">+ Add</button>
-              <button className="ct-clear-glass-pill rounded-full px-3 py-1.5 text-xs text-gray-700">Edit</button>
-            </div>
-          </div>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+              <div className="flex items-center justify-between text-[14px] text-slate-500">
+                <span>◔ Canonical Intent Pipeline</span>
+                <span>•••</span>
+              </div>
+              <p className="mt-3 text-sm text-slate-500">Intent Processing</p>
+              <div className="mt-1 flex items-end justify-between">
+                <p className="text-[54px] font-semibold leading-none text-slate-900">18,923</p>
+                <p className="pb-1 text-base text-slate-400">Canonical Intents</p>
+              </div>
 
-          <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <article className="ct-coin-card overflow-hidden border-slate-200/80 bg-white/[0.92] xl:col-span-2">
-              <div className="flex items-center justify-between">
+              <p className="mt-3 text-xs font-medium tracking-wide text-slate-500">Envelope → NIR → Canonical → Tokenized</p>
+              <div className="mt-4 h-2 rounded-full bg-slate-200">
+                <div className="h-full w-[78%] rounded-full bg-[#f2aa36]" />
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-y-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Workflow Confidence Trace</h3>
-                  <p className="text-sm text-gray-500">Phase 1→6 mapped from Complete Walkthrough Traceability document</p>
+                  <p className="text-sm text-slate-500">Validated</p>
+                  <p className="text-[42px] leading-none text-slate-900">17,845</p>
                 </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="flex items-center gap-1 text-gray-700">
-                    <span className="h-1.5 w-3 rounded-full bg-[#6366F1]" />
-                    v2.1 Current
-                  </span>
-                  <span className="flex items-center gap-1 text-gray-500">
-                    <span className="h-1.5 w-3 rounded-full bg-[#0D9488]" />
-                    v2.2 Replay
-                  </span>
+                <div>
+                  <p className="text-sm text-slate-500">Avg Confidence</p>
+                  <p className="text-[42px] leading-none text-slate-900">0.96</p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500">DLQ Intents</p>
+                  <p className="text-[42px] leading-none text-slate-900">432</p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500">Ready for Relay</p>
+                  <p className="text-[42px] leading-none text-slate-900">18,102</p>
                 </div>
               </div>
-              <div className="mt-2">
-                <ConfidenceTraceChart />
+
+              <div className="mt-4 flex items-center gap-3 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <span className="h-8 w-8 rounded-full bg-emerald-400 shadow-[0_0_24px_rgba(74,222,128,0.78)]" />
+                <p className="text-sm text-emerald-800">Great system health. Intent engine processing normally with high confidence mappings.</p>
               </div>
             </article>
 
-            <article className="ct-coin-card border-slate-200/80 bg-white/[0.92]">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Workflow Checkpoints</h3>
-                <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                  {workflowCheckpoints.length} steps
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+              <div className="flex items-center justify-between text-[14px] text-slate-500">
+                <span>♡ Outcome Fusion State</span>
+                <span>•••</span>
+              </div>
+              <p className="mt-3 text-sm text-slate-500">Outcome fusion</p>
+              <div className="mt-1 flex items-end gap-2.5">
+                <p className="text-[54px] font-semibold leading-none text-slate-900">85.3%</p>
+                <p className="pb-1 text-[18px] text-slate-500">Finalized Payments</p>
+              </div>
+
+              <div className="mt-3 flex justify-end gap-4 text-xs text-slate-600">
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-[#35a0ff]" />
+                  Provisional Success
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-[#2445db]" />
+                  Confirmed Success
                 </span>
               </div>
-              <div className="mt-3 space-y-5">
-                {workflowCheckpoints.map((item) => (
-                  <div key={item.title} className="group flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-2">
-                      <span
-                        className={`mt-2 h-2.5 w-2.5 rounded-full ${
-                          item.severity === 'success'
-                            ? 'bg-[#0D9488]'
-                            : item.severity === 'critical'
-                              ? 'bg-[#0F172A]'
-                              : 'bg-[#F59E0B]'
-                        }`}
-                      />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{item.title}</p>
-                        <p className="text-xs text-gray-500">{item.desc}</p>
-                      </div>
-                    </div>
-                    <span className="mt-1 text-slate-400 transition-transform group-hover:translate-x-1">›</span>
-                  </div>
-                ))}
+
+              <div className="mt-3 h-[158px]">
+                <svg viewBox="0 0 360 150" className="h-full w-full">
+                  <path d="M0 84 C38 84 52 42 90 42 C130 42 126 120 168 120 C212 120 209 62 252 62 C292 62 304 84 360 84" fill="none" stroke="#35a0ff" strokeWidth="2.5" />
+                  <path d="M0 84 C38 84 56 118 95 118 C134 118 136 64 176 64 C216 64 220 102 260 102 C300 102 316 84 360 84" fill="none" stroke="#2445db" strokeWidth="2.5" />
+                </svg>
               </div>
-              <div className="mt-5 border-t border-gray-100 pt-3 text-center">
-                <button className="text-sm font-semibold text-slate-700">View full timeline mapping →</button>
+
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <div className="rounded-xl border border-slate-200 bg-[#fafafa] p-3">
+                  <p className="text-xs text-slate-500">Provisional</p>
+                  <p className="mt-1.5 text-[38px] leading-none text-slate-900">72</p>
+                  <p className="mt-1 text-xs text-slate-500">events</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-[#fafafa] p-3">
+                  <p className="text-xs text-slate-500">Confirmed</p>
+                  <p className="mt-1.5 text-[38px] leading-none text-slate-900">112</p>
+                  <p className="mt-1 text-xs text-slate-500">events</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-[#fafafa] p-3">
+                  <p className="text-xs text-slate-500">Conflicts</p>
+                  <p className="mt-1.5 text-[38px] leading-none text-slate-900">4</p>
+                  <p className="mt-1 text-xs text-slate-500">events</p>
+                </div>
               </div>
             </article>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <article className="ct-coin-card border-slate-200/80 bg-white/[0.92]">
-              <h3 className="text-lg font-semibold text-gray-900">Signal Authority Map</h3>
-              <div className="mt-4 space-y-3">
-                {signalAuthority.map((item, index) => (
-                  <div key={item.label} className="grid grid-cols-[170px_1fr_40px] items-center gap-3">
-                    <span className="text-sm text-gray-700">{item.label}</span>
-                    <div className="h-2 overflow-hidden rounded-full bg-[#E0E7FF]">
-                      <div
-                        className="h-full rounded-full bg-[#4F46E5] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
-                        style={{
-                          width: `${item.value}%`,
-                        }}
-                      />
-                    </div>
-                    <span className="text-right text-sm text-[#3730A3]">{item.value}</span>
-                  </div>
-                ))}
+          <section className="mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-[36px] font-medium text-slate-900">Health log</h3>
+              <div className="flex items-center gap-2">
+                <button className="rounded-full border border-slate-200 bg-white px-5 py-2 text-sm text-slate-700">This month ▼</button>
+                <button className="rounded-full bg-[#111318] px-5 py-2 text-sm font-medium text-white">⬇ Download records</button>
               </div>
-              <p className="mt-5 text-sm text-gray-500">
-                Fusion hierarchy: <span className="font-semibold text-slate-700">S4 &gt; S2 &gt; S3</span> with explicit conflict guards.
-              </p>
-            </article>
+            </div>
 
-            <article className="ct-coin-card border-slate-200/80 bg-white/[0.92]">
-              <h3 className="text-lg font-semibold text-gray-900">Dispatch & Backfill</h3>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-slate-50 p-3">
-                  <p className="text-xs text-gray-500">Attempt count</p>
-                  <p className="mt-1 text-xl font-semibold text-gray-900">1</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-3">
-                  <p className="text-xs text-gray-500">Payout amount</p>
-                  <p className="mt-1 text-xl font-semibold text-gray-900">₹5,000</p>
-                </div>
-              </div>
-              <div className="mt-4 space-y-3 text-sm text-gray-700">
-                <div className="flex items-center justify-between">
-                  <span>Webhook S2 arrival</span>
-                  <span>
-                    +5m <span className="ml-1 text-[#0D9488]">●</span>
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Poll S3 corroboration</span>
-                  <span>
-                    +10m <span className="ml-1 text-[#F59E0B]">●</span>
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Finality certificate</span>
-                  <span>2026-03-03 09:00:01Z</span>
-                </div>
-              </div>
-            </article>
-
-            <article className="ct-coin-card ct-frost-card border-slate-200/80 bg-white/[0.92]">
-              <h3 className="text-lg font-semibold text-gray-900">Evidence & Certificate</h3>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="ct-frost-chip rounded-xl p-3">
-                  <p className="text-xs text-gray-500">Pack completeness</p>
-                  <p className="mt-1 text-xl font-semibold text-gray-900">
-                    7/7 <span className="text-xs text-slate-600">all artifacts</span>
-                  </p>
-                </div>
-                <div className="ct-frost-chip rounded-xl p-3">
-                  <p className="text-xs text-gray-500">Signature verify</p>
-                  <p className="mt-1 text-xl font-semibold text-gray-900">
-                    VALID <span className="text-xs text-slate-600">cert_123</span>
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 space-y-3 text-sm text-gray-700">
-                <div className="flex items-center justify-between">
-                  <span>Raw envelope</span>
-                  <span className="font-mono text-xs">env_abc123</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Canonical intent</span>
-                  <span className="font-mono text-xs">int_xyz789</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Outcome events</span>
-                  <span className="font-mono text-xs">evt_888 · evt_889 · evt_890</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Finality certificate</span>
-                  <span className="font-mono text-xs">cert_123</span>
-                </div>
-              </div>
-              <div className="mt-4 h-2 overflow-hidden rounded-full border border-white/70 bg-white/65">
-                <div className="h-full w-full rounded-full bg-gradient-to-r from-[#6366F1] via-[#A5B4FC] to-[#2DD4BF]" />
-              </div>
-            </article>
-          </div>
-        </div>
-      </main>
-
-      <div className="mx-auto mt-24 max-w-md rounded-2xl border border-white/60 bg-white/70 p-6 text-center shadow-[0_20px_60px_rgba(0,0,0,0.08)] lg:hidden">
-        <p className="text-base font-semibold text-gray-800">Desktop View Recommended</p>
-        <p className="mt-2 text-sm text-gray-600">
-          This test page is desktop-first. Open it on a larger screen (≥1024px) for the intended layout.
-        </p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] border-separate border-spacing-0">
+                <thead>
+                  <tr>
+                    {['Date', 'Calories burned', 'Body weight', 'Avg. HR', 'Lowest HR', 'Highest HR', 'Cardio Zone'].map((head) => (
+                      <th key={head} className="border-b border-slate-200 px-3 py-2.5 text-left text-sm font-medium text-slate-500">
+                        {head}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {healthRows.map((row) => (
+                    <tr key={row.date}>
+                      <td className="border-b border-slate-100 px-3 py-3 text-sm text-slate-700">{row.date}</td>
+                      <td className="border-b border-slate-100 px-3 py-3 text-sm text-slate-700">{row.calories}</td>
+                      <td className="border-b border-slate-100 px-3 py-3 text-sm text-slate-700">{row.weight}</td>
+                      <td className="border-b border-slate-100 px-3 py-3 text-sm text-slate-700">{row.avgHr}</td>
+                      <td className="border-b border-slate-100 px-3 py-3 text-sm text-slate-700">{row.lowHr}</td>
+                      <td className="border-b border-slate-100 px-3 py-3 text-sm text-slate-700">{row.highHr}</td>
+                      <td className="border-b border-slate-100 px-3 py-3 text-sm text-slate-700">{row.cardio}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </section>
       </div>
-    </div>
+    </main>
   )
 }

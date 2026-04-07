@@ -11,6 +11,12 @@ export const BACKEND_SERVICES = {
       TENANT_REGISTER: '/v1/tenantReg',
       TENANTS: '/v1/tenants',
       TENANT_BY_ID: (id: string) => `/v1/tenants/${id}`,
+      AUTH_LOGIN: '/v1/auth/login',
+      AUTH_REFRESH: '/v1/auth/refresh',
+      AUTH_LOGOUT: '/v1/auth/logout',
+      AUTH_ME: '/v1/auth/me',
+      AUTH_ADMIN_USERS: '/v1/auth/admin/users',
+      AUTH_ADMIN_USER_STATUS: (id: string) => `/v1/auth/admin/users/${id}/status`,
     },
   },
 
@@ -64,6 +70,20 @@ export const BACKEND_SERVICES = {
     BASE_URL: process.env.ZORD_PII_ENCLAVE_URL || 'http://localhost:8085',
     ENDPOINTS: {
       HEALTH: '/health',
+    },
+  },
+
+  // zord-analytics: Dashboard KPI and reconciliation intelligence (console-integrated API)
+  ANALYTICS: {
+    BASE_URL: process.env.ZORD_ANALYTICS_URL || 'http://localhost:3000',
+    ENDPOINTS: {
+      OVERVIEW: '/api/prod/zord/metrics/overview',
+      PAYOUT_INTELLIGENCE: '/api/prod/zord/metrics/payout-intelligence',
+      RECONCILIATION: '/api/prod/zord/metrics/reconciliation',
+      PSP_HEALTH: '/api/prod/zord/metrics/psp-health',
+      ERRORS: '/api/prod/zord/metrics/errors',
+      INTENT_DETAIL: (id: string) => `/api/prod/zord/intent/${id}/detail`,
+      SEARCH: '/api/prod/zord/search',
     },
   },
 } as const

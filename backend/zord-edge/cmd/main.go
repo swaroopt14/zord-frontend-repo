@@ -12,6 +12,10 @@ import (
 	"syscall"
 	"time"
 
+	authhandler "zord-edge/auth/handler"
+	authrepo "zord-edge/auth/repository"
+	authsecurity "zord-edge/auth/security"
+	authservice "zord-edge/auth/service"
 	"zord-edge/config"
 	"zord-edge/db"
 	"zord-edge/handler"
@@ -114,6 +118,36 @@ func main() {
 	}
 	cfg := config.LoadConfig()
 
+	tokenManager, err := authsecurity.NewTokenManager(
+		cfg.Auth.SigningKeyPath,
+		cfg.Auth.SigningKeyBase64,
+		cfg.Auth.Issuer,
+		cfg.Auth.Audience,
+		cfg.Auth.AccessTokenTTL,
+	)
+	if err != nil {
+		log.Fatal("failed to initialize auth token manager:", err)
+	}
+
+	authRepository := authrepo.New(db.DB)
+	authService := authservice.New(authRepository, tokenManager, authservice.Config{
+		Issuer:                 cfg.Auth.Issuer,
+		Audience:               cfg.Auth.Audience,
+		AccessTokenTTL:         cfg.Auth.AccessTokenTTL,
+		RefreshTokenTTL:        cfg.Auth.RefreshTokenTTL,
+		LockoutThreshold:       cfg.Auth.LockoutThreshold,
+		LockoutDuration:        cfg.Auth.LockoutDuration,
+		BootstrapAdminName:     cfg.Auth.BootstrapAdminName,
+		BootstrapAdminEmail:    cfg.Auth.BootstrapAdminEmail,
+		BootstrapAdminPassword: cfg.Auth.BootstrapAdminPassword,
+		BootstrapAdminTenantID: cfg.Auth.BootstrapAdminTenantID,
+		BootstrapWorkspaceCode: cfg.Auth.BootstrapWorkspaceCode,
+	})
+	if err := authService.BootstrapAdmin(context.Background()); err != nil {
+		log.Fatal("failed to bootstrap auth admin:", err)
+	}
+	authHTTPHandler := authhandler.New(authService)
+
 	err = vault.InitVaultKey(cfg.VaultKey)
 	if err != nil {
 		log.Fatal("failed to initialize vault key:", err)
@@ -127,7 +161,7 @@ func main() {
 		log.Fatal("failed to load signing key:", err)
 	}
 
-	routes.Routes(server, h)
+	routes.Routes(server, h, authHTTPHandler, tokenManager)
 
 	// Add metrics endpoint
 	server.GET("/metrics", gin.WrapH(promhttp.Handler()))

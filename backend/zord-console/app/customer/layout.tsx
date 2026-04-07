@@ -14,6 +14,8 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
   const pathname = usePathname()
   const [environment, setEnvironment] = useState<'sandbox' | 'production'>('production')
   const [tenantName, setTenantName] = useState<string>('AcmePay')
+  const isCopilotRoute = pathname?.startsWith('/customer/copilot') ?? false
+  const isZordDashboardRoute = pathname?.startsWith('/customer/zord') ?? false
 
   useEffect(() => {
     const t = localStorage.getItem('cx_tenant_name')
@@ -37,6 +39,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
   // Login page gets its own full-screen layout
   const isLoginPage = pathname === '/customer/login'
   if (isLoginPage) return <>{children}</>
+  if (isZordDashboardRoute) return <>{children}</>
 
   return (
     <>
@@ -100,9 +103,16 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
           --glass-badge-bg: rgba(229, 231, 235, 0.12);
           --glass-badge-text: rgba(229, 231, 235, 0.78);
         }
+
+        .cx-liquid-copilot-bg {
+          background:
+            radial-gradient(720px 320px at 8% 0%, rgba(255, 255, 255, 0.08), transparent 62%),
+            radial-gradient(680px 320px at 96% 12%, rgba(255, 255, 255, 0.05), transparent 68%),
+            linear-gradient(180deg, #0b0b0c 0%, #141416 50%, #1c1c1f 100%);
+        }
       `}</style>
 
-      <div className="cx-glass-bg min-h-screen">
+      <div className={`cx-glass-bg min-h-screen ${isCopilotRoute ? 'cx-liquid-copilot-bg' : ''}`}>
       <CustomerTopBar
         tenant={tenantName}
         environment={environment}

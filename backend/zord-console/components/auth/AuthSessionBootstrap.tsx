@@ -1,0 +1,71 @@
+'use client'
+
+import { useEffect } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { clearAuth, getCurrentUser, hasSessionHint, hydrateSession } from '@/services/auth'
+import { UserRole } from '@/types/auth'
+
+function getLoginRoute(pathname: string) {
+  if (pathname.startsWith('/admin')) return '/admin/login'
+  if (pathname.startsWith('/ops')) return '/ops/login'
+  if (pathname.startsWith('/customer')) return '/customer/login'
+  return '/console/login'
+}
+
+function isProtectedPath(pathname: string) {
+  return pathname.startsWith('/console') || pathname.startsWith('/customer') || pathname.startsWith('/ops') || pathname.startsWith('/admin')
+}
+
+function isLoginPath(pathname: string) {
+  return pathname === '/console/login' || pathname === '/customer/login' || pathname === '/ops/login' || pathname === '/admin/login'
+}
+
+function roleMatchesPath(pathname: string, role: UserRole) {
+  if (pathname.startsWith('/admin')) return role === 'ADMIN'
+  if (pathname.startsWith('/ops')) return role === 'OPS'
+  if (pathname.startsWith('/customer') || pathname.startsWith('/console')) {
+    return role === 'CUSTOMER_USER' || role === 'CUSTOMER_ADMIN'
+  }
+  return true
+}
+
+export function AuthSessionBootstrap() {
+  const pathname = usePathname()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!pathname || isLoginPath(pathname) || !isProtectedPath(pathname)) {
+      return
+    }
+
+    // The hint cookie prevents immediate false redirects on hard refresh while
+    // the real session is still being revalidated through /api/auth/me.
+    if (!hasSessionHint() && !getCurrentUser()) {
+      clearAuth()
+      router.replace(getLoginRoute(pathname))
+      return
+    }
+
+    let cancelled = false
+
+    void hydrateSession().then((user) => {
+      if (cancelled) return
+
+      if (!user) {
+        router.replace(getLoginRoute(pathname))
+        return
+      }
+
+      if (!roleMatchesPath(pathname, user.role)) {
+        clearAuth()
+        router.replace(getLoginRoute(pathname))
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [pathname, router])
+
+  return null
+}

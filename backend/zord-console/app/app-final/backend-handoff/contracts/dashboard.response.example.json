@@ -1,0 +1,67 @@
+{
+  "tenant_id": "acme-finance-prod",
+  "generated_at": "2026-03-20T11:25:00Z",
+  "period": "daily",
+  "range": "6m",
+  "activity_mode": "transactions",
+  "payments_funnel": {
+    "stages": [
+      { "key": "income", "label": "Income", "value": 67800, "display": "67.8k" },
+      { "key": "essentials", "label": "Essentials", "value": 33900, "display": "33.9k", "pct": 49, "pct_of": 50 },
+      { "key": "investment", "label": "Investment", "value": 16960, "display": "16.96k", "pct": 25, "pct_of": 25 },
+      { "key": "saving", "label": "Saving", "value": 8810, "display": "8.81k", "pct": 13, "pct_of": 15 },
+      { "key": "rewards", "label": "Rewards", "value": 8130, "display": "8.13k", "pct": 12, "pct_of": 10 }
+    ]
+  },
+  "gross_volume": {
+    "total": 41540,
+    "total_display": "$41,540",
+    "growth_pct": 15,
+    "categories": [
+      { "key": "online_payments", "label": "Online Payments", "amount": 26800, "amount_display": "$26,800", "share_pct": 65 },
+      { "key": "subscriptions", "label": "Subscriptions", "amount": 10400, "amount_display": "$10,400", "share_pct": 40 },
+      { "key": "in_store", "label": "In-Store Sales", "amount": 4340, "amount_display": "$4,340", "share_pct": 20 }
+    ],
+    "chips": [
+      { "key": "transactions", "label": "Transactions", "value": "3,842", "sub": "today" },
+      { "key": "avg_order", "label": "Avg. Order", "value": "$108", "sub": "per txn" },
+      { "key": "refunds", "label": "Refunds", "value": "$1,200", "sub": "0.3%" }
+    ]
+  },
+  "retention": {
+    "range": "6m",
+    "current_pct": 42,
+    "target_pct": 50,
+    "gap_pts": 8,
+    "health": "Watch"
+  },
+  "activity": {
+    "mode": "transactions",
+    "value": "106k",
+    "unit": "processed today",
+    "peak_day": "Wed",
+    "delta": "+34,002",
+    "delta_label": "vs last period",
+    "fill_target": 0.74
+  },
+  "ai_insights": {
+    "score": 75,
+    "status_label": "Reliable",
+    "status_color": "#34D399",
+    "confidence": 96,
+    "updated_label": "Updated 12s ago",
+    "progress": 75,
+    "title": "Authorization rate increased by 4% compared to last week.",
+    "description": "Model confidence is high and signal quality is stable across PSP latency, decline reasons, and retry outcomes.",
+    "drivers": [
+      { "label": "Retry recovery", "value": "+$12.4k", "tone": "positive" },
+      { "label": "Failure volume", "value": "-950", "tone": "positive" },
+      { "label": "Latency alerts", "value": "2 active", "tone": "warning" }
+    ],
+    "chips": [
+      { "label": "Recovered", "value": "$12.4k", "color": "#22c55e", "width": 82 },
+      { "label": "Failures ↓", "value": "−950", "color": "#ef4444", "width": 48 },
+      { "label": "Rate ↑", "value": "+4%", "color": "#a78bfa", "width": 64 }
+    ]
+  }
+}

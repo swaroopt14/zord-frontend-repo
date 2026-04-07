@@ -16,6 +16,7 @@ import (
 type TenantResponse struct {
 	TenantID   string `json:"tenant_id"`
 	TenantName string `json:"tenant_name"`
+	WorkspaceCode string `json:"workspace_code"`
 	Status     string `json:"status"`     // "ACTIVE" or "DISABLED" — mapped from is_active boolean
 	CreatedAt  string `json:"created_at"` // RFC3339 format
 }
@@ -76,7 +77,7 @@ func ListTenants(ctx context.Context, db *sql.DB, page, pageSize int, statusFilt
 	offset := (page - 1) * pageSize
 
 	dataQuery := fmt.Sprintf(`
-		SELECT tenant_id, tenant_name, is_active, created_at
+		SELECT tenant_id, tenant_name, workspace_code, is_active, created_at
 		FROM tenants
 		%s
 		ORDER BY created_at DESC
@@ -96,10 +97,11 @@ func ListTenants(ctx context.Context, db *sql.DB, page, pageSize int, statusFilt
 	for rows.Next() {
 		var tenantID string
 		var tenantName string
+		var workspaceCode string
 		var isActive bool
 		var createdAt time.Time
 
-		if err := rows.Scan(&tenantID, &tenantName, &isActive, &createdAt); err != nil {
+		if err := rows.Scan(&tenantID, &tenantName, &workspaceCode, &isActive, &createdAt); err != nil {
 			return nil, fmt.Errorf("failed to scan tenant row: %w", err)
 		}
 
@@ -111,6 +113,7 @@ func ListTenants(ctx context.Context, db *sql.DB, page, pageSize int, statusFilt
 		tenants = append(tenants, TenantResponse{
 			TenantID:   tenantID,
 			TenantName: tenantName,
+			WorkspaceCode: workspaceCode,
 			Status:     status,
 			CreatedAt:  createdAt.Format(time.RFC3339),
 		})
@@ -143,17 +146,18 @@ func ListTenants(ctx context.Context, db *sql.DB, page, pageSize int, statusFilt
 
 func GetTenantByID(ctx context.Context, db *sql.DB, tenantID string) (*TenantResponse, error) {
 	query := `
-		SELECT tenant_id, tenant_name, is_active, created_at
+		SELECT tenant_id, tenant_name, workspace_code, is_active, created_at
 		FROM tenants
 		WHERE tenant_id = $1
 	`
 
 	var tid string
 	var tenantName string
+	var workspaceCode string
 	var isActive bool
 	var createdAt time.Time
 
-	err := db.QueryRowContext(ctx, query, tenantID).Scan(&tid, &tenantName, &isActive, &createdAt)
+	err := db.QueryRowContext(ctx, query, tenantID).Scan(&tid, &tenantName, &workspaceCode, &isActive, &createdAt)
 	if err == sql.ErrNoRows {
 		return nil, nil // Not found — handler will return 404
 	}
@@ -169,6 +173,7 @@ func GetTenantByID(ctx context.Context, db *sql.DB, tenantID string) (*TenantRes
 	return &TenantResponse{
 		TenantID:   tid,
 		TenantName: tenantName,
+		WorkspaceCode: workspaceCode,
 		Status:     status,
 		CreatedAt:  createdAt.Format(time.RFC3339),
 	}, nil

@@ -1,0 +1,13 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="128" height="128" rx="30" fill="#070708"/>
+  <rect x="1" y="1" width="126" height="126" rx="29" stroke="url(#zord-border)" stroke-opacity="0.35"/>
+  <path d="M28 96V46H64" stroke="white" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M100 96V46H64" stroke="white" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="64" cy="46" r="4" fill="#A855F7"/>
+  <defs>
+    <linearGradient id="zord-border" x1="20" y1="14" x2="106" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6633EE"/>
+      <stop offset="1" stop-color="#A855F7"/>
+    </linearGradient>
+  </defs>
+</svg>

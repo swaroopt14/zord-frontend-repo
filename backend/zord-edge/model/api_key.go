@@ -15,6 +15,7 @@ type MerchantRequest struct {
 type Tenant struct {
 	TenantID   uuid.UUID `db:"tenant_id"`
 	TenantName string    `db:"tenant_name"`
+	WorkspaceCode string `db:"workspace_code"`
 	KeyPrefix  string    `db:"key_prefix"`
 	KeyHash    string    `db:"key_hash"`
 	IsActive   bool      `db:"is_active"`
