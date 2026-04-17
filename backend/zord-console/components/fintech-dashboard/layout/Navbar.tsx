@@ -21,20 +21,20 @@ const NAV_ROUTE_MAP: Partial<Record<NavPage, string>> = {
   SYSTEM: '/app-final/system',
   SETTINGS: '/app-final/settings',
 }
-const NEO_BASE = '#B2B8A3'
-const NEO_LIGHT = '#CAD1B9'
-const NEO_DARK = '#9A9F8D'
-const NEO_INSET_LIGHT = '#D5DCBF'
-const NEO_INSET_DARK = '#8E9382'
-const NEO_CREAM = '#F7F1E3'
-const NEO_TEXT = '#243225'
-const NEO_MUTED = '#6B7360'
-const NEO_ACTIVE = '#4A5D4E'
+const NEO_BASE = '#1C1F2E'
+const NEO_CREAM = '#21253A'
+const NEO_TEXT = '#F0F2F5'
+const NEO_MUTED = 'rgba(240,242,245,0.66)'
+const NEO_ACTIVE = '#6366F1'
+const SIGNAL_GREEN = '#22C55E'
+const SIGNAL_AMBER = '#EAB308'
+const NAV_BORDER = '1px solid rgba(255,255,255,0.07)'
+const NAV_BORDER_STRONG = '1px solid rgba(255,255,255,0.12)'
 const SHELL_SHADOW =
-  '22px 22px 44px rgba(154,159,141,0.38), -16px -16px 34px rgba(213,220,191,0.88), inset 1px 1px 0 rgba(255,255,255,0.22)'
-const OUTSET_SHADOW = `8px 8px 18px ${NEO_DARK}, -6px -6px 14px ${NEO_LIGHT}`
-const POP_SHADOW = `6px 6px 14px ${NEO_DARK}, -4px -4px 12px rgba(255,255,255,0.72)`
-const INSET_SHADOW = `inset 6px 6px 12px ${NEO_INSET_DARK}, inset -6px -6px 12px ${NEO_INSET_LIGHT}`
+  '0 22px 52px rgba(20,22,38,0.30), 0 2px 8px rgba(20,22,38,0.22), inset 0 0.5px 0 rgba(255,255,255,0.10)'
+const POP_SHADOW =
+  '0 10px 26px rgba(20,22,38,0.26), inset 0 0.5px 0 rgba(255,255,255,0.10), inset -3px -3px 8px rgba(0,0,0,0.16)'
+const INSET_SHADOW = 'inset 7px 7px 14px rgba(20,22,38,0.34), inset -5px -5px 10px rgba(255,255,255,0.04)'
 
 interface NavbarProps {
   activePage?: NavPage
@@ -133,8 +133,8 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
         <div
           className="relative overflow-hidden rounded-[34px] p-3 md:p-4"
           style={{
-            background: 'linear-gradient(180deg, rgba(178,184,163,0.97), rgba(170,176,154,0.93))',
-            border: '1px solid rgba(255,255,255,0.24)',
+            background: 'linear-gradient(180deg, rgba(33,37,58,0.98) 0%, rgba(28,31,46,0.98) 100%)',
+            border: NAV_BORDER,
             boxShadow: SHELL_SHADOW,
           }}
         >
@@ -142,7 +142,7 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
             className="pointer-events-none absolute inset-0"
             style={{
               background:
-                'radial-gradient(circle at 10% 0%, rgba(255,255,255,0.34), transparent 28%), radial-gradient(circle at 84% 12%, rgba(255,255,255,0.16), transparent 24%), linear-gradient(180deg, rgba(255,255,255,0.08), transparent 42%)',
+                'radial-gradient(circle at 10% 0%, rgba(99,102,241,0.14), transparent 28%), radial-gradient(circle at 84% 12%, rgba(34,197,94,0.08), transparent 24%), linear-gradient(180deg, rgba(255,255,255,0.05), transparent 42%)',
             }}
           />
           <div className="relative space-y-3">
@@ -152,7 +152,7 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
                 className="group flex min-h-[74px] items-center gap-3 rounded-[26px] px-4 py-3 transition-transform duration-200 hover:-translate-y-[1px]"
                 style={{
                   background: NEO_CREAM,
-                  border: '1px solid rgba(255,255,255,0.22)',
+                  border: NAV_BORDER_STRONG,
                   boxShadow: POP_SHADOW,
                 }}
                 aria-label="Go to Zord dashboard"
@@ -160,12 +160,12 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
                 <div
                   className="flex h-12 w-12 items-center justify-center rounded-[15px]"
                   style={{
-                    background: NEO_ACTIVE,
-                    boxShadow: 'inset 1px 1px 0 rgba(255,255,255,0.14), 0 8px 18px rgba(74,93,78,0.24)',
+                    background: `linear-gradient(180deg, ${NEO_ACTIVE} 0%, #4F46E5 100%)`,
+                    boxShadow: '0 12px 26px rgba(99,102,241,0.24), inset 0 1px 0 rgba(255,255,255,0.20)',
                   }}
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-                    <path d="M3 3h10v2L5.5 11H13v2H3v-2l7.5-6H3V3z" fill={NEO_CREAM} fillRule="evenodd" />
+                    <path d="M3 3h10v2L5.5 11H13v2H3v-2l7.5-6H3V3z" fill={NEO_TEXT} fillRule="evenodd" />
                   </svg>
                 </div>
                 <div className="min-w-0 flex-1">
@@ -176,10 +176,10 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
                     <span
                       className="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] leading-none"
                       style={{
-                        color: ENVIRONMENT === 'LIVE' ? NEO_ACTIVE : '#5C4A2D',
-                        background: ENVIRONMENT === 'LIVE' ? 'rgba(242,232,213,0.92)' : '#DBCFAC',
-                        border: '1px solid rgba(255,255,255,0.28)',
-                        boxShadow: '0 6px 14px rgba(74,93,78,0.12)',
+                        color: ENVIRONMENT === 'LIVE' ? '#BBF7D0' : '#FEF3C7',
+                        background: ENVIRONMENT === 'LIVE' ? 'rgba(34,197,94,0.12)' : 'rgba(234,179,8,0.12)',
+                        border: ENVIRONMENT === 'LIVE' ? '1px solid rgba(34,197,94,0.22)' : '1px solid rgba(234,179,8,0.24)',
+                        boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.10)',
                       }}
                     >
                       {ENVIRONMENT}
@@ -187,7 +187,7 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] font-semibold tracking-[0.08em]" style={{ color: NEO_MUTED }}>
                     <span className="truncate">{TENANT_NAME}</span>
-                    <span className="hidden h-1.5 w-1.5 rounded-full sm:inline-block" style={{ background: NEO_ACTIVE, opacity: 0.65 }} />
+                    <span className="hidden h-1.5 w-1.5 rounded-full sm:inline-block" style={{ background: ENVIRONMENT === 'LIVE' ? SIGNAL_GREEN : SIGNAL_AMBER, opacity: 0.85 }} />
                     <span className="uppercase tracking-[0.16em]">Control Layer</span>
                   </div>
                 </div>
@@ -199,7 +199,7 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
                 className="group flex min-h-[74px] min-w-0 items-center gap-3 rounded-[26px] px-4 text-left"
                 style={{
                   background: NEO_BASE,
-                  border: '1px solid rgba(255,255,255,0.22)',
+                  border: NAV_BORDER,
                   boxShadow: INSET_SHADOW,
                 }}
                 aria-label="Open global search"
@@ -209,7 +209,7 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
                   style={{
                     background: NEO_CREAM,
                     color: NEO_MUTED,
-                    border: '1px solid rgba(255,255,255,0.28)',
+                    border: NAV_BORDER_STRONG,
                     boxShadow: POP_SHADOW,
                   }}
                 >
@@ -231,7 +231,7 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
                   style={{
                     color: NEO_ACTIVE,
                     background: NEO_CREAM,
-                    border: '1px solid rgba(255,255,255,0.3)',
+                    border: NAV_BORDER_STRONG,
                     boxShadow: POP_SHADOW,
                   }}
                 >
@@ -245,7 +245,7 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
                   className="group relative inline-flex h-[74px] items-center justify-center rounded-[24px]"
                   style={{
                     background: NEO_CREAM,
-                    border: '1px solid rgba(255,255,255,0.22)',
+                    border: NAV_BORDER_STRONG,
                     boxShadow: POP_SHADOW,
                   }}
                   title="Alerts"
@@ -257,10 +257,10 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
                   <span
                     className="absolute right-2 top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold"
                     style={{
-                      color: NEO_ACTIVE,
-                      background: NEO_CREAM,
-                      border: '1px solid rgba(255,255,255,0.3)',
-                      boxShadow: POP_SHADOW,
+                      color: '#FECACA',
+                      background: 'rgba(239,68,68,0.13)',
+                      border: '1px solid rgba(239,68,68,0.26)',
+                      boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.10)',
                     }}
                   >
                     6
@@ -272,7 +272,7 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
                   className="group flex min-h-[74px] min-w-0 items-center gap-3 rounded-[24px] px-4 text-left"
                   style={{
                     background: NEO_CREAM,
-                    border: '1px solid rgba(255,255,255,0.22)',
+                    border: NAV_BORDER_STRONG,
                     boxShadow: POP_SHADOW,
                   }}
                   title="Evidence export queue"
@@ -281,7 +281,7 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]"
                     style={{
                       background: NEO_BASE,
-                      border: '1px solid rgba(255,255,255,0.26)',
+                      border: NAV_BORDER,
                       boxShadow: INSET_SHADOW,
                     }}
                   >
@@ -300,9 +300,9 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
                   <span
                     className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold"
                     style={{
-                      color: NEO_ACTIVE,
-                      background: NEO_BASE,
-                      border: '1px solid rgba(255,255,255,0.3)',
+                      color: '#C7D2FE',
+                      background: 'rgba(99,102,241,0.14)',
+                      border: '1px solid rgba(99,102,241,0.24)',
                       boxShadow: INSET_SHADOW,
                     }}
                   >
@@ -315,15 +315,15 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
                   className="inline-flex min-h-[74px] items-center gap-3 rounded-[24px] pl-2 pr-3"
                   style={{
                     background: NEO_CREAM,
-                    border: '1px solid rgba(255,255,255,0.22)',
+                    border: NAV_BORDER_STRONG,
                     boxShadow: POP_SHADOW,
                   }}
                 >
                   <div
                     className="flex h-10 w-10 items-center justify-center rounded-full p-[1.5px]"
                     style={{
-                      background: NEO_ACTIVE,
-                      boxShadow: '0 0 0 1px rgba(255,255,255,0.12), 0 6px 14px rgba(74,93,78,0.22)',
+                      background: `linear-gradient(180deg, ${NEO_ACTIVE} 0%, #4F46E5 100%)`,
+                      boxShadow: '0 0 0 1px rgba(255,255,255,0.12), 0 12px 26px rgba(99,102,241,0.24)',
                     }}
                   >
                     <div
@@ -354,7 +354,7 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
               className="rounded-[28px] px-2 py-2.5"
               style={{
                 background: NEO_BASE,
-                border: '1px solid rgba(255,255,255,0.18)',
+                border: NAV_BORDER,
                 boxShadow: INSET_SHADOW,
               }}
             >
@@ -369,11 +369,14 @@ export function Navbar({ activePage, onPageChange }: NavbarProps) {
                       className="relative flex h-11 w-full items-center justify-center rounded-[18px] px-3 text-center text-[11px] font-bold tracking-[0.14em] transition-all duration-300"
                       style={{
                         color: isActive ? NEO_TEXT : NEO_MUTED,
-                        background: isActive ? NEO_CREAM : 'transparent',
-                        boxShadow: isActive ? POP_SHADOW : 'none',
-                        textShadow: isActive
-                          ? '1px 1px 0 rgba(255,255,255,0.24)'
-                          : '1px 1px 0 rgba(213,220,191,0.45)',
+                        background: isActive
+                          ? 'linear-gradient(180deg, rgba(99,102,241,0.22) 0%, rgba(42,47,69,0.96) 100%)'
+                          : 'transparent',
+                        border: isActive ? '1px solid rgba(99,102,241,0.24)' : '1px solid transparent',
+                        boxShadow: isActive
+                          ? '0 10px 26px rgba(99,102,241,0.18), inset 0 0.5px 0 rgba(255,255,255,0.12)'
+                          : 'none',
+                        textShadow: isActive ? '0 1px 12px rgba(255,255,255,0.10)' : 'none',
                       }}
                     >
                       <span className="relative z-10">{item}</span>

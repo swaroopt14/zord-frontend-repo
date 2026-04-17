@@ -19,7 +19,7 @@
     "docker:recreate": "docker compose up --build --force-recreate -d",
     "docker:reset": "docker compose down --remove-orphans && npm run clean && docker compose up --build -d",
     "deploy": "npm run docker:build && npm run docker:up",
-    "health": "curl -f http://localhost:3000/api/health"
+    "health": "node scripts/health-check.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

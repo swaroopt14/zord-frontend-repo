@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion'
 import { SpotlightCard } from './SpotlightCard'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export function TrustLayer() {
   return (
@@ -38,9 +39,11 @@ export function TrustLayer() {
           </h3>
 
           <div className="mt-8 flex flex-col items-center">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-zord-accent-600 to-zord-accent-300 border border-white/20 mb-3 shadow-[0_0_15px_rgba(102,51,238,0.4)]" />
-            <p className="text-[14px] font-medium text-white/90">Operations Lead</p>
-            <p className="text-[12px] text-white/40">High-volume marketplace team</p>
+            <div className="relative w-12 h-12 mb-3 rounded-full overflow-hidden border border-white/20 shadow-[0_0_15px_rgba(102,51,238,0.4)]">
+              <Image src="/images/ops_lead_avatar.png" alt="Operations Lead" fill className="object-cover" />
+            </div>
+            <p className="text-[14px] font-medium text-white/90">Sarah Jenkins</p>
+            <p className="text-[12px] text-white/40">VP of Operations, Marketplace</p>
           </div>
 
           <div className="mt-14 mb-4 border-t border-white/5 pt-10 flex flex-wrap justify-center gap-6">

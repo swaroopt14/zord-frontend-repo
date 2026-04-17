@@ -24,12 +24,22 @@ export async function POST(request: NextRequest) {
     return response
   }
 
-  const edgeResponse = await fetch(edgeAuthUrl(BACKEND_SERVICES.EDGE.ENDPOINTS.AUTH_REFRESH), {
-    method: 'POST',
-    headers: buildForwardHeaders(request),
-    cache: 'no-store',
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  })
+  let edgeResponse: Response
+  try {
+    edgeResponse = await fetch(edgeAuthUrl(BACKEND_SERVICES.EDGE.ENDPOINTS.AUTH_REFRESH), {
+      method: 'POST',
+      headers: buildForwardHeaders(request),
+      cache: 'no-store',
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+  } catch {
+    const response = NextResponse.json(
+      { code: 'AUTH_SERVICE_UNAVAILABLE', message: 'Authentication service is unavailable right now.' },
+      { status: 503 },
+    )
+    clearAuthCookies(response)
+    return response
+  }
 
   if (!edgeResponse.ok) {
     const errorBody = await parseJSONSafe<BackendErrorEnvelope>(edgeResponse)

@@ -16,6 +16,7 @@
 | --- | --- | --- |
 | `v1.0` | 2026-04-07 | Initial backend JWT auth implementation report |
 | `v1.1` | 2026-04-07 | Added review-ready structure, implementation notes, and local run appendix link |
+| `v1.2` | 2026-04-07 | Added Docker runtime findings, fresh-schema note, and compose healthcheck correction |
 
 ## Scope
 This report covers the JWT-based human authentication work added inside `backend/zord-edge`.
@@ -117,6 +118,8 @@ The backend now returns explicit auth failures required by the new login UX:
 | Refresh tokens were not implemented | Sessions could not be rotated or revoked properly |
 | Existing service already had API-key auth for ingestion | Human auth had to be added without breaking ingestion routes |
 | Bootstrap admin needed a real tenant/workspace | The first admin could not be created against a nonexistent workspace |
+| Legacy DBs could miss `ingress_envelopes.status` | Docker startup could fail before auth endpoints came up |
+| Root compose healthcheck assumed `wget` existed in a `scratch` image | Docker reported the service unhealthy even when HTTP health was green |
 
 ## How Those Problems Were Fixed
 
@@ -129,6 +132,8 @@ The backend now returns explicit auth failures required by the new login UX:
 | No refresh/session rotation | Added opaque refresh token hashing and rotation flow |
 | Need to preserve API-key behavior | Left ingestion auth middleware untouched and added separate user-session middleware |
 | Bootstrap admin dependency | Added bootstrap lookup by tenant ID or workspace code |
+| Old local DB volume missing `ingress_envelopes.status` | Kept `status` in the base `CREATE TABLE` definition and documented that fresh local testing should use a recreated volume/database |
+| False unhealthy Docker state | Removed root-compose container healthcheck for `zord-edge` and documented host-side `/health` probing instead |
 
 ## Tests Added
 
@@ -144,6 +149,21 @@ The backend now returns explicit auth failures required by the new login UX:
 | --- | --- |
 | `go version` | Passed, Go available locally |
 | `go test ./auth/... -v` | Passed |
+| `go test ./...` | Passed |
+| `go vet ./...` | Passed |
+| `go build ./cmd/main.go` | Passed |
+| `docker compose config` | Passed |
+| `docker compose up -d zord-edge-postgres zord-redis zord-kafka-1 zord-kafka-2 zord-kafka-3 zord-edge` | Passed on a fresh schema after correcting local Docker/runtime issues |
+| `curl -i http://localhost:8080/health` | Passed, returned `200 OK` |
+
+## Docker Runtime Findings
+
+| Finding | Result |
+| --- | --- |
+| Backend auth stack starts in Docker | Confirmed |
+| `/v1/auth/*` host service path becomes reachable through Dockerized `zord-edge` | Confirmed |
+| Older local DB volume caused startup mismatch during live testing | Confirmed and documented |
+| Docker health status now needs host/orchestrator probing instead of in-container `wget` | Documented and corrected in compose |
 
 ## Risks and Current Constraints
 
@@ -153,6 +173,7 @@ The backend now returns explicit auth failures required by the new login UX:
 | Startup dependencies | `zord-edge` still requires Kafka and S3 initialization on boot | Recommend follow-up work to isolate auth-only local startup |
 | Bootstrap admin | Requires an existing tenant/workspace | Operational setup step must be followed during first deployment |
 | Password reset | Not included in this phase | Should be planned before wide internal rollout |
+| Observability exporter | Logs noisy warnings when no local OTLP collector is running | Does not block auth flow, but should be tuned for local Docker developer experience |
 
 ## Approval Checklist
 

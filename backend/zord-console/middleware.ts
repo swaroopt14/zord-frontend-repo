@@ -4,13 +4,14 @@ function getLoginRoute(pathname: string) {
   if (pathname.startsWith('/admin')) return '/admin/login'
   if (pathname.startsWith('/ops')) return '/ops/login'
   if (pathname.startsWith('/customer')) return '/customer/login'
+  if (pathname.startsWith('/app-final')) return '/app-final/login'
   return '/console/login'
 }
 
 function roleMatchesPath(pathname: string, role: string) {
   if (pathname.startsWith('/admin')) return role === 'ADMIN'
   if (pathname.startsWith('/ops')) return role === 'OPS'
-  if (pathname.startsWith('/customer') || pathname.startsWith('/console')) {
+  if (pathname.startsWith('/customer') || pathname.startsWith('/console') || pathname.startsWith('/app-final')) {
     return role === 'CUSTOMER_USER' || role === 'CUSTOMER_ADMIN'
   }
   return true
@@ -23,13 +24,15 @@ export function middleware(request: NextRequest) {
     pathname === '/console/login' ||
     pathname === '/customer/login' ||
     pathname === '/ops/login' ||
-    pathname === '/admin/login'
+    pathname === '/admin/login' ||
+    pathname === '/app-final/login'
   ) {
     return NextResponse.next()
   }
 
-  const hasSessionHint = request.cookies.get('zord_session_present')?.value === '1'
-  if (!hasSessionHint) {
+  const hasAccessToken = Boolean(request.cookies.get('zord_access_token')?.value)
+  const hasRefreshToken = Boolean(request.cookies.get('zord_refresh_token')?.value)
+  if (!hasAccessToken && !hasRefreshToken) {
     return NextResponse.redirect(new URL(getLoginRoute(pathname), request.url))
   }
 
@@ -42,5 +45,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/console/:path*', '/customer/:path*', '/ops/:path*', '/admin/:path*'],
+  matcher: ['/console/:path*', '/customer/:path*', '/ops/:path*', '/admin/:path*', '/app-final/:path*'],
 }

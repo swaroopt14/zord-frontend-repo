@@ -2,32 +2,22 @@ package vault
 
 import (
 	"crypto/ed25519"
-	"crypto/x509"
-	"encoding/pem"
-	"errors"
-	"os"
+
+	authsecurity "zord-edge/auth/security"
 )
 
 var SigningKey ed25519.PrivateKey
 
 func InitSigningKey(path string) error {
-	keydata, err := os.ReadFile(path)
+	return InitSigningKeyFromConfig(path, "", false)
+}
+
+func InitSigningKeyFromConfig(path string, base64Key string, allowEphemeral bool) error {
+	parsedKey, err := authsecurity.LoadEd25519PrivateKey(path, base64Key, allowEphemeral)
 	if err != nil {
 		return err
 	}
-	block, _ := pem.Decode(keydata)
-	if block == nil {
-		return errors.New("failed to decode PEM block")
-	}
-	parsedkey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		return err
-	}
-	privkey, ok := parsedkey.(ed25519.PrivateKey)
-	if !ok {
-		return errors.New("not an Ed25519 private key")
-	}
-	SigningKey = privkey
+	SigningKey = parsedKey
 	return nil
 }
 

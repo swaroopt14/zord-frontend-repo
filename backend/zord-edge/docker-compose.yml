@@ -24,8 +24,19 @@ services: # Define the containers/services to run
       - JAEGER_ENDPOINT=http://host.docker.internal:14268/api/traces # Jaeger tracing endpoint
       - AWS_REGION=ap-south-1
       - AWS_EC2_METADATA_DISABLED=true
+      - AWS_ACCESS_KEY_ID=localtest
+      - AWS_SECRET_ACCESS_KEY=localtest
       - S3_BUCKET=arealis-zord-vault
-      - SIGNING_KEY_PATH=/run/secrets/ed25519_private.pem
+      - ZORD_VAULT_KEY=${ZORD_VAULT_KEY:-MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
+      - JWT_ISSUER=${JWT_ISSUER:-zord-edge}
+      - JWT_AUDIENCE=${JWT_AUDIENCE:-zord-console}
+      - JWT_ACCESS_TOKEN_TTL=${JWT_ACCESS_TOKEN_TTL:-15m}
+      - JWT_REFRESH_TOKEN_TTL=${JWT_REFRESH_TOKEN_TTL:-720h}
+      - JWT_LOCKOUT_THRESHOLD=${JWT_LOCKOUT_THRESHOLD:-5}
+      - JWT_LOCKOUT_DURATION=${JWT_LOCKOUT_DURATION:-15m}
+      - AUTH_ALLOW_EPHEMERAL_SIGNING_KEY=${AUTH_ALLOW_EPHEMERAL_SIGNING_KEY:-true}
+      - JWT_SIGNING_PRIVATE_KEY_BASE64=${JWT_SIGNING_PRIVATE_KEY_BASE64:-}
+      - JWT_SIGNING_PRIVATE_KEY_PATH=${JWT_SIGNING_PRIVATE_KEY_PATH:-}
       - VAULT_KEY_ID=key-1234567890
       - OBJECT_STORE_VERSION=v1
     depends_on: # Service dependencies (wait for health checks)
@@ -39,8 +50,6 @@ services: # Define the containers/services to run
         condition: service_healthy
     networks: # Networks this service connects to
       - zord-network
-    volumes:
-      - ./ed25519_private.pem:/run/secrets/ed25519_private.pem:ro
     restart: unless-stopped # Restart policy (restart unless manually stopped)
     # Container healthcheck intentionally omitted for minimal scratch image.
     # Use platform/orchestrator health probes instead.

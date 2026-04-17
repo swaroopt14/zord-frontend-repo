@@ -78,7 +78,7 @@ export default function SettingsPage() {
           <NeumoCard title="Organization Settings" subtitle="Tenant-level identity, defaults, and retention settings that define how the product behaves for this business.">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {orgRows.map((row) => (
-                <div key={row.key} className="rounded-[24px] p-5" style={{ background: NEO_CREAM, border: '1px solid rgba(255,255,255,0.34)', boxShadow: '8px 8px 18px rgba(154,159,141,0.14), -6px -6px 12px rgba(255,255,255,0.62)' }}>
+                <div key={row.key} className="rounded-[24px] p-5" style={{ background: NEO_CREAM, border: '1px solid rgba(255,255,255,0.82)', boxShadow: '6px 6px 14px rgba(118,84,111,0.10), -4px -4px 10px rgba(255,255,255,0.72), inset 1px 1px 0 rgba(255,255,255,0.44)' }}>
                   <div className="text-[12px] font-black uppercase tracking-[0.16em]" style={{ color: NEO_MUTED }}>{row.key}</div>
                   <div className="mt-3 text-[24px] font-black tracking-[-0.03em]" style={{ color: NEO_TEXT }}>{row.value}</div>
                 </div>
@@ -121,7 +121,7 @@ export default function SettingsPage() {
             </InfoStrip>
             <div className="space-y-4">
               {securityRows.map((row) => (
-                <div key={row.control} className="rounded-[24px] p-5" style={{ background: NEO_CREAM, border: '1px solid rgba(255,255,255,0.34)', boxShadow: '8px 8px 18px rgba(154,159,141,0.14), -6px -6px 12px rgba(255,255,255,0.62)' }}>
+                <div key={row.control} className="rounded-[24px] p-5" style={{ background: NEO_CREAM, border: '1px solid rgba(255,255,255,0.82)', boxShadow: '6px 6px 14px rgba(118,84,111,0.10), -4px -4px 10px rgba(255,255,255,0.72), inset 1px 1px 0 rgba(255,255,255,0.44)' }}>
                   <div className="flex items-center justify-between gap-4">
                     <div className="text-[20px] font-black tracking-[-0.03em]" style={{ color: NEO_TEXT }}>{row.control}</div>
                     <StatusChip tone={row.status === 'Enabled' ? 'healthy' : 'watch'}>{row.status}</StatusChip>
@@ -137,7 +137,7 @@ export default function SettingsPage() {
           <NeumoCard title="Billing & Usage" subtitle="Usage and plan visibility so the team can see cost drivers across events, webhook deliveries, and export-heavy activity.">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               {billingRows.map((row) => (
-                <div key={row.item} className="rounded-[24px] p-5" style={{ background: NEO_CREAM, border: '1px solid rgba(255,255,255,0.34)', boxShadow: '8px 8px 18px rgba(154,159,141,0.14), -6px -6px 12px rgba(255,255,255,0.62)' }}>
+                <div key={row.item} className="rounded-[24px] p-5" style={{ background: NEO_CREAM, border: '1px solid rgba(255,255,255,0.82)', boxShadow: '6px 6px 14px rgba(118,84,111,0.10), -4px -4px 10px rgba(255,255,255,0.72), inset 1px 1px 0 rgba(255,255,255,0.44)' }}>
                   <div className="text-[12px] font-black uppercase tracking-[0.16em]" style={{ color: NEO_MUTED }}>{row.item}</div>
                   <div className="mt-4 text-[34px] font-black leading-none tracking-[-0.04em]" style={{ color: NEO_TEXT }}>{row.usage}</div>
                   <div className="mt-3 text-[15px]" style={{ color: NEO_MUTED }}>{row.plan}</div>

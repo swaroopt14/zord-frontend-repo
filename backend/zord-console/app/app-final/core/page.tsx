@@ -7,58 +7,117 @@ import { motion } from 'framer-motion'
 
 
 const FONT_MONO = "'IBM Plex Mono', monospace"
-const PAGE_BG = '#F0F4F8'
-const PAGE_TEXT = '#1E293B'
-const PAGE_MUTED = '#64748B'
-const ELEM_PRIMARY = '#2B3F56'
-const ELEM_ACCENT = '#2563EB'
-const TEXT_ON_STRONG = '#FFFFFF'
-const STRONG_MUTED = 'rgba(255,255,255,0.72)'
-const STRONG_SUBTLE = 'rgba(255,255,255,0.58)'
-const NEO_BASE = PAGE_BG
-const NEO_LIGHT = '#FFFFFF'
-const NEO_DARK = '#D4DCE8'
-const NEO_INSET_LIGHT = '#FFFFFF'
-const NEO_INSET_DARK = '#D4DCE8'
-const NEO_CREAM = '#F7FAFC'
-const NEO_TEXT = PAGE_TEXT
-const NEO_MUTED = PAGE_MUTED
+const PAGE_BG = '#F0F2F5'
+const PAGE_TEXT = '#1C1F2E'
+const PAGE_MUTED = '#5A6070'
+const ELEM_PRIMARY = '#1C1F2E'
+const ELEM_ACCENT = '#6366F1'
+const TEXT_ON_STRONG = '#F0F2F5'
+const STRONG_MUTED = 'rgba(240,242,245,0.72)'
+const STRONG_SUBTLE = 'rgba(240,242,245,0.58)'
+const NEO_BASE = '#1C1F2E'
+const NEO_LIGHT = '#2A2F45'
+const NEO_DARK = '#141725'
+const NEO_INSET_LIGHT = 'rgba(255,255,255,0.09)'
+const NEO_INSET_DARK = 'rgba(20,22,38,0.28)'
+const NEO_CREAM = '#21253A'
+const NEO_TEXT = '#F0F2F5'
+const NEO_MUTED = STRONG_MUTED
 const NEO_ACTIVE = ELEM_ACCENT
-const NEO_CARD_SHADOW = '12px 12px 24px #D4DCE8, -12px -12px 24px #FFFFFF'
-const NEO_TRACK_SHADOW = 'inset 6px 6px 12px #D4DCE8, inset -6px -6px 12px #FFFFFF'
-const NEO_RAISED_SHADOW = '4px 4px 10px #D4DCE8, -4px -4px 10px #FFFFFF'
-const NEO_INSET_SHADOW = 'inset 6px 6px 12px #D4DCE8, inset -6px -6px 12px #FFFFFF'
-const ELEM_DROP_SHADOW = '12px 12px 24px #D4DCE8, -12px -12px 24px #FFFFFF'
+const NEO_CARD_SHADOW =
+  '0 8px 24px rgba(20,22,38,0.28), 0 2px 6px rgba(20,22,38,0.18), inset 0 0.5px 0 rgba(255,255,255,0.09)'
+const NEO_TRACK_SHADOW =
+  'inset 7px 7px 14px rgba(20,22,38,0.34), inset -5px -5px 10px rgba(255,255,255,0.04)'
+const NEO_RAISED_SHADOW =
+  '0 8px 24px rgba(20,22,38,0.24), 0 2px 6px rgba(20,22,38,0.14), inset 0 0.5px 0 rgba(255,255,255,0.09)'
+const NEO_INSET_SHADOW =
+  'inset 7px 7px 14px rgba(20,22,38,0.34), inset -5px -5px 10px rgba(255,255,255,0.04)'
+const ELEM_DROP_SHADOW =
+  '0 8px 24px rgba(20,22,38,0.28), 0 2px 6px rgba(20,22,38,0.18), inset 0 0.5px 0 rgba(255,255,255,0.09)'
 const ELEM_BEVEL_SHADOW =
-  'inset 2px 2px 6px rgba(255, 255, 255, 0.2), inset -3px -3px 8px rgba(0, 0, 0, 0.3)'
+  'inset 0 0.5px 0 rgba(255,255,255,0.09), inset -4px -4px 12px rgba(0,0,0,0.18)'
 const STRONG_CARD_SHADOW = `${ELEM_DROP_SHADOW}, ${ELEM_BEVEL_SHADOW}`
 const STRONG_RAISED_SHADOW =
-  '7px 7px 16px rgba(212,220,232,0.9), -7px -7px 16px rgba(255,255,255,0.98), inset 1px 1px 0 rgba(255,255,255,0.14), inset -2px -2px 6px rgba(0,0,0,0.18)'
+  '0 10px 26px rgba(20,22,38,0.26), inset 0 0.5px 0 rgba(255,255,255,0.10), inset -3px -3px 8px rgba(0,0,0,0.16)'
 const NEO_DARK_ACTIVE_SHADOW =
-  '0 12px 28px rgba(37,99,235,0.18), inset 0 1px 0 rgba(255,255,255,0.24)'
-const CORE_PAGE_BG = 'linear-gradient(180deg, #F0F4F8 0%, #F0F4F8 100%)'
+  '0 12px 28px rgba(99,102,241,0.22), inset 0 1px 0 rgba(255,255,255,0.14)'
+const CORE_PAGE_BG = '#F0F2F5'
 const CORE_PAGE_SPOTS =
-  'radial-gradient(circle at 18% 12%, rgba(255,255,255,0.82), transparent 28%), radial-gradient(circle at 82% 20%, rgba(212,220,232,0.52), transparent 26%), radial-gradient(circle at 76% 78%, rgba(255,255,255,0.68), transparent 24%), radial-gradient(circle at 28% 74%, rgba(212,220,232,0.36), transparent 22%)'
-const CLAY_BG = '#F6EFE6'
-const CLAY_SAGE = '#9CA797'
-const CLAY_CREAM = '#F8EFE3'
-const CLAY_TEXT = '#586354'
-const CLAY_PURPLE = '#4f266e'
-const CLAY_PINK = '#FFF0F8'
-const SWITCHBOARD_TEXT = '#111111'
+  'radial-gradient(circle at 18% 10%, rgba(255,255,255,0.80), transparent 28%), radial-gradient(circle at 78% 8%, rgba(206,211,222,0.34), transparent 32%), radial-gradient(circle at 82% 72%, rgba(227,230,236,0.42), transparent 28%)'
+const CLAY_BG = '#1C1F2E'
+const CLAY_SAGE = '#21253A'
+const CLAY_CREAM = '#21253A'
+const CLAY_TEXT = '#F0F2F5'
+const CLAY_PURPLE = '#1C1F2E'
+const CLAY_PINK = '#21253A'
+const SWITCHBOARD_TEXT = '#F0F2F5'
 const CLAY_TROUGH_SHADOW =
-  'inset 6px 6px 12px rgba(100,110,95,0.5), inset -6px -6px 12px rgba(255,255,255,0.4)'
+  'inset 7px 7px 14px rgba(20,22,38,0.34), inset -5px -5px 10px rgba(255,255,255,0.04)'
 const CLAY_BUTTON_SHADOW =
-  '4px 4px 10px rgba(0,0,0,0.15), inset 4px 4px 8px rgba(255,255,255,0.9), inset -4px -4px 8px rgba(210,195,175,0.7)'
+  '0 8px 24px rgba(20,22,38,0.24), 0 2px 6px rgba(20,22,38,0.14), inset 0 0.5px 0 rgba(255,255,255,0.09)'
 const CLAY_TAB_ACTIVE_SHADOW =
-  '0px 4px 12px rgba(0,0,0,0.15), 0px 0px 0px 6px rgba(248,239,227,0.4), inset 3px 3px 8px rgba(255,255,255,0.9), inset -3px -3px 8px rgba(210,195,175,0.6)'
+  '0 10px 26px rgba(20,22,38,0.22), inset 0 0.5px 0 rgba(255,255,255,0.16), inset -3px -3px 8px rgba(0,0,0,0.16)'
 const CLAY_CARD_DARK_SHADOW =
-  '0px 24px 48px rgba(69,41,90,0.3), inset 2px 2px 8px rgba(255,255,255,0.2), inset -4px -4px 16px rgba(0,0,0,0.4)'
+  '0 8px 24px rgba(20,22,38,0.28), 0 2px 6px rgba(20,22,38,0.18), inset 0 0.5px 0 rgba(255,255,255,0.09)'
 const CLAY_CARD_LIGHT_SHADOW =
-  '0px 16px 32px rgba(0,0,0,0.04), inset 4px 4px 12px rgba(255,255,255,1), inset -4px -4px 12px rgba(230,210,225,0.8)'
+  '0 8px 24px rgba(20,22,38,0.28), 0 2px 6px rgba(20,22,38,0.18), inset 0 0.5px 0 rgba(255,255,255,0.09)'
 const CLAY_NOTE_SHADOW =
-  '0px 10px 24px rgba(210,195,175,0.14), inset 3px 3px 8px rgba(255,255,255,0.95), inset -3px -3px 8px rgba(216,200,182,0.65)'
+  '0 8px 24px rgba(20,22,38,0.24), 0 2px 6px rgba(20,22,38,0.14), inset 0 0.5px 0 rgba(255,255,255,0.09)'
 const FONT_DISPLAY = '"Sora", "Plus Jakarta Sans", "DM Sans", "Inter", sans-serif'
+const PREMIUM_SURFACE = 'linear-gradient(180deg, rgba(33,37,58,0.98) 0%, rgba(28,31,46,0.98) 100%)'
+const PREMIUM_SURFACE_RAISED =
+  'linear-gradient(180deg, rgba(39,44,68,0.98) 0%, rgba(28,31,46,0.98) 100%)'
+const PREMIUM_BORDER = 'rgba(255,255,255,0.07)'
+const PREMIUM_BORDER_STRONG = 'rgba(255,255,255,0.12)'
+const PREMIUM_SHADOW =
+  '0 22px 52px rgba(20,22,38,0.30), 0 2px 8px rgba(20,22,38,0.22), inset 0 0.5px 0 rgba(255,255,255,0.10)'
+const PREMIUM_INSET =
+  'inset 8px 8px 18px rgba(20,22,38,0.32), inset -5px -5px 12px rgba(255,255,255,0.035)'
+
+function statusSurface(tone: string) {
+  if (tone === 'emerald') {
+    return {
+      label: '#86EFAC',
+      dot: '#22C55E',
+      border: 'rgba(34,197,94,0.30)',
+      background: 'linear-gradient(180deg, rgba(34,197,94,0.11) 0%, rgba(33,37,58,0.98) 100%)',
+      chipBackground: 'rgba(34,197,94,0.12)',
+      chipColor: '#BBF7D0',
+      glow: 'rgba(34,197,94,0.15)',
+    }
+  }
+  if (tone === 'amber') {
+    return {
+      label: '#FDE68A',
+      dot: '#EAB308',
+      border: 'rgba(234,179,8,0.30)',
+      background: 'linear-gradient(180deg, rgba(234,179,8,0.12) 0%, rgba(33,37,58,0.98) 100%)',
+      chipBackground: 'rgba(234,179,8,0.12)',
+      chipColor: '#FEF3C7',
+      glow: 'rgba(234,179,8,0.15)',
+    }
+  }
+  if (tone === 'rose') {
+    return {
+      label: '#FCA5A5',
+      dot: '#EF4444',
+      border: 'rgba(239,68,68,0.32)',
+      background: 'linear-gradient(180deg, rgba(239,68,68,0.13) 0%, rgba(33,37,58,0.98) 100%)',
+      chipBackground: 'rgba(239,68,68,0.12)',
+      chipColor: '#FECACA',
+      glow: 'rgba(239,68,68,0.16)',
+    }
+  }
+  return {
+    label: '#C7D2FE',
+    dot: '#6366F1',
+    border: 'rgba(99,102,241,0.26)',
+    background: 'linear-gradient(180deg, rgba(99,102,241,0.10) 0%, rgba(33,37,58,0.98) 100%)',
+    chipBackground: 'rgba(99,102,241,0.12)',
+    chipColor: '#C7D2FE',
+    glow: 'rgba(99,102,241,0.14)',
+  }
+}
 
 type SectionTheme = {
   shellBackground: string
@@ -80,91 +139,106 @@ type SectionTheme = {
 
 const SECTION_THEMES = {
   switchboard: {
-    shellBackground: 'linear-gradient(180deg, #FFF5FB 0%, #F6E5F0 100%)',
-    shellBorder: 'rgba(255,255,255,0.82)',
+    shellBackground: 'linear-gradient(180deg, #21253A 0%, #1C1F2E 100%)',
+    shellBorder: 'rgba(255,255,255,0.07)',
     shellShadow: CLAY_CARD_LIGHT_SHADOW,
     accent: SWITCHBOARD_TEXT,
-    accentSoft: 'rgba(17,17,17,0.05)',
-    accentBorder: 'rgba(17,17,17,0.12)',
-    panelBackground: 'linear-gradient(180deg, #FFF8FC 0%, #F7E8F2 100%)',
-    panelBorder: 'rgba(255,255,255,0.82)',
+    accentSoft: 'rgba(240,242,245,0.06)',
+    accentBorder: 'rgba(255,255,255,0.08)',
+    panelBackground: 'linear-gradient(180deg, #252A41 0%, #1C1F2E 100%)',
+    panelBorder: 'rgba(255,255,255,0.07)',
     panelShadow: CLAY_BUTTON_SHADOW,
-    noteBackground: 'linear-gradient(180deg, #FAEFF7 0%, #F3E4EE 100%)',
-    noteBorder: 'rgba(255,255,255,0.78)',
+    noteBackground: 'linear-gradient(180deg, #24293F 0%, #1C1F2E 100%)',
+    noteBorder: 'rgba(255,255,255,0.07)',
     noteShadow: CLAY_NOTE_SHADOW,
     titleColor: SWITCHBOARD_TEXT,
-    descriptionColor: SWITCHBOARD_TEXT,
+    descriptionColor: 'rgba(240,242,245,0.76)',
     metaColor: SWITCHBOARD_TEXT,
   },
   alerts: {
-    shellBackground: 'linear-gradient(180deg, #FCF4EE 0%, #F7EDE6 100%)',
-    shellBorder: 'rgba(255,255,255,0.78)',
+    shellBackground: 'linear-gradient(180deg, #21253A 0%, #1C1F2E 100%)',
+    shellBorder: 'rgba(255,255,255,0.07)',
     shellShadow: CLAY_CARD_LIGHT_SHADOW,
-    accent: '#876652',
-    accentSoft: 'rgba(135,102,82,0.12)',
-    accentBorder: 'rgba(135,102,82,0.18)',
-    panelBackground: 'linear-gradient(180deg, #FBF3ED 0%, #F7EEE8 100%)',
-    panelBorder: 'rgba(255,255,255,0.82)',
+    accent: '#EAB308',
+    accentSoft: 'rgba(234,179,8,0.12)',
+    accentBorder: 'rgba(234,179,8,0.18)',
+    panelBackground: 'linear-gradient(180deg, #252A41 0%, #1C1F2E 100%)',
+    panelBorder: 'rgba(255,255,255,0.07)',
     panelShadow: CLAY_BUTTON_SHADOW,
-    noteBackground: 'linear-gradient(180deg, #FAF2EB 0%, #F5EBE2 100%)',
-    noteBorder: 'rgba(255,255,255,0.78)',
+    noteBackground: 'linear-gradient(180deg, #24293F 0%, #1C1F2E 100%)',
+    noteBorder: 'rgba(255,255,255,0.07)',
     noteShadow: CLAY_NOTE_SHADOW,
+    titleColor: '#F0F2F5',
+    descriptionColor: 'rgba(240,242,245,0.76)',
+    metaColor: '#F0F2F5',
   },
   flow: {
-    shellBackground: 'linear-gradient(180deg, #FBF4EC 0%, #F6EFE6 100%)',
-    shellBorder: 'rgba(255,255,255,0.78)',
+    shellBackground: 'linear-gradient(180deg, #21253A 0%, #1C1F2E 100%)',
+    shellBorder: 'rgba(255,255,255,0.07)',
     shellShadow: CLAY_CARD_LIGHT_SHADOW,
-    accent: '#6A7B86',
-    accentSoft: 'rgba(106,123,134,0.12)',
-    accentBorder: 'rgba(106,123,134,0.18)',
-    panelBackground: 'linear-gradient(180deg, #FBF4EC 0%, #F8EFE3 100%)',
-    panelBorder: 'rgba(255,255,255,0.82)',
+    accent: '#6366F1',
+    accentSoft: 'rgba(99,102,241,0.13)',
+    accentBorder: 'rgba(99,102,241,0.20)',
+    panelBackground: 'linear-gradient(180deg, #252A41 0%, #1C1F2E 100%)',
+    panelBorder: 'rgba(255,255,255,0.07)',
     panelShadow: CLAY_BUTTON_SHADOW,
-    noteBackground: 'linear-gradient(180deg, #F9F2E9 0%, #F4EBDC 100%)',
-    noteBorder: 'rgba(255,255,255,0.78)',
+    noteBackground: 'linear-gradient(180deg, #24293F 0%, #1C1F2E 100%)',
+    noteBorder: 'rgba(255,255,255,0.07)',
     noteShadow: CLAY_NOTE_SHADOW,
+    titleColor: '#F0F2F5',
+    descriptionColor: 'rgba(240,242,245,0.76)',
+    metaColor: '#F0F2F5',
   },
   risk: {
-    shellBackground: 'linear-gradient(180deg, #FBF3F6 0%, #F4EBF0 100%)',
-    shellBorder: 'rgba(255,255,255,0.78)',
+    shellBackground: 'linear-gradient(180deg, #21253A 0%, #1C1F2E 100%)',
+    shellBorder: 'rgba(255,255,255,0.07)',
     shellShadow: CLAY_CARD_LIGHT_SHADOW,
-    accent: '#7B6C87',
-    accentSoft: 'rgba(123,108,135,0.12)',
-    accentBorder: 'rgba(123,108,135,0.18)',
-    panelBackground: 'linear-gradient(180deg, #FBF3F6 0%, #F6EEF1 100%)',
-    panelBorder: 'rgba(255,255,255,0.82)',
+    accent: '#EF4444',
+    accentSoft: 'rgba(239,68,68,0.12)',
+    accentBorder: 'rgba(239,68,68,0.18)',
+    panelBackground: 'linear-gradient(180deg, #252A41 0%, #1C1F2E 100%)',
+    panelBorder: 'rgba(255,255,255,0.07)',
     panelShadow: CLAY_BUTTON_SHADOW,
-    noteBackground: 'linear-gradient(180deg, #F9F1F4 0%, #F4EBEE 100%)',
-    noteBorder: 'rgba(255,255,255,0.78)',
+    noteBackground: 'linear-gradient(180deg, #24293F 0%, #1C1F2E 100%)',
+    noteBorder: 'rgba(255,255,255,0.07)',
     noteShadow: CLAY_NOTE_SHADOW,
+    titleColor: '#F0F2F5',
+    descriptionColor: 'rgba(240,242,245,0.76)',
+    metaColor: '#F0F2F5',
   },
   realtime: {
-    shellBackground: 'linear-gradient(180deg, #FAF4EC 0%, #F5EEE5 100%)',
-    shellBorder: 'rgba(255,255,255,0.78)',
+    shellBackground: 'linear-gradient(180deg, #21253A 0%, #1C1F2E 100%)',
+    shellBorder: 'rgba(255,255,255,0.07)',
     shellShadow: CLAY_CARD_LIGHT_SHADOW,
-    accent: '#6A7A72',
-    accentSoft: 'rgba(106,122,114,0.12)',
-    accentBorder: 'rgba(106,122,114,0.18)',
-    panelBackground: 'linear-gradient(180deg, #FBF4EC 0%, #F8EFE3 100%)',
-    panelBorder: 'rgba(255,255,255,0.82)',
+    accent: '#22C55E',
+    accentSoft: 'rgba(34,197,94,0.12)',
+    accentBorder: 'rgba(34,197,94,0.18)',
+    panelBackground: 'linear-gradient(180deg, #252A41 0%, #1C1F2E 100%)',
+    panelBorder: 'rgba(255,255,255,0.07)',
     panelShadow: CLAY_BUTTON_SHADOW,
-    noteBackground: 'linear-gradient(180deg, #F9F2E9 0%, #F4EBDC 100%)',
-    noteBorder: 'rgba(255,255,255,0.78)',
+    noteBackground: 'linear-gradient(180deg, #24293F 0%, #1C1F2E 100%)',
+    noteBorder: 'rgba(255,255,255,0.07)',
     noteShadow: CLAY_NOTE_SHADOW,
+    titleColor: '#F0F2F5',
+    descriptionColor: 'rgba(240,242,245,0.76)',
+    metaColor: '#F0F2F5',
   },
   exports: {
-    shellBackground: 'linear-gradient(180deg, #FBF3F7 0%, #F5EDF2 100%)',
-    shellBorder: 'rgba(255,255,255,0.78)',
+    shellBackground: 'linear-gradient(180deg, #21253A 0%, #1C1F2E 100%)',
+    shellBorder: 'rgba(255,255,255,0.07)',
     shellShadow: CLAY_CARD_LIGHT_SHADOW,
-    accent: '#7B6C87',
-    accentSoft: 'rgba(123,108,135,0.12)',
-    accentBorder: 'rgba(123,108,135,0.18)',
-    panelBackground: 'linear-gradient(180deg, #FBF3F6 0%, #F7EEF2 100%)',
-    panelBorder: 'rgba(255,255,255,0.82)',
+    accent: '#6366F1',
+    accentSoft: 'rgba(99,102,241,0.13)',
+    accentBorder: 'rgba(99,102,241,0.20)',
+    panelBackground: 'linear-gradient(180deg, #252A41 0%, #1C1F2E 100%)',
+    panelBorder: 'rgba(255,255,255,0.07)',
     panelShadow: CLAY_BUTTON_SHADOW,
-    noteBackground: 'linear-gradient(180deg, #F8F0F4 0%, #F3EAF0 100%)',
-    noteBorder: 'rgba(255,255,255,0.78)',
+    noteBackground: 'linear-gradient(180deg, #24293F 0%, #1C1F2E 100%)',
+    noteBorder: 'rgba(255,255,255,0.07)',
     noteShadow: CLAY_NOTE_SHADOW,
+    titleColor: '#F0F2F5',
+    descriptionColor: 'rgba(240,242,245,0.76)',
+    metaColor: '#F0F2F5',
   },
 } as const
 
@@ -201,7 +275,7 @@ const COMMAND_CENTER_KPI_ITEMS = [
     sub: '14,712 payouts confirmed cleanly out of 14,879 intents',
     trend: 'Healthy execution with failure load contained below 1.2%',
     note: 'Answers: is the payout engine working right now?',
-    accent: 'text-[#0EA5E9]',
+    accent: 'text-[#5A5D68]',
   },
   {
     label: 'Money at Risk',
@@ -210,7 +284,7 @@ const COMMAND_CENTER_KPI_ITEMS = [
     sub: 'Pending finality plus failed / reversed value still under watch',
     trend: 'Biggest exposure sits in delayed statements and SLA-breach cohorts',
     note: 'Answers: where can the customer still lose money?',
-    accent: 'text-[#1E293B]',
+    accent: 'text-[#F0F2F5]',
   },
   {
     label: 'Outcome Trust',
@@ -219,7 +293,7 @@ const COMMAND_CENTER_KPI_ITEMS = [
     sub: 'Webhook, poll, and settlement evidence aligned for close-ready payouts',
     trend: 'Audit posture is strong, but statement lag still lowers full confidence',
     note: 'Answers: can finance defend the payout outcome with evidence?',
-    accent: 'text-[#0EA5E9]',
+    accent: 'text-[#5A5D68]',
   },
   {
     label: 'Leakage Prevented',
@@ -228,7 +302,7 @@ const COMMAND_CENTER_KPI_ITEMS = [
     sub: 'Recovered this cycle through routing changes and recon automation',
     trend: 'Savings are coming from avoided retries, variance catch, and faster proof',
     note: 'Answers: how much money did operations protect this cycle?',
-    accent: 'text-[#0EA5E9]',
+    accent: 'text-[#5A5D68]',
   },
 ] as const
 
@@ -240,7 +314,7 @@ const PAYOUT_KPI_ITEMS = [
     sub: '14,712 confirmed of 14,879',
     trend: '↑ +0.24% WoW',
     note: 'Execution health: confirms routed payout volume is landing without churn.',
-    accent: 'text-[#0EA5E9]',
+    accent: 'text-[#5A5D68]',
   },
   {
     label: 'Total Confirmed',
@@ -249,7 +323,7 @@ const PAYOUT_KPI_ITEMS = [
     sub: '14,712 intents · this cycle',
     trend: '↑ +12% vs last week',
     note: 'Outcome landed: value already delivered and no longer sitting in risk queues.',
-    accent: 'text-[#0EA5E9]',
+    accent: 'text-[#5A5D68]',
   },
   {
     label: 'Pending Finality',
@@ -258,7 +332,7 @@ const PAYOUT_KPI_ITEMS = [
     sub: '51 intents — SFTP awaited',
     trend: '→ 6 approaching SLA',
     note: 'Money risk: capital still blocked until UTR and bank evidence are confirmed.',
-    accent: 'text-[#0EA5E9]',
+    accent: 'text-[#5A5D68]',
   },
   {
     label: 'Failed + Reversed',
@@ -267,7 +341,7 @@ const PAYOUT_KPI_ITEMS = [
     sub: '27 conflict · 89 SLA breach',
     trend: '↓ Better than last week',
     note: 'Loss prevention: unresolved failures become write-off or support cost if ignored.',
-    accent: 'text-[#1E293B]',
+    accent: 'text-[#F0F2F5]',
   },
 ] as const
 
@@ -282,12 +356,12 @@ const PAYOUT_TREND_DATA = [
 ]
 
 const VELOCITY_BINS = [
-  { label: '0-1m', count: 8821, tone: 'bg-[#0EA5E9]' },
+  { label: '0-1m', count: 8821, tone: 'bg-[#6B6E7A]' },
   { label: '1-5m', count: 2341, tone: 'bg-[#38BDF8]' },
   { label: '5-15m', count: 892, tone: 'bg-[#7DD3FC]' },
-  { label: '15-30m', count: 421, tone: 'bg-[#94A3B8]' },
-  { label: '30-60m', count: 204, tone: 'bg-[#64748B]' },
-  { label: '>60m', count: 201, tone: 'bg-[#1E293B]' },
+  { label: '15-30m', count: 421, tone: 'bg-[#A8AFBF]' },
+  { label: '30-60m', count: 204, tone: 'bg-[#A8AFBF]' },
+  { label: '>60m', count: 201, tone: 'bg-[#A8AFBF]' },
 ]
 
 const PSP_ROWS = [
@@ -314,10 +388,10 @@ const IFSC_ROWS = [
 ] as const
 
 const RECON_ROWS = [
-  { state: 'Confirmed and safe', value: 14021, pct: 95, tone: 'bg-[#0EA5E9]' },
+  { state: 'Confirmed and safe', value: 14021, pct: 95, tone: 'bg-[#6B6E7A]' },
   { state: 'Awaiting statement proof', value: 421, pct: 34, tone: 'bg-[#7DD3FC]' },
-  { state: 'Partially settled', value: 192, pct: 18, tone: 'bg-[#94A3B8]' },
-  { state: 'Amount unverified', value: 78, pct: 8, tone: 'bg-[#1E293B]' },
+  { state: 'Partially settled', value: 192, pct: 18, tone: 'bg-[#A8AFBF]' },
+  { state: 'Amount unverified', value: 78, pct: 8, tone: 'bg-[#A8AFBF]' },
 ] as const
 
 const SELLER_ROWS = [
@@ -336,7 +410,7 @@ const RECON_KPI_ITEMS = [
     sub: '14,354 payout intents now defensible for finance close',
     trend: '↑ +1.10% vs prior window',
     note: 'Trust layer: how much of the payout book is backed by reconciled evidence.',
-    accent: 'text-[#0EA5E9]',
+    accent: 'text-[#5A5D68]',
   },
   {
     label: 'Evidence Coverage',
@@ -345,7 +419,7 @@ const RECON_KPI_ITEMS = [
     sub: 'Webhook, poll, and statement aligned',
     trend: '↑ +0.70% coverage lift',
     note: 'Trust layer: strongest defence against audit challenge and dispute re-open.',
-    accent: 'text-[#0EA5E9]',
+    accent: 'text-[#5A5D68]',
   },
   {
     label: 'Time to Provisional',
@@ -354,7 +428,7 @@ const RECON_KPI_ITEMS = [
     sub: 'Initial confidence from available signals',
     trend: '↓ Faster by 0.4m',
     note: 'Execution layer: early confidence reduces ops drag before final proof arrives.',
-    accent: 'text-[#0EA5E9]',
+    accent: 'text-[#5A5D68]',
   },
   {
     label: 'Variance at Risk',
@@ -363,7 +437,7 @@ const RECON_KPI_ITEMS = [
     sub: 'Cross-period and settlement-gap value still needing explanation',
     trend: '→ Stable within SLA',
     note: 'Risk layer: small variances compound into leakage and close-delay if not contained.',
-    accent: 'text-[#1E293B]',
+    accent: 'text-[#F0F2F5]',
   },
 ] as const
 
@@ -424,8 +498,8 @@ const VARIANCE_ROWS = [
 ] as const
 
 const AUTO_MANUAL_CLOSURE = [
-  { name: 'Auto-close', pct: 78, color: '#0EA5E9' },
-  { name: 'Manual-close', pct: 22, color: '#1E293B' },
+  { name: 'Auto-close', pct: 78, color: '#6B6E7A' },
+  { name: 'Manual-close', pct: 22, color: '#A8AFBF' },
 ] as const
 
 const CROSS_PERIOD_FLAGS = [
@@ -506,11 +580,11 @@ const SETTLEMENT_COHORT_ROWS = [
 ] as const
 
 const AMOUNT_BUCKET_ROWS = [
-  { label: 'Under ₹1K', count: '3,421', success: '99.1%', pct: 62, tone: 'bg-[#0EA5E9]' },
+  { label: 'Under ₹1K', count: '3,421', success: '99.1%', pct: 62, tone: 'bg-[#6B6E7A]' },
   { label: '₹1K – ₹10K', count: '6,892', success: '98.8%', pct: 82, tone: 'bg-[#38BDF8]' },
   { label: '₹10K – ₹50K', count: '3,104', success: '97.2%', pct: 55, tone: 'bg-[#7DD3FC]' },
-  { label: '₹50K – ₹1L', count: '892', success: '94.1%', pct: 28, tone: 'bg-[#94A3B8]' },
-  { label: 'Above ₹1L', count: '570', success: '91.4%', pct: 18, tone: 'bg-[#1E293B]' },
+  { label: '₹50K – ₹1L', count: '892', success: '94.1%', pct: 28, tone: 'bg-[#A8AFBF]' },
+  { label: 'Above ₹1L', count: '570', success: '91.4%', pct: 18, tone: 'bg-[#A8AFBF]' },
 ] as const
 
 const SIGNAL_COVERAGE_MATRIX = [
@@ -557,8 +631,8 @@ function Card({
     <section
       className={`rounded-[30px] ${className}`}
       style={{
-        background: CLAY_BG,
-        border: '1px solid rgba(255,255,255,0.82)',
+        background: PREMIUM_SURFACE,
+        border: `1px solid ${PREMIUM_BORDER}`,
         boxShadow: CLAY_CARD_LIGHT_SHADOW,
         ...style,
       }}
@@ -585,7 +659,7 @@ function SectionHeader({
   const eyebrowBackground = theme?.accentSoft ?? 'rgba(156,167,151,0.16)'
   const eyebrowBorder = theme?.accentBorder ?? 'rgba(156,167,151,0.24)'
   const titleColor = theme?.titleColor ?? (theme ? CLAY_TEXT : NEO_TEXT)
-  const descriptionColor = theme?.descriptionColor ?? (theme ? 'rgba(88,99,84,0.78)' : NEO_MUTED)
+  const descriptionColor = theme?.descriptionColor ?? (theme ? 'rgba(240,242,245,0.76)' : NEO_MUTED)
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -653,28 +727,28 @@ function LiquidGlassTabs<T extends string>({
       <div
         className="relative isolate w-full max-w-[860px] overflow-hidden rounded-[30px] p-[10px]"
         style={{
-          background: 'linear-gradient(180deg, #C8B4CC 0%, #B7A0BC 100%)',
-          border: '1px solid rgba(255,255,255,0.22)',
+          background: 'linear-gradient(180deg, #21253A 0%, #1C1F2E 100%)',
+          border: '1px solid rgba(255,255,255,0.07)',
           boxShadow:
-            '6px 6px 14px rgba(118,84,111,0.18), -4px -4px 10px rgba(255,255,255,0.72), inset 6px 6px 12px rgba(93,69,109,0.28), inset -4px -4px 10px rgba(255,255,255,0.36)',
+            '0 8px 24px rgba(20,22,38,0.28), 0 2px 6px rgba(20,22,38,0.18), inset 7px 7px 14px rgba(20,22,38,0.34), inset -5px -5px 10px rgba(255,255,255,0.04)',
         }}
       >
         <span
           aria-hidden="true"
           className="pointer-events-none absolute inset-[3px] rounded-[27px]"
           style={{
-            border: '1px solid rgba(255,255,255,0.18)',
+            border: '1px solid rgba(255,255,255,0.07)',
             boxShadow:
-              'inset 1px 1px 0 rgba(255,255,255,0.18), inset -1px -1px 0 rgba(93,69,109,0.12)',
+              'inset 0 0.5px 0 rgba(255,255,255,0.08), inset -1px -1px 0 rgba(0,0,0,0.18)',
           }}
         />
         <span
           aria-hidden="true"
           className="pointer-events-none absolute inset-[9px] rounded-[23px]"
           style={{
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.01) 40%, rgba(93,69,109,0.08) 100%)',
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.01) 40%, rgba(0,0,0,0.16) 100%)',
             boxShadow:
-              'inset 2px 2px 5px rgba(93,69,109,0.18), inset -2px -2px 5px rgba(255,255,255,0.12)',
+              'inset 2px 2px 5px rgba(20,22,38,0.22), inset -2px -2px 5px rgba(255,255,255,0.05)',
           }}
         />
         <div className="relative z-10 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -694,23 +768,23 @@ function LiquidGlassTabs<T extends string>({
                 }}
               >
                 {isActive ? (
-                  <motion.span
-                    layoutId="core-liquid-glass-tab"
-                    className="absolute inset-0 rounded-[20px]"
-                    transition={{ type: 'spring', stiffness: 380, damping: 34 }}
-                    style={{
-                      background: 'linear-gradient(180deg, #FFF6FB 0%, #F3E2EC 100%)',
-                      border: '1px solid rgba(255,255,255,0.34)',
+                <motion.span
+                  layoutId="core-liquid-glass-tab"
+                  className="absolute inset-0 rounded-[20px]"
+                  transition={{ type: 'spring', stiffness: 380, damping: 34 }}
+                  style={{
+                      background: 'linear-gradient(180deg, #F0F2F5 0%, #DCE0E8 100%)',
+                      border: '1px solid rgba(255,255,255,0.32)',
                       boxShadow:
-                        '0px 6px 16px rgba(118,84,111,0.16), inset 2px 2px 6px rgba(255,255,255,0.82), inset -3px -3px 8px rgba(118,84,111,0.14)',
+                        '0 10px 26px rgba(20,22,38,0.24), inset 0 1px 0 rgba(255,255,255,0.74), inset -3px -3px 8px rgba(20,22,38,0.12)',
                     }}
                   >
                     <span
                       className="absolute inset-[4px] rounded-[16px]"
                       style={{
-                        background: 'linear-gradient(180deg, rgba(255,255,255,0.52) 0%, rgba(255,255,255,0.16) 100%)',
+                        background: 'linear-gradient(180deg, rgba(255,255,255,0.52) 0%, rgba(255,255,255,0.14) 100%)',
                         boxShadow:
-                          'inset 2px 2px 4px rgba(255,255,255,0.30), inset -2px -2px 5px rgba(118,84,111,0.08)',
+                          'inset 1px 1px 0 rgba(255,255,255,0.32), inset -2px -2px 5px rgba(20,22,38,0.08)',
                       }}
                     />
                   </motion.span>
@@ -721,11 +795,13 @@ function LiquidGlassTabs<T extends string>({
                     style={{
                       border: '1px solid rgba(255,255,255,0.10)',
                       boxShadow:
-                        'inset 1px 1px 0 rgba(255,255,255,0.08), inset -1px -1px 0 rgba(93,69,109,0.10)',
+                        'inset 1px 1px 0 rgba(255,255,255,0.08), inset -1px -1px 0 rgba(100,105,122,0.10)',
                     }}
                   />
                 )}
-                <span className="relative z-10 leading-tight">{item.label}</span>
+                <span className="relative z-10 leading-tight" style={{ color: isActive ? PAGE_TEXT : 'rgba(240,242,245,0.76)' }}>
+                  {item.label}
+                </span>
               </button>
             )
           })}
@@ -756,10 +832,10 @@ function GlassSwitchTabs<T extends string>({
         compact ? 'gap-1 p-1 rounded-[18px]' : 'gap-1.5 p-1.5 rounded-[20px]'
       }`}
       style={{
-        background: isPlum ? 'linear-gradient(180deg, #C8B4CC 0%, #B7A0BC 100%)' : CLAY_SAGE,
-        border: '1px solid rgba(255,255,255,0.24)',
+        background: isPlum ? 'linear-gradient(180deg, #21253A 0%, #1C1F2E 100%)' : CLAY_SAGE,
+        border: '1px solid rgba(255,255,255,0.07)',
         boxShadow: isPlum
-          ? 'inset 6px 6px 12px rgba(93,69,109,0.28), inset -4px -4px 10px rgba(255,255,255,0.36)'
+          ? 'inset 7px 7px 14px rgba(20,22,38,0.34), inset -5px -5px 10px rgba(255,255,255,0.04)'
           : CLAY_TROUGH_SHADOW,
       }}
     >
@@ -776,13 +852,13 @@ function GlassSwitchTabs<T extends string>({
             style={{
               background: isActive
                 ? isPlum
-                  ? 'linear-gradient(180deg, #FFF6FB 0%, #F3E2EC 100%)'
+                  ? 'linear-gradient(180deg, #F0F2F5 0%, #DCE0E8 100%)'
                   : CLAY_CREAM
                 : 'transparent',
-              color: isPlum ? SWITCHBOARD_TEXT : isActive ? CLAY_TEXT : CLAY_TEXT,
+              color: isPlum ? (isActive ? PAGE_TEXT : 'rgba(240,242,245,0.76)') : isActive ? CLAY_TEXT : CLAY_TEXT,
               boxShadow: isActive
                 ? isPlum
-                  ? '0px 6px 16px rgba(118,84,111,0.16), inset 2px 2px 6px rgba(255,255,255,0.82), inset -3px -3px 8px rgba(118,84,111,0.14)'
+                  ? '0 10px 26px rgba(20,22,38,0.24), inset 0 1px 0 rgba(255,255,255,0.74), inset -3px -3px 8px rgba(20,22,38,0.12)'
                   : CLAY_TAB_ACTIVE_SHADOW
                 : 'none',
               textShadow: isActive
@@ -821,9 +897,9 @@ function GlassUtilityPill({
         }
       : tone === 'smoke'
       ? {
-          color: NEO_MUTED,
-          background: NEO_BASE,
-          border: '1px solid rgba(255,255,255,0.72)',
+          color: STRONG_MUTED,
+          background: 'rgba(255,255,255,0.08)',
+          border: '1px solid rgba(255,255,255,0.12)',
           boxShadow: NEO_INSET_SHADOW,
         }
       : tone === 'dark'
@@ -836,7 +912,7 @@ function GlassUtilityPill({
       : {
           color: NEO_TEXT,
           background: NEO_CREAM,
-          border: '1px solid rgba(255,255,255,0.78)',
+          border: '1px solid rgba(255,255,255,0.12)',
           boxShadow: NEO_RAISED_SHADOW,
         }
 
@@ -870,31 +946,37 @@ function DashboardKpiStrip({
       {items.map((kpi) => {
         const lensClasses =
           kpi.lens === 'Execution'
-            ? 'border-[rgba(248,239,227,0.28)] bg-[rgba(248,239,227,0.18)] text-white'
+            ? 'border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.12)] text-[#BBF7D0]'
             : kpi.lens === 'Risk'
-            ? 'border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.08)] text-white'
-            : 'border-[rgba(255,240,248,0.26)] bg-[rgba(255,240,248,0.14)] text-white'
+            ? 'border-[rgba(239,68,68,0.28)] bg-[rgba(239,68,68,0.12)] text-[#FECACA]'
+            : 'border-[rgba(99,102,241,0.28)] bg-[rgba(99,102,241,0.12)] text-[#C7D2FE]'
 
-        const trendColor = kpi.lens === 'Risk' ? TEXT_ON_STRONG : '#F9E8F5'
+        const trendColor = kpi.lens === 'Risk' ? '#FCA5A5' : kpi.lens === 'Execution' ? '#86EFAC' : '#C7D2FE'
         const accentBar =
           kpi.lens === 'Execution'
-            ? 'linear-gradient(90deg, rgba(248,239,227,0.18), rgba(248,239,227,0.9), rgba(255,255,255,0.26))'
+            ? 'linear-gradient(90deg, rgba(34,197,94,0.12), rgba(34,197,94,0.82), rgba(255,255,255,0.18))'
             : kpi.lens === 'Risk'
-            ? 'linear-gradient(90deg, rgba(255,255,255,0.12), rgba(255,255,255,0.72), rgba(255,255,255,0.18))'
-            : 'linear-gradient(90deg, rgba(255,240,248,0.18), rgba(255,240,248,0.88), rgba(255,255,255,0.24))'
+            ? 'linear-gradient(90deg, rgba(239,68,68,0.12), rgba(239,68,68,0.84), rgba(255,255,255,0.16))'
+            : 'linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.22), rgba(255,255,255,0.08))'
         const accentGlow =
           kpi.lens === 'Execution'
-            ? 'radial-gradient(circle, rgba(248,239,227,0.22), transparent 70%)'
+            ? 'radial-gradient(circle, rgba(34,197,94,0.18), transparent 70%)'
             : kpi.lens === 'Risk'
-            ? 'radial-gradient(circle, rgba(255,255,255,0.18), transparent 72%)'
-            : 'radial-gradient(circle, rgba(255,240,248,0.22), transparent 72%)'
+            ? 'radial-gradient(circle, rgba(239,68,68,0.18), transparent 72%)'
+            : 'radial-gradient(circle, rgba(99,102,241,0.08), transparent 74%)'
+        const cardSurface =
+          kpi.lens === 'Execution'
+            ? 'radial-gradient(circle at 100% 0%, rgba(34,197,94,0.10), transparent 30%), linear-gradient(180deg, #21253A 0%, #1C1F2E 100%)'
+            : kpi.lens === 'Risk'
+            ? 'radial-gradient(circle at 100% 0%, rgba(239,68,68,0.12), transparent 32%), linear-gradient(180deg, #21253A 0%, #1C1F2E 100%)'
+            : 'linear-gradient(180deg, #21253A 0%, #1C1F2E 100%)'
 
         return (
           <section
             key={kpi.label}
             className="relative overflow-hidden rounded-[30px] p-7"
             style={{
-              background: CLAY_PURPLE,
+              background: cardSurface,
               border: '1px solid rgba(255,255,255,0.14)',
               boxShadow: CLAY_CARD_DARK_SHADOW,
             }}
@@ -957,16 +1039,16 @@ function CommandStatusOverview() {
           background: theme.shellBackground,
           border: `1px solid ${theme.shellBorder}`,
           boxShadow:
-            '10px 10px 22px rgba(118,84,111,0.10), -6px -6px 16px rgba(255,255,255,0.85), inset 1px 1px 0 rgba(255,255,255,0.52), inset -1px -1px 0 rgba(118,84,111,0.08)',
+            '0 8px 24px rgba(20,22,38,0.28), 0 2px 6px rgba(20,22,38,0.18), inset 0 0.5px 0 rgba(255,255,255,0.09)',
         }}
       >
         <span
           aria-hidden="true"
           className="pointer-events-none absolute inset-[4px] rounded-[26px]"
           style={{
-            border: '1px solid rgba(255,255,255,0.26)',
+            border: '1px solid rgba(255,255,255,0.07)',
             boxShadow:
-              'inset 8px 8px 16px rgba(118,84,111,0.08), inset -6px -6px 12px rgba(255,255,255,0.26)',
+              'inset 8px 8px 16px rgba(20,22,38,0.22), inset -6px -6px 12px rgba(255,255,255,0.03)',
           }}
         />
         <span
@@ -975,7 +1057,7 @@ function CommandStatusOverview() {
           style={{
             background: 'linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.02) 100%)',
             boxShadow:
-              'inset 2px 2px 6px rgba(255,255,255,0.10), inset -4px -4px 10px rgba(118,84,111,0.05)',
+              'inset 2px 2px 6px rgba(255,255,255,0.04), inset -4px -4px 10px rgba(20,22,38,0.18)',
           }}
         />
         <SectionHeader
@@ -993,24 +1075,24 @@ function CommandStatusOverview() {
               value: '4 PSPs + bank API',
               note: 'route quality and callback trust',
               accent: SWITCHBOARD_TEXT,
-              background: 'linear-gradient(180deg, #FFF7FC 0%, #F5E8F2 100%)',
-              border: '#E8D6E4',
+              background: 'linear-gradient(180deg, #252A41 0%, #1C1F2E 100%)',
+              border: 'rgba(255,255,255,0.07)',
             },
             {
               label: 'Rail Posture',
               value: 'IMPS healthy',
               note: 'NEFT batch + RTGS watch',
               accent: SWITCHBOARD_TEXT,
-              background: 'linear-gradient(180deg, #FCF2F8 0%, #F1E3EE 100%)',
-              border: '#E6D4E2',
+              background: 'linear-gradient(180deg, #252A41 0%, #1C1F2E 100%)',
+              border: 'rgba(255,255,255,0.07)',
             },
             {
               label: 'Bank Hotspots',
               value: '3 branches flagged',
               note: 'ICICI and SBI need attention',
               accent: SWITCHBOARD_TEXT,
-              background: 'linear-gradient(180deg, #FCEFF5 0%, #F2E2EA 100%)',
-              border: '#E8D5DE',
+              background: 'linear-gradient(180deg, #252A41 0%, #1C1F2E 100%)',
+              border: 'rgba(255,255,255,0.07)',
             },
           ].map((item) => (
             <div
@@ -1020,7 +1102,7 @@ function CommandStatusOverview() {
                 background: item.background,
                 border: `1px solid ${item.border}`,
                 boxShadow:
-                  '6px 6px 14px rgba(118,84,111,0.10), -4px -4px 10px rgba(255,255,255,0.72), inset 1px 1px 0 rgba(255,255,255,0.44), inset -1px -1px 0 rgba(118,84,111,0.05)',
+                  '0 8px 24px rgba(20,22,38,0.22), 0 2px 6px rgba(20,22,38,0.14), inset 0 0.5px 0 rgba(255,255,255,0.09)',
               }}
             >
               <span
@@ -1029,7 +1111,7 @@ function CommandStatusOverview() {
                 style={{
                   border: '1px solid rgba(255,255,255,0.22)',
                   boxShadow:
-                    'inset 5px 5px 10px rgba(118,84,111,0.08), inset -3px -3px 6px rgba(255,255,255,0.22)',
+                    'inset 5px 5px 10px rgba(20,22,38,0.20), inset -3px -3px 6px rgba(255,255,255,0.04)',
                 }}
               />
               <div className="relative z-10">
@@ -1071,7 +1153,7 @@ function CommandStatusOverview() {
             background: theme.panelBackground,
             border: `1px solid ${theme.panelBorder}`,
             boxShadow:
-              '7px 7px 16px rgba(118,84,111,0.08), -4px -4px 12px rgba(255,255,255,0.64), inset 7px 7px 14px rgba(118,84,111,0.06), inset -5px -5px 12px rgba(255,255,255,0.34)',
+              '0 8px 24px rgba(20,22,38,0.24), 0 2px 6px rgba(20,22,38,0.14), inset 7px 7px 14px rgba(20,22,38,0.20), inset -5px -5px 12px rgba(255,255,255,0.04)',
           }}
         >
           <span
@@ -1080,76 +1162,74 @@ function CommandStatusOverview() {
             style={{
               border: '1px solid rgba(255,255,255,0.24)',
               boxShadow:
-                'inset 5px 5px 10px rgba(118,84,111,0.07), inset -4px -4px 8px rgba(255,255,255,0.18)',
+                'inset 5px 5px 10px rgba(20,22,38,0.18), inset -4px -4px 8px rgba(255,255,255,0.04)',
             }}
           />
           {view === 'psp' && (
             <div className="relative z-10 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
               {PSP_STATUS_PILLS.map((pill) => {
-                const tone =
-                  pill.tone === 'emerald'
-                    ? {
-                        border: '#E3D5E2',
-                        background: 'linear-gradient(180deg, #F8EDF6 0%, #EEE2EC 100%)',
-                        color: SWITCHBOARD_TEXT,
-                        dot: '#664A78',
-                      }
-                    : pill.tone === 'amber'
-                    ? {
-                        border: '#E8D5DE',
-                        background: 'linear-gradient(180deg, #FCEEF4 0%, #F1E0E8 100%)',
-                        color: SWITCHBOARD_TEXT,
-                        dot: '#8C5867',
-                      }
-                    : pill.tone === 'rose'
-                    ? {
-                        border: '#DCC6D7',
-                        background: 'linear-gradient(180deg, #F2E4F0 0%, #E8D7E5 100%)',
-                        color: SWITCHBOARD_TEXT,
-                        dot: '#5A365F',
-                      }
-                    : {
-                        border: '#DED6E4',
-                        background: 'linear-gradient(180deg, #F4EDF6 0%, #EAE2EE 100%)',
-                        color: SWITCHBOARD_TEXT,
-                        dot: '#6E617E',
-                      }
+                const tone = statusSurface(pill.tone)
                 return (
                   <div
                     key={pill.name}
-                    className="relative overflow-hidden rounded-[22px] border px-5 py-5"
+                    className="group relative min-h-[158px] overflow-hidden rounded-[24px] border px-5 py-5 transition-transform duration-300 hover:-translate-y-0.5"
                     style={{
                       borderColor: tone.border,
                       background: tone.background,
-                      color: tone.color,
                       boxShadow:
-                        '7px 7px 16px rgba(92,68,108,0.14), -5px -5px 12px rgba(255,255,255,0.72), inset 1px 1px 0 rgba(255,255,255,0.28), inset -1px -1px 0 rgba(92,68,108,0.08)',
+                        `0 18px 36px rgba(20,22,38,0.28), 0 0 28px ${tone.glow}, inset 0 0.5px 0 rgba(255,255,255,0.10)`,
                     }}
                   >
                     <span
                       aria-hidden="true"
-                      className="pointer-events-none absolute inset-[4px] rounded-[18px]"
+                      className="pointer-events-none absolute inset-x-5 top-0 h-[3px] rounded-b-full opacity-90"
                       style={{
-                        border: '1px solid rgba(255,255,255,0.24)',
-                        boxShadow:
-                          'inset 5px 5px 10px rgba(92,68,108,0.13), inset -4px -4px 8px rgba(255,255,255,0.22)',
+                        background: tone.dot,
+                        boxShadow: `0 0 22px ${tone.glow}`,
                       }}
                     />
                     <span
                       aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-[10px] inset-y-[12px] rounded-[16px]"
+                      className="pointer-events-none absolute inset-[4px] rounded-[18px]"
                       style={{
-                        background: 'linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 100%)',
+                        border: '1px solid rgba(255,255,255,0.07)',
                         boxShadow:
-                          'inset 2px 2px 5px rgba(255,255,255,0.10), inset -4px -4px 8px rgba(92,68,108,0.08)',
+                          'inset 5px 5px 10px rgba(20,22,38,0.24), inset -4px -4px 8px rgba(255,255,255,0.04)',
                       }}
                     />
-                    <div className="relative z-10 flex items-center gap-2.5 text-[16px] font-bold">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: tone.dot }} />
-                      {pill.name}
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute -right-7 top-4 h-24 w-24 rounded-full opacity-50 blur-2xl transition-opacity duration-300 group-hover:opacity-75"
+                      style={{
+                        background: tone.glow,
+                      }}
+                    />
+                    <div className="relative z-10 flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2.5 text-[17px] font-black tracking-[-0.03em]">
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ background: tone.dot, boxShadow: `0 0 14px ${tone.dot}` }} />
+                          {pill.name}
+                        </div>
+                        <div className="mt-2 text-[13px] leading-5" style={{ color: STRONG_MUTED }}>
+                          {pill.metric}
+                        </div>
+                      </div>
+                      <span
+                        className="rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em]"
+                        style={{
+                          borderColor: tone.border,
+                          background: tone.chipBackground,
+                          color: tone.chipColor,
+                        }}
+                      >
+                        {pill.state}
+                      </span>
                     </div>
-                    <div className="relative z-10 mt-3 text-[12px] font-bold uppercase tracking-[0.09em]">{pill.state}</div>
-                    <div className="relative z-10 mt-1.5 text-[14px] opacity-80">{pill.metric}</div>
+                    <div className="relative z-10 mt-7 h-px w-full bg-white/10" />
+                    <div className="relative z-10 mt-3 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: STRONG_SUBTLE }}>
+                      <span>Provider lane</span>
+                      <span style={{ color: tone.label }}>Live</span>
+                    </div>
                   </div>
                 )
               })}
@@ -1159,32 +1239,27 @@ function CommandStatusOverview() {
           {view === 'rails' && (
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
               {RAIL_STATUS.map((rail) => {
-                const tone =
-                  rail.tone === 'emerald'
-                    ? { border: '#E3D5E2', background: '#F8EDF6', color: SWITCHBOARD_TEXT }
-                    : rail.tone === 'amber'
-                    ? { border: '#E8D5DE', background: '#FCEEF4', color: SWITCHBOARD_TEXT }
-                    : { border: '#DED6E4', background: '#F4EDF6', color: SWITCHBOARD_TEXT }
+                const tone = statusSurface(rail.tone)
                 return (
                   <div
                     key={rail.rail}
-                    className="rounded-2xl border px-4 py-4"
+                    className="rounded-[24px] border px-5 py-5"
                     style={{
-                      borderColor: 'rgba(255,255,255,0.72)',
-                      background: 'linear-gradient(180deg, #FBF1F7 0%, #F1E4ED 100%)',
-                      boxShadow: CLAY_BUTTON_SHADOW,
+                      borderColor: tone.border,
+                      background: PREMIUM_SURFACE_RAISED,
+                      boxShadow: `0 18px 36px rgba(20,22,38,0.26), 0 0 26px ${tone.glow}, inset 0 0.5px 0 rgba(255,255,255,0.09)`,
                     }}
                   >
                     <div className="flex items-center justify-between">
                       <div className="text-[17px] font-bold" style={{ color: SWITCHBOARD_TEXT }}>{rail.rail}</div>
                       <span
                         className="inline-flex rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold"
-                        style={{ borderColor: tone.border, background: tone.background, color: tone.color }}
+                        style={{ borderColor: tone.border, background: tone.chipBackground, color: tone.chipColor }}
                       >
                         {rail.status}
                       </span>
                     </div>
-                    <div className="mt-3 text-[15px] leading-6" style={{ color: SWITCHBOARD_TEXT }}>{rail.note}</div>
+                    <div className="mt-3 text-[15px] leading-6" style={{ color: STRONG_MUTED }}>{rail.note}</div>
                   </div>
                 )
               })}
@@ -1192,9 +1267,9 @@ function CommandStatusOverview() {
           )}
 
           {view === 'provider' && (
-            <div className="overflow-hidden rounded-2xl border border-[#D8E3EC] bg-white/96">
+            <div className="overflow-hidden rounded-[26px] border border-white/10 bg-[#1C1F2E]/95" style={{ boxShadow: PREMIUM_INSET }}>
               <table className="w-full text-left text-[15px]">
-                <thead className="bg-[#F3F8FD] text-[12px] uppercase tracking-[0.09em]" style={{ color: SWITCHBOARD_TEXT }}>
+                <thead className="bg-white/5 text-[12px] uppercase tracking-[0.09em]" style={{ color: STRONG_SUBTLE }}>
                   <tr>
                     <th className="px-4 py-3">Provider</th>
                     <th className="px-4 py-3">Success</th>
@@ -1205,7 +1280,7 @@ function CommandStatusOverview() {
                 </thead>
                 <tbody>
                   {PSP_ROWS.map((row) => (
-                    <tr key={row.name} className="border-t border-[#E1E8EF]" style={{ color: SWITCHBOARD_TEXT }}>
+                    <tr key={row.name} className="border-t border-white/10" style={{ color: SWITCHBOARD_TEXT }}>
                       <td className="px-4 py-4 text-[16px] font-bold">{row.name}</td>
                       <td className="px-4 py-4 text-[16px] font-bold">{row.success}</td>
                       <td className="px-4 py-4">{row.latency}</td>
@@ -1214,14 +1289,14 @@ function CommandStatusOverview() {
                         <span
                           className="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[12px] font-semibold uppercase tracking-wide"
                           style={{
-                            borderColor: row.tone === 'emerald' ? '#E3D5E2' : row.tone === 'amber' ? '#E8D5DE' : '#DCC6D7',
-                            background: row.tone === 'emerald' ? '#F8EDF6' : row.tone === 'amber' ? '#FCEEF4' : '#F2E4F0',
-                            color: SWITCHBOARD_TEXT,
+                            borderColor: statusSurface(row.tone).border,
+                            background: statusSurface(row.tone).chipBackground,
+                            color: statusSurface(row.tone).chipColor,
                           }}
                         >
                           <span
                             className="h-2 w-2 rounded-full"
-                            style={{ background: row.tone === 'emerald' ? '#664A78' : row.tone === 'amber' ? '#8C5867' : '#5A365F' }}
+                            style={{ background: statusSurface(row.tone).dot }}
                           />
                           {row.severity}
                         </span>
@@ -1240,24 +1315,26 @@ function CommandStatusOverview() {
                   key={row.bank}
                   className="rounded-2xl border p-4 shadow-[0_10px_24px_rgba(184,198,214,0.18)]"
                   style={{
-                    borderColor: row.dir === 'up' ? '#E8D5DE' : '#E3D5E2',
-                    background: row.dir === 'up' ? '#FCEEF4' : '#F8EDF6',
-                    boxShadow: CLAY_BUTTON_SHADOW,
+                    borderColor: row.dir === 'up' ? 'rgba(239,68,68,0.30)' : 'rgba(34,197,94,0.24)',
+                    background: row.dir === 'up'
+                      ? 'linear-gradient(180deg, rgba(239,68,68,0.14) 0%, rgba(33,37,58,0.96) 100%)'
+                      : 'linear-gradient(180deg, rgba(34,197,94,0.10) 0%, rgba(33,37,58,0.96) 100%)',
+                    boxShadow: `0 16px 34px rgba(20,22,38,0.24), ${row.dir === 'up' ? '0 0 26px rgba(239,68,68,0.12)' : '0 0 22px rgba(34,197,94,0.08)'}, inset 0 0.5px 0 rgba(255,255,255,0.09)`,
                   }}
                   >
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-white shadow-sm ring-1 ring-black/5">
+                    <div className="h-10 w-10 rounded-full bg-white/10 shadow-sm ring-1 ring-white/10">
                       <Image src={row.logo} alt={`${row.bank} logo`} width={40} height={40} className="h-full w-full rounded-full object-contain p-1.5" />
                     </div>
                     <div className="text-[16px] font-bold" style={{ color: SWITCHBOARD_TEXT }}>{row.bank}</div>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-xl border border-[#E1E8EF] bg-white px-3 py-2">
-                      <div style={{ color: SWITCHBOARD_TEXT }}>Failed</div>
+                    <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                      <div style={{ color: STRONG_SUBTLE }}>Failed</div>
                       <div className="mt-1 font-semibold" style={{ color: SWITCHBOARD_TEXT }}>{row.failed}</div>
                     </div>
-                    <div className="rounded-xl border border-[#E1E8EF] bg-white px-3 py-2">
-                      <div style={{ color: SWITCHBOARD_TEXT }}>Fail %</div>
+                    <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                      <div style={{ color: STRONG_SUBTLE }}>Fail %</div>
                       <div className="mt-1 font-semibold" style={{ color: SWITCHBOARD_TEXT }}>{row.concentration}</div>
                     </div>
                   </div>
@@ -1274,46 +1351,47 @@ function CommandStatusOverview() {
           className="relative mt-5 overflow-hidden rounded-[24px] px-5 py-5"
           style={{
             color: SWITCHBOARD_TEXT,
-            background: 'linear-gradient(180deg, #F8EEF6 0%, #F1E4EF 55%, #EEDFEA 100%)',
-            border: `1px solid ${theme.noteBorder}`,
-            boxShadow:
-              '9px 9px 20px rgba(95,74,110,0.18), -6px -6px 14px rgba(255,255,255,0.80), inset 1px 1px 0 rgba(255,255,255,0.52), inset -1px -1px 0 rgba(95,74,110,0.12)',
+            background:
+              'radial-gradient(circle at 12% 0%, rgba(99,102,241,0.18), transparent 26%), linear-gradient(180deg, #252A41 0%, #1C1F2E 100%)',
+            border: `1px solid ${PREMIUM_BORDER_STRONG}`,
+            boxShadow: PREMIUM_SHADOW,
           }}
         >
           <span
             aria-hidden="true"
             className="pointer-events-none absolute -right-8 top-2 h-16 w-24 rounded-full opacity-70 blur-2xl"
-            style={{ background: 'rgba(95,74,110,0.18)' }}
+            style={{ background: 'rgba(99,102,241,0.18)' }}
           />
           <span
             aria-hidden="true"
             className="pointer-events-none absolute inset-[4px] rounded-[18px]"
             style={{
-              border: '1px solid rgba(255,255,255,0.24)',
+              border: '1px solid rgba(255,255,255,0.07)',
               boxShadow:
-                'inset 5px 5px 10px rgba(95,74,110,0.12), inset -4px -4px 8px rgba(255,255,255,0.24)',
+                'inset 5px 5px 10px rgba(20,22,38,0.24), inset -4px -4px 8px rgba(255,255,255,0.04)',
             }}
           />
           <span
             aria-hidden="true"
             className="pointer-events-none absolute inset-x-5 top-0 h-3 rounded-b-[999px]"
             style={{
-              background: '#5F4A6E',
-              boxShadow: '0 6px 16px rgba(95,74,110,0.28)',
+              background: '#6366F1',
+              boxShadow: '0 6px 16px rgba(99,102,241,0.28)',
             }}
           />
-          <div className="relative z-10 grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+          <div className="relative z-10 grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
             <div
-              className="rounded-[20px] px-4 py-4"
+              className="rounded-[22px] px-5 py-5"
               style={{
-                background: '#5F4A6E',
+                background:
+                  'radial-gradient(circle at 18% 0%, rgba(255,255,255,0.18), transparent 36%), linear-gradient(180deg, rgba(99,102,241,0.92) 0%, rgba(79,70,229,0.78) 100%)',
                 color: '#FFFFFF',
                 boxShadow:
-                  '0 8px 18px rgba(95,74,110,0.22), inset 2px 2px 4px rgba(255,255,255,0.16), inset -2px -2px 5px rgba(0,0,0,0.18)',
+                  '0 18px 36px rgba(99,102,241,0.24), inset 0 0.5px 0 rgba(255,255,255,0.18), inset -3px -3px 8px rgba(0,0,0,0.16)',
               }}
             >
               <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/14 text-[11px] font-black tracking-[0.12em]">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-[11px] font-black tracking-[0.12em]">
                   AI
                 </span>
                 <div
@@ -1324,40 +1402,39 @@ function CommandStatusOverview() {
                 </div>
               </div>
               <div
-                className="mt-4 text-[22px] font-semibold leading-7 tracking-[-0.03em]"
+                className="mt-5 text-[24px] font-semibold leading-7 tracking-[-0.04em]"
                 style={{ fontFamily: FONT_DISPLAY }}
               >
                 Operational Recommendation
               </div>
               <div
-                className="mt-2 text-[14px] leading-6 text-white/76"
+                className="mt-2 text-[14px] leading-6 text-white/75"
                 style={{ fontFamily: FONT_DISPLAY }}
               >
                 Control-layer insight for routing posture, callback trust, and bank exposure triage.
               </div>
             </div>
             <div
-              className="min-w-0 rounded-[20px] px-4 py-4"
+              className="min-w-0 rounded-[22px] px-5 py-5"
               style={{
-                background: 'linear-gradient(180deg, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.18) 100%)',
-                border: '1px solid rgba(255,255,255,0.34)',
-                boxShadow:
-                  'inset 2px 2px 5px rgba(255,255,255,0.24), inset -3px -3px 8px rgba(95,74,110,0.08)',
+                background: 'linear-gradient(180deg, rgba(33,37,58,0.72) 0%, rgba(28,31,46,0.72) 100%)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                boxShadow: PREMIUM_INSET,
               }}
             >
               <div className="flex flex-wrap items-center gap-2">
                 <div
                   className="text-[11px] font-bold uppercase tracking-[0.16em]"
-                  style={{ color: '#5F4A6E', fontFamily: FONT_DISPLAY }}
+                  style={{ color: '#A5B4FC', fontFamily: FONT_DISPLAY }}
                 >
                   Recommended next move
                 </div>
                 <span
                   className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em]"
                   style={{
-                    background: 'rgba(95,74,110,0.10)',
-                    color: '#5F4A6E',
-                    border: '1px solid rgba(95,74,110,0.14)',
+                    background: 'rgba(99,102,241,0.14)',
+                    color: '#C7D2FE',
+                    border: '1px solid rgba(99,102,241,0.22)',
                     fontFamily: FONT_DISPLAY,
                   }}
                 >
@@ -1365,14 +1442,14 @@ function CommandStatusOverview() {
                 </span>
               </div>
               <div
-                className="mt-3 text-[26px] font-semibold leading-[1.2] tracking-[-0.04em] sm:text-[30px]"
+                className="mt-4 text-[28px] font-semibold leading-[1.14] tracking-[-0.05em] sm:text-[32px]"
                 style={{ color: SWITCHBOARD_TEXT, fontFamily: FONT_DISPLAY }}
               >
                 Keep Switchboard scan-first. Move PayU and bank-risk diagnosis into Payout Intelligence.
               </div>
               <div
-                className="mt-3 text-[16px] leading-8"
-                style={{ color: 'rgba(17,17,17,0.82)', fontFamily: FONT_DISPLAY }}
+                className="mt-4 max-w-[980px] text-[16px] leading-8"
+                style={{ color: STRONG_MUTED, fontFamily: FONT_DISPLAY }}
               >
                 {`PayU is currently ${payuSignal?.metric ?? '12.4% errors · 4.2s'}, Bank API is ${bankApiSignal?.metric?.toLowerCase() ?? 'no signal in 3m'}, and ICICI / SBI hotspots are still active with ${iciciSignal?.failed ?? '84'} + ${sbiSignal?.failed ?? '41'} failed payouts under watch. Use this surface for fast posture checks; keep routing, callback, and bank-side drilldown inside the deeper intelligence workspace.`}
               </div>
@@ -1380,10 +1457,10 @@ function CommandStatusOverview() {
                 <span
                   className="inline-flex items-center rounded-full px-3 py-1 text-[12px] font-semibold"
                   style={{
-                    background: 'rgba(95,74,110,0.12)',
-                    color: '#5F4A6E',
-                    border: '1px solid rgba(95,74,110,0.16)',
-                    boxShadow: '0 4px 10px rgba(95,74,110,0.10)',
+                    background: 'rgba(239,68,68,0.14)',
+                    color: '#FECACA',
+                    border: '1px solid rgba(239,68,68,0.24)',
+                    boxShadow: '0 4px 10px rgba(239,68,68,0.10)',
                     fontFamily: FONT_DISPLAY,
                   }}
                 >
@@ -1392,10 +1469,10 @@ function CommandStatusOverview() {
                 <span
                   className="inline-flex items-center rounded-full px-3 py-1 text-[12px] font-semibold"
                   style={{
-                    background: 'rgba(95,74,110,0.12)',
-                    color: '#5F4A6E',
-                    border: '1px solid rgba(95,74,110,0.16)',
-                    boxShadow: '0 4px 10px rgba(95,74,110,0.10)',
+                    background: 'rgba(99,102,241,0.14)',
+                    color: '#C7D2FE',
+                    border: '1px solid rgba(99,102,241,0.24)',
+                    boxShadow: '0 4px 10px rgba(99,102,241,0.10)',
                     fontFamily: FONT_DISPLAY,
                   }}
                 >
@@ -1404,10 +1481,10 @@ function CommandStatusOverview() {
                 <span
                   className="inline-flex items-center rounded-full px-3 py-1 text-[12px] font-semibold"
                   style={{
-                    background: 'rgba(95,74,110,0.12)',
-                    color: '#5F4A6E',
-                    border: '1px solid rgba(95,74,110,0.16)',
-                    boxShadow: '0 4px 10px rgba(95,74,110,0.10)',
+                    background: 'rgba(234,179,8,0.14)',
+                    color: '#FDE68A',
+                    border: '1px solid rgba(234,179,8,0.24)',
+                    boxShadow: '0 4px 10px rgba(234,179,8,0.10)',
                     fontFamily: FONT_DISPLAY,
                   }}
                 >
@@ -1416,10 +1493,10 @@ function CommandStatusOverview() {
                 <span
                   className="inline-flex items-center rounded-full px-3 py-1 text-[12px] font-semibold"
                   style={{
-                    background: '#5F4A6E',
+                    background: '#6366F1',
                     color: '#FFFFFF',
                     border: '1px solid rgba(255,255,255,0.12)',
-                    boxShadow: '0 6px 14px rgba(95,74,110,0.18)',
+                    boxShadow: '0 6px 14px rgba(99,102,241,0.22)',
                     fontFamily: FONT_DISPLAY,
                   }}
                 >
@@ -1457,12 +1534,12 @@ function AlertFeedCard() {
         {ALERT_FEED_ITEMS.map((item) => {
           const tone =
             item.severity === 'Critical'
-              ? { border: '#E5DBDF', background: '#F4EFF1', color: '#8C5867', rail: '#8C5867' }
+              ? { border: 'rgba(239,68,68,0.30)', background: 'rgba(239,68,68,0.13)', color: '#FECACA', rail: '#EF4444' }
               : item.severity === 'High'
-              ? { border: '#E5DDD5', background: '#F5F1EC', color: '#8B6A53', rail: '#8B6A53' }
+              ? { border: 'rgba(234,179,8,0.30)', background: 'rgba(234,179,8,0.13)', color: '#FEF3C7', rail: '#EAB308' }
               : item.severity === 'Medium'
-              ? { border: '#E0E4D8', background: '#F2F4EE', color: '#74806A', rail: '#74806A' }
-              : { border: '#DFE5EC', background: '#F3F6F9', color: '#66778A', rail: '#66778A' }
+              ? { border: 'rgba(99,102,241,0.28)', background: 'rgba(99,102,241,0.12)', color: '#C7D2FE', rail: '#6366F1' }
+              : { border: 'rgba(168,175,191,0.24)', background: 'rgba(168,175,191,0.10)', color: '#E2E8F0', rail: '#A8AFBF' }
           return (
             <div
               key={item.title}
@@ -1474,8 +1551,8 @@ function AlertFeedCard() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-[17px] font-bold text-[#1E293B]">{item.title}</div>
-                      <div className="mt-2 text-[14px] leading-6 text-[#64748B]">{item.detail}</div>
+                      <div className="text-[17px] font-bold text-[#F0F2F5]">{item.title}</div>
+                      <div className="mt-2 text-[14px] leading-6 text-[#A8AFBF]">{item.detail}</div>
                     </div>
                     <span
                       className="inline-flex rounded-full border px-3.5 py-1.5 text-[12px] font-semibold"
@@ -1548,7 +1625,7 @@ function CommandVolumeTrendCard() {
         description="Dispatched versus confirmed volume to catch divergence early"
         meta={
           <div className="flex items-center gap-5 text-[14px] font-semibold">
-            <span className="inline-flex items-center gap-2 text-[#64748B]"><span className="h-2.5 w-2.5 rounded-full bg-[#1E293B]" />Dispatched</span>
+            <span className="inline-flex items-center gap-2 text-[#A8AFBF]"><span className="h-2.5 w-2.5 rounded-full bg-[#A8AFBF]" />Dispatched</span>
             <span className="inline-flex items-center gap-2" style={{ color: theme.accent }}>
               <span className="h-2.5 w-2.5 rounded-full" style={{ background: theme.accent }} />
               Confirmed
@@ -1562,30 +1639,30 @@ function CommandVolumeTrendCard() {
         style={{
           background: theme.panelBackground,
           border: `1px solid ${theme.panelBorder}`,
-          boxShadow: `inset 0 1px 0 rgba(255,255,255,0.94), ${theme.panelShadow}`,
+          boxShadow: `inset 0 1px 0 rgba(255,255,255,0.08), ${theme.panelShadow}`,
         }}
       >
         <div className="grid grid-cols-1 gap-3 pb-4 md:grid-cols-4">
-          <div className="rounded-2xl border px-4 py-3" style={{ background: 'rgba(255,255,255,0.76)', borderColor: theme.panelBorder, boxShadow: theme.panelShadow }}>
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-[#64748B]">Peak dispatched</div>
-            <div className="mt-1.5 text-[28px] font-black tracking-[-0.04em] text-[#1E293B]">{peakHour.dispatched}</div>
-            <div className="mt-1.5 text-[14px] leading-6 text-[#64748B]">Highest release pressure at {peakHour.hour}:00</div>
+          <div className="rounded-2xl border px-4 py-3" style={{ background: 'rgba(255,255,255,0.07)', borderColor: theme.panelBorder, boxShadow: theme.panelShadow }}>
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-[#A8AFBF]">Peak dispatched</div>
+            <div className="mt-1.5 text-[28px] font-black tracking-[-0.04em] text-[#F0F2F5]">{peakHour.dispatched}</div>
+            <div className="mt-1.5 text-[14px] leading-6 text-[#A8AFBF]">Highest release pressure at {peakHour.hour}:00</div>
           </div>
-          <div className="rounded-2xl border px-4 py-3" style={{ background: 'rgba(255,255,255,0.76)', borderColor: theme.panelBorder, boxShadow: theme.panelShadow }}>
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-[#64748B]">Average confirmed</div>
-            <div className="mt-1.5 text-[28px] font-black tracking-[-0.04em] text-[#1E293B]">{averageConfirmed}</div>
-            <div className="mt-1.5 text-[14px] leading-6 text-[#64748B]">Steady confirmation load across the day</div>
+          <div className="rounded-2xl border px-4 py-3" style={{ background: 'rgba(255,255,255,0.07)', borderColor: theme.panelBorder, boxShadow: theme.panelShadow }}>
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-[#A8AFBF]">Average confirmed</div>
+            <div className="mt-1.5 text-[28px] font-black tracking-[-0.04em] text-[#F0F2F5]">{averageConfirmed}</div>
+            <div className="mt-1.5 text-[14px] leading-6 text-[#A8AFBF]">Steady confirmation load across the day</div>
           </div>
-          <div className="rounded-2xl border px-4 py-3" style={{ background: 'rgba(255,255,255,0.76)', borderColor: theme.panelBorder, boxShadow: theme.panelShadow }}>
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-[#64748B]">Live divergence</div>
-            <div className="mt-1.5 text-[28px] font-black tracking-[-0.04em] text-[#1E293B]">{activeGap} gap</div>
-            <div className="mt-1.5 text-[14px] leading-6 text-[#64748B]">{confirmEfficiency}% of dispatched volume is already confirmed at {activePoint.hour}:00</div>
+          <div className="rounded-2xl border px-4 py-3" style={{ background: 'rgba(255,255,255,0.07)', borderColor: theme.panelBorder, boxShadow: theme.panelShadow }}>
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-[#A8AFBF]">Live divergence</div>
+            <div className="mt-1.5 text-[28px] font-black tracking-[-0.04em] text-[#F0F2F5]">{activeGap} gap</div>
+            <div className="mt-1.5 text-[14px] leading-6 text-[#A8AFBF]">{confirmEfficiency}% of dispatched volume is already confirmed at {activePoint.hour}:00</div>
           </div>
         </div>
           <div className="rounded-[22px] border px-5 py-4" style={{ background: theme.noteBackground, borderColor: theme.noteBorder, boxShadow: theme.noteShadow }}>
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-[#64748B]">AI insight</div>
-            <div className="mt-2 text-[18px] font-bold text-[#1E293B]">Confirmation drift is lowest after 12:00</div>
-            <div className="mt-2 text-[14px] leading-6 text-[#64748B]">AI sees the healthiest dispatch-to-confirmation compression in the midday band, which makes it the safest window for routing heavier payout batches.</div>
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-[#A8AFBF]">AI insight</div>
+            <div className="mt-2 text-[18px] font-bold text-[#F0F2F5]">Confirmation drift is lowest after 12:00</div>
+            <div className="mt-2 text-[14px] leading-6 text-[#A8AFBF]">AI sees the healthiest dispatch-to-confirmation compression in the midday band, which makes it the safest window for routing heavier payout batches.</div>
           </div>
         <div className="relative flex-1">
           <motion.div
@@ -1602,18 +1679,18 @@ function CommandVolumeTrendCard() {
               boxShadow: theme.noteShadow,
             }}
           >
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-[#64748B]">{activePoint.hour}:00 snapshot</div>
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-[#A8AFBF]">{activePoint.hour}:00 snapshot</div>
             <div className="mt-2 flex items-end justify-between gap-3">
               <div>
-                <div className="text-[12px] text-[#64748B]">Confirmed</div>
+                <div className="text-[12px] text-[#A8AFBF]">Confirmed</div>
                 <div className="text-[34px] font-black leading-none tracking-[-0.04em]" style={{ color: theme.accent }}>{activePoint.confirmed}</div>
               </div>
               <div className="text-right">
-                <div className="text-[12px] text-[#64748B]">Dispatched</div>
-                <div className="text-[22px] font-bold text-[#1E293B]">{activePoint.dispatched}</div>
+                <div className="text-[12px] text-[#A8AFBF]">Dispatched</div>
+                <div className="text-[22px] font-bold text-[#F0F2F5]">{activePoint.dispatched}</div>
               </div>
             </div>
-            <div className="mt-3 text-[14px] leading-6 text-[#64748B]">Gap of {activeGap} payouts waiting to settle through the confirmation path.</div>
+            <div className="mt-3 text-[14px] leading-6 text-[#A8AFBF]">Gap of {activeGap} payouts waiting to settle through the confirmation path.</div>
           </motion.div>
           <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="h-full min-h-[400px] w-full">
             <defs>
@@ -1628,7 +1705,7 @@ function CommandVolumeTrendCard() {
             </defs>
             {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
               const y = top + (bottom - top) * tick
-              return <line key={tick} x1={left} y1={y} x2={width - right} y2={y} stroke="rgba(15,23,42,0.06)" strokeWidth="1" />
+              return <line key={tick} x1={left} y1={y} x2={width - right} y2={y} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
             })}
             {COMMAND_VOLUME_TREND.map((item, index) => {
               const x = left + index * step
@@ -1645,7 +1722,7 @@ function CommandVolumeTrendCard() {
               )
             })}
             <path d={`${lineFor('confirmed')} L ${left + (COMMAND_VOLUME_TREND.length - 1) * step} ${bottom} L ${left} ${bottom} Z`} fill="url(#command-confirmed-area)" />
-            <path d={lineFor('dispatched')} fill="none" stroke="#1E293B" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={lineFor('dispatched')} fill="none" stroke="#A8AFBF" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
             <path d={lineFor('confirmed')} fill="none" stroke={theme.accent} strokeWidth="3.8" strokeLinecap="round" strokeLinejoin="round" />
             {COMMAND_VOLUME_TREND.map((item, index) => {
               const x = left + index * step
@@ -1654,8 +1731,8 @@ function CommandVolumeTrendCard() {
                 <g key={item.hour}>
                   {isActive ? <circle cx={x} cy={yFor(item.confirmed)} r="13" fill="rgba(94,123,150,0.14)" /> : null}
                   <circle cx={x} cy={yFor(item.confirmed)} r="6" fill="#fff" stroke={theme.accent} strokeWidth="2.8" />
-                  <circle cx={x} cy={yFor(item.dispatched)} r="4.5" fill="#fff" stroke="#1E293B" strokeWidth="2" />
-                  <text x={x} y={labelY} fontSize="12" fill={isActive ? '#1E293B' : '#64748B'} fontWeight={isActive ? '700' : '500'} textAnchor="middle">
+                  <circle cx={x} cy={yFor(item.dispatched)} r="4.5" fill="#fff" stroke="#A8AFBF" strokeWidth="2" />
+                  <text x={x} y={labelY} fontSize="12" fill={isActive ? '#A8AFBF' : '#A8AFBF'} fontWeight={isActive ? '700' : '500'} textAnchor="middle">
                     {item.hour}
                   </text>
                   <rect
@@ -1711,17 +1788,17 @@ function RiskCommandCard() {
       <div className="mt-5 rounded-2xl p-5" style={{ background: theme.panelBackground, border: `1px solid ${theme.panelBorder}`, boxShadow: theme.panelShadow }}>
         {view === 'risk' ? (
           <>
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-[#64748B]">Total uncertain payout value</div>
-            <div className="mt-3 text-[42px] font-black leading-none tracking-[-0.04em] text-[#1E293B]">₹1.04 Cr</div>
-            <div className="mt-3 text-[16px] leading-7 text-[#64748B]">Pending finality, SLA-breach clusters, and reversal / ambiguity buckets consolidated for ops and finance.</div>
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-[#A8AFBF]">Total uncertain payout value</div>
+            <div className="mt-3 text-[42px] font-black leading-none tracking-[-0.04em] text-[#F0F2F5]">₹1.04 Cr</div>
+            <div className="mt-3 text-[16px] leading-7 text-[#A8AFBF]">Pending finality, SLA-breach clusters, and reversal / ambiguity buckets consolidated for ops and finance.</div>
             <div className="mt-5 space-y-3">
               {MONEY_AT_RISK_BUCKETS.map((bucket) => (
                 <div key={bucket.label}>
                   <div className="flex items-center justify-between text-[16px]">
-                    <span className="font-semibold text-[#1E293B]">{bucket.label}</span>
-                    <span className="font-semibold text-[#1E293B]">{bucket.amount}</span>
+                    <span className="font-semibold text-[#F0F2F5]">{bucket.label}</span>
+                    <span className="font-semibold text-[#F0F2F5]">{bucket.amount}</span>
                   </div>
-                  <div className="mt-2 h-2.5 rounded-full bg-[#DDE7EF]">
+                  <div className="mt-2 h-2.5 rounded-full bg-white/10">
                     <div className={`h-2.5 rounded-full ${bucket.tone}`} style={{ width: `${bucket.pct}%` }} />
                   </div>
                 </div>
@@ -1731,17 +1808,17 @@ function RiskCommandCard() {
         ) : (
           <>
             <div className="flex items-center justify-between">
-              <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-[#64748B]">Today’s failure pattern</div>
-              <div className="rounded-full border border-[#D8E3EC] bg-[#F7FAFD] px-3.5 py-1.5 text-[12px] font-semibold text-[#64748B]">173 failures</div>
+              <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-[#A8AFBF]">Today’s failure pattern</div>
+              <div className="rounded-full border border-white/10 bg-white/10 px-3.5 py-1.5 text-[12px] font-semibold text-[#A8AFBF]">173 failures</div>
             </div>
             <div className="mt-5 space-y-4">
               {FAILURE_REASON_ROWS.map((row) => (
                 <div key={row.code}>
                   <div className="flex items-center justify-between gap-3 text-[15px]">
-                    <span className="font-semibold text-[#1E293B]">{row.code}</span>
-                    <span className="text-[#64748B]">{row.count} · {row.share}</span>
+                    <span className="font-semibold text-[#F0F2F5]">{row.code}</span>
+                    <span className="text-[#A8AFBF]">{row.count} · {row.share}</span>
                   </div>
-                  <div className="mt-2 h-3 rounded-full bg-[#DDE7EF]">
+                  <div className="mt-2 h-3 rounded-full bg-white/10">
                     <div className={`h-3 rounded-full ${row.tone}`} style={{ width: `${(row.count / max) * 100}%` }} />
                   </div>
                 </div>
@@ -1751,7 +1828,7 @@ function RiskCommandCard() {
         )}
       </div>
 
-      <div className="mt-5 rounded-[22px] px-5 py-4 text-[15px] leading-7 text-[#64748B]" style={{ background: theme.noteBackground, border: `1px solid ${theme.noteBorder}`, boxShadow: theme.noteShadow }}>
+      <div className="mt-5 rounded-[22px] px-5 py-4 text-[15px] leading-7 text-[#A8AFBF]" style={{ background: theme.noteBackground, border: `1px solid ${theme.noteBorder}`, boxShadow: theme.noteShadow }}>
         <span className="font-bold" style={{ color: theme.accent }}>AI note:</span> the current risk stack says statement delay is the biggest value block, while failure codes point to beneficiary-data cleanup as the fastest win.
       </div>
     </Card>
@@ -1779,9 +1856,9 @@ function LivePaymentStreamCard() {
       />
       <div className="mt-5 grid gap-3 md:grid-cols-3">
         {[
-          { label: 'Confirmed', value: '2', tone: '#5F7D78', background: '#F2F6F4', border: '#DCE5E1' },
-          { label: 'In flight', value: '2', tone: '#58708D', background: '#F3F7FA', border: '#DDE5EC' },
-          { label: 'Failed / reversed', value: '2', tone: '#8C5867', background: '#F4EFF1', border: '#E5DBDF' },
+          { label: 'Confirmed', value: '2', tone: '#22C55E', background: 'rgba(34,197,94,0.10)', border: 'rgba(34,197,94,0.24)' },
+          { label: 'In flight', value: '2', tone: '#6366F1', background: 'rgba(99,102,241,0.11)', border: 'rgba(99,102,241,0.24)' },
+          { label: 'Failed / reversed', value: '2', tone: '#EF4444', background: 'rgba(239,68,68,0.11)', border: 'rgba(239,68,68,0.26)' },
         ].map((item) => (
           <div
             key={item.label}
@@ -1806,7 +1883,7 @@ function LivePaymentStreamCard() {
       </div>
       <div className="mt-5 overflow-hidden rounded-2xl" style={{ border: `1px solid ${theme.panelBorder}`, background: theme.panelBackground }}>
         <table className="w-full text-left">
-          <thead className="text-[12px] uppercase tracking-[0.09em] text-[#64748B]" style={{ background: 'rgba(95,125,120,0.08)' }}>
+          <thead className="text-[12px] uppercase tracking-[0.09em] text-[#A8AFBF]" style={{ background: 'rgba(95,125,120,0.08)' }}>
             <tr>
               <th className="px-4 py-3">Intent</th>
               <th className="px-4 py-3">Amount</th>
@@ -1816,7 +1893,7 @@ function LivePaymentStreamCard() {
           </thead>
           <tbody>
             {LIVE_PAYMENT_STREAM.map((item) => (
-              <tr key={item.intent} className="border-t border-[#E1E8EF] text-[15px] text-[#1E293B]">
+              <tr key={item.intent} className="border-t border-white/10 text-[15px] text-[#F0F2F5]">
                 <td className="px-4 py-4 text-[15px] font-bold" style={{ fontFamily: FONT_MONO }}>{item.intent}</td>
                 <td className="px-4 py-4 font-semibold">{item.amount}</td>
                 <td className="px-4 py-4">
@@ -1825,34 +1902,34 @@ function LivePaymentStreamCard() {
                     style={{
                       borderColor:
                         item.status === 'CONFIRMED'
-                          ? '#DCE5E1'
+                          ? 'rgba(34,197,94,0.28)'
                           : item.status === 'FAILED' || item.status === 'REVERSED'
-                          ? '#E5DBDF'
+                          ? 'rgba(239,68,68,0.28)'
                           : item.status === 'PROVISIONAL'
-                          ? '#DFE5EC'
-                          : '#DDE5EC',
+                          ? 'rgba(234,179,8,0.26)'
+                          : 'rgba(99,102,241,0.24)',
                       background:
                         item.status === 'CONFIRMED'
-                          ? '#F2F6F4'
+                          ? 'rgba(34,197,94,0.12)'
                           : item.status === 'FAILED' || item.status === 'REVERSED'
-                          ? '#F4EFF1'
+                          ? 'rgba(239,68,68,0.12)'
                           : item.status === 'PROVISIONAL'
-                          ? '#F3F6F9'
-                          : '#F3F7FA',
+                          ? 'rgba(234,179,8,0.12)'
+                          : 'rgba(99,102,241,0.12)',
                       color:
                         item.status === 'CONFIRMED'
-                          ? '#5F7D78'
+                          ? '#BBF7D0'
                           : item.status === 'FAILED' || item.status === 'REVERSED'
-                          ? '#8C5867'
+                          ? '#FECACA'
                           : item.status === 'PROVISIONAL'
-                          ? '#66778A'
-                          : '#58708D',
+                          ? '#FEF3C7'
+                          : '#C7D2FE',
                     }}
                   >
                     {item.status}
                   </span>
                 </td>
-                <td className="px-4 py-4 text-right text-[#64748B]">{item.elapsed}</td>
+                <td className="px-4 py-4 text-right text-[#A8AFBF]">{item.elapsed}</td>
               </tr>
             ))}
           </tbody>
@@ -1907,7 +1984,7 @@ function EvidenceExportsCard() {
                 </svg>
               </div>
               <div className="min-w-0">
-                <div className="truncate text-[17px] font-bold text-[#1E293B]">{item.entity}</div>
+                <div className="truncate text-[17px] font-bold text-[#F0F2F5]">{item.entity}</div>
                 <div
                   className="mt-1.5 inline-flex rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em]"
                   style={{
@@ -1981,11 +2058,11 @@ function PayoutTrendCard() {
   const barOpacity = focusMode === 'failures' ? 0.92 : 0.48
 
   return (
-    <Card className="xl:col-span-8 min-h-[520px] overflow-hidden border-white/50 bg-[#F8FBFF]/70 p-0 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-8 min-h-[520px] overflow-hidden border-white/10 bg-[#1C1F2E]/95 p-0 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-start justify-between gap-4 px-6 pt-6">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Settlement Success Trend</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">Execution health versus failure load so ops can act before money is lost</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Settlement Success Trend</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">Execution health versus failure load so ops can act before money is lost</div>
         </div>
         <GlassSwitchTabs
           compact
@@ -1998,7 +2075,7 @@ function PayoutTrendCard() {
         />
       </div>
 
-      <div className="mt-5 relative h-[342px] overflow-hidden border-y border-white/40 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(245,249,255,0.84))] px-0 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.95)]">
+      <div className="mt-5 relative h-[342px] overflow-hidden border-y border-white/10 bg-[linear-gradient(180deg,rgba(39,44,68,0.96),rgba(28,31,46,0.92))] px-0 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
         {hovered && (
           <motion.div
             initial={{ opacity: 0, y: 6 }}
@@ -2006,10 +2083,10 @@ function PayoutTrendCard() {
             className="pointer-events-none absolute z-10"
             style={{ left: `clamp(12px, ${hoveredX - 78}px, calc(100% - 172px))`, top: Math.max(18, hoveredY - 18) }}
           >
-            <div className="rounded-2xl border border-white/80 bg-white/96 px-4 py-3 shadow-[0_22px_40px_rgba(37,99,235,0.16)] backdrop-blur-[14px]">
-              <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[#64748B]">{hovered.day}</div>
-              <div className="mt-1 text-[17px] font-bold text-[#0F172A]">{hovered.success.toFixed(2)}% success</div>
-              <div className="mt-1 text-[14px] leading-6 text-black/60">{hovered.failures} failure events</div>
+            <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 shadow-[0_22px_40px_rgba(99,102,241,0.16)] backdrop-blur-[14px]">
+              <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[#A8AFBF]">{hovered.day}</div>
+              <div className="mt-1 text-[17px] font-bold text-[#F0F2F5]">{hovered.success.toFixed(2)}% success</div>
+              <div className="mt-1 text-[14px] leading-6 text-white/60">{hovered.failures} failure events</div>
             </div>
           </motion.div>
         )}
@@ -2045,8 +2122,8 @@ function PayoutTrendCard() {
             const y = getY(tick)
             return (
               <g key={tick}>
-                <line x1={plotLeft} y1={y} x2={width - padRight} y2={y} stroke="rgba(15,23,42,0.06)" strokeWidth="1" />
-                <text x={labelLane} y={y + 4} fontSize="11" fill="#94A3B8">
+                <line x1={plotLeft} y1={y} x2={width - padRight} y2={y} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+                <text x={labelLane} y={y + 4} fontSize="11" fill="#A8AFBF">
                   {tick.toFixed(1)}%
                 </text>
               </g>
@@ -2071,12 +2148,12 @@ function PayoutTrendCard() {
             transition={{ duration: 0.35 }}
           />
           {hovered && (
-            <line x1={hoveredX} y1={top} x2={hoveredX} y2={bottom + 6} stroke="rgba(37,99,235,0.16)" strokeWidth="1.5" strokeDasharray="4 6" />
+            <line x1={hoveredX} y1={top} x2={hoveredX} y2={bottom + 6} stroke="rgba(99,102,241,0.16)" strokeWidth="1.5" strokeDasharray="4 6" />
           )}
           <motion.path
             d={linePath}
             fill="none"
-            stroke="#2563EB"
+            stroke="#6366F1"
             strokeWidth="3.5"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -2096,12 +2173,12 @@ function PayoutTrendCard() {
                     cx={x}
                     cy={y}
                     r="16"
-                    fill="rgba(37,99,235,0.10)"
+                    fill="rgba(99,102,241,0.10)"
                     animate={{ opacity: [0.25, 0.55, 0.25], scale: [1, 1.08, 1] }}
                     transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
                   />
                 )}
-                <circle cx={x} cy={y} r="7" fill="#fff" stroke="#2563EB" strokeWidth="3.5" opacity={focusMode === 'success' ? 1 : 0.82} />
+                <circle cx={x} cy={y} r="7" fill="#fff" stroke="#6366F1" strokeWidth="3.5" opacity={focusMode === 'success' ? 1 : 0.82} />
                 <rect
                   x={x - stepX / 2}
                   y={top - 8}
@@ -2115,7 +2192,7 @@ function PayoutTrendCard() {
           })}
 
           {PAYOUT_TREND_DATA.map((point, index) => (
-            <text key={`${point.day}-label`} x={plotLeft + index * stepX} y="304" fontSize="12" fill="#64748B" textAnchor="middle">
+            <text key={`${point.day}-label`} x={plotLeft + index * stepX} y="304" fontSize="12" fill="#A8AFBF" textAnchor="middle">
               {point.day}
             </text>
           ))}
@@ -2129,29 +2206,29 @@ function PayoutVelocityCard() {
   const max = Math.max(...VELOCITY_BINS.map((item) => item.count))
 
   return (
-    <Card className="xl:col-span-4 min-h-[520px] p-8 border-white/50 bg-[#F5F9FF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-4 min-h-[520px] p-8 border-white/10 bg-[#21253A]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Payout Velocity</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">How fast dispatched money becomes seller-ready and support-safe</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Payout Velocity</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">How fast dispatched money becomes seller-ready and support-safe</div>
         </div>
         <div className="space-y-2 text-right">
-          <div className="rounded-full border border-[#D8E4FF] bg-white/70 px-4.5 py-2 text-[13px] font-semibold text-[#2563EB]">P50 44s</div>
-          <div className="rounded-full border border-black/5 bg-white/70 px-4 py-1.5 text-[13px] font-semibold text-black/70">P95 45m</div>
+          <div className="rounded-full border border-white/10 bg-white/10 px-4.5 py-2 text-[13px] font-semibold text-[#6366F1]">P50 44s</div>
+          <div className="rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-[13px] font-semibold text-white/70">P95 45m</div>
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-white/40 bg-white/85 p-5">
+      <div className="mt-6 rounded-2xl border border-white/10 bg-white/10 p-5">
         <div className="flex h-[210px] items-end gap-3">
           {VELOCITY_BINS.map((bin) => {
             const height = Math.max(18, (bin.count / max) * 170)
             return (
               <div key={bin.label} className="flex flex-1 flex-col items-center gap-3">
-                <div className="text-[11px] font-semibold text-black/55">{bin.count.toLocaleString()}</div>
-                <div className="flex w-full items-end justify-center rounded-t-[18px] bg-[#EEF4FF]/70" style={{ height }}>
+                <div className="text-[11px] font-semibold text-white/60">{bin.count.toLocaleString()}</div>
+                <div className="flex w-full items-end justify-center rounded-t-[18px] bg-indigo-500/10" style={{ height }}>
                   <div className={`w-full rounded-t-[18px] ${bin.tone}`} style={{ height }} />
                 </div>
-                <div className="text-xs font-semibold text-[#64748B]">{bin.label}</div>
+                <div className="text-xs font-semibold text-[#A8AFBF]">{bin.label}</div>
               </div>
             )
           })}
@@ -2163,17 +2240,17 @@ function PayoutVelocityCard() {
 
 function SettlementWeekCohortCard() {
   return (
-    <Card className="p-8 border-white/50 bg-[#F8FBFF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="p-8 border-white/10 bg-[#1C1F2E]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Settlement Week Cohort</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">Rolling cohort view to spot whether payout quality is improving or slipping week to week</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Settlement Week Cohort</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">Rolling cohort view to spot whether payout quality is improving or slipping week to week</div>
         </div>
         <GlassUtilityPill tone="smoke">8 weeks</GlassUtilityPill>
       </div>
-      <div className="mt-6 overflow-hidden rounded-2xl border border-black/5 bg-white/88">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-white/10">
         <table className="w-full text-left text-[15px]">
-          <thead className="bg-[#F3F7FF] text-[12px] uppercase tracking-[0.09em] text-black/50">
+          <thead className="bg-white/5 text-[12px] uppercase tracking-[0.09em] text-white/50">
             <tr>
               <th className="px-4 py-3">Week</th>
               <th className="px-4 py-3">Total</th>
@@ -2185,12 +2262,12 @@ function SettlementWeekCohortCard() {
           </thead>
           <tbody>
             {SETTLEMENT_COHORT_ROWS.map((row) => (
-              <tr key={row.week} className="border-t border-black/5 text-[15px] text-black">
+              <tr key={row.week} className="border-t border-white/10 text-[15px] text-white">
                 <td className="px-4 py-4 font-semibold">{row.week}</td>
                 <td className="px-4 py-4">{row.total}</td>
-                <td className="px-4 py-4 font-semibold text-[#2563EB]">{row.success}</td>
-                <td className="px-4 py-4 text-black/65">{row.failed}</td>
-                <td className="px-4 py-4 text-black/65">{row.pending}</td>
+                <td className="px-4 py-4 font-semibold text-[#6366F1]">{row.success}</td>
+                <td className="px-4 py-4 text-white/70">{row.failed}</td>
+                <td className="px-4 py-4 text-white/70">{row.pending}</td>
                 <td className="px-4 py-4 text-right font-semibold">{row.confirmed}</td>
               </tr>
             ))}
@@ -2203,25 +2280,25 @@ function SettlementWeekCohortCard() {
 
 function AmountBucketDistributionCard() {
   return (
-    <Card className="xl:col-span-7 min-h-[430px] p-8 border-white/50 bg-[#F5F9FF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-7 min-h-[430px] p-8 border-white/10 bg-[#21253A]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Amount Bucket Distribution</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">Success rate shifts by payout size, so high-value cohorts deserve separate monitoring</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Amount Bucket Distribution</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">Success rate shifts by payout size, so high-value cohorts deserve separate monitoring</div>
         </div>
         <GlassUtilityPill tone="smoke">Value buckets</GlassUtilityPill>
       </div>
       <div className="mt-6 space-y-4">
         {AMOUNT_BUCKET_ROWS.map((row) => (
-          <div key={row.label} className="rounded-[22px] border border-black/5 bg-white/88 p-5">
+          <div key={row.label} className="rounded-[22px] border border-white/10 bg-white/10 p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[17px] font-bold text-black">{row.label}</div>
-                <div className="mt-1 text-[13px] text-black/55">{row.count} payouts</div>
+                <div className="text-[17px] font-bold text-white">{row.label}</div>
+                <div className="mt-1 text-[13px] text-white/60">{row.count} payouts</div>
               </div>
-              <span className="rounded-full border border-[#D8E4FF] bg-[#EEF4FF] px-4.5 py-2 text-[13px] font-semibold text-[#2563EB]">{row.success}</span>
+              <span className="rounded-full border border-white/10 bg-indigo-500/10 px-4.5 py-2 text-[13px] font-semibold text-[#6366F1]">{row.success}</span>
             </div>
-            <div className="mt-3 h-3 rounded-full bg-[#E8EEF8]">
+            <div className="mt-3 h-3 rounded-full bg-white/10">
               <div className={`h-3 rounded-full ${row.tone}`} style={{ width: `${row.pct}%` }} />
             </div>
           </div>
@@ -2233,28 +2310,28 @@ function AmountBucketDistributionCard() {
 
 function PayoutCostMonitorCard() {
   return (
-    <Card className="xl:col-span-5 min-h-[430px] p-8 border-white/50 bg-[#F8FBFF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-5 min-h-[430px] p-8 border-white/10 bg-[#1C1F2E]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Payout Cost Monitor</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">Quantify fee waste so routing and retry policies can protect margin</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Payout Cost Monitor</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">Quantify fee waste so routing and retry policies can protect margin</div>
         </div>
         <GlassUtilityPill tone="accent">AI tracked</GlassUtilityPill>
       </div>
       <div className="mt-6 space-y-4">
-        <div className="rounded-[22px] border border-black/5 bg-white/90 p-6 shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
-          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Total PSP fees this cycle</div>
-          <div className="mt-2 text-[42px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">₹2.14 L</div>
-          <div className="mt-2 text-[17px] font-bold text-[#2563EB]">↑ ₹18K vs last week</div>
+        <div className="rounded-[22px] border border-white/10 bg-white/10 p-6 shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
+          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Total PSP fees this cycle</div>
+          <div className="mt-2 text-[42px] font-black leading-none tracking-[-0.04em] text-[#F0F2F5]">₹2.14 L</div>
+          <div className="mt-2 text-[17px] font-bold text-[#6366F1]">↑ ₹18K vs last week</div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-[22px] border border-black/5 bg-white/90 p-5">
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Per Success</div>
-            <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">₹14.5</div>
+          <div className="rounded-[22px] border border-white/10 bg-white/10 p-5">
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Per Success</div>
+            <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#F0F2F5]">₹14.5</div>
           </div>
-          <div className="rounded-[22px] border border-black/5 bg-white/90 p-5">
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Per Failure</div>
-            <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">₹29.0</div>
+          <div className="rounded-[22px] border border-white/10 bg-white/10 p-5">
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Per Failure</div>
+            <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#F0F2F5]">₹29.0</div>
           </div>
         </div>
         <div
@@ -2279,19 +2356,19 @@ function PayoutCostMonitorCard() {
 
 function PspComparisonCard() {
   return (
-    <Card className="xl:col-span-7 min-h-[410px] p-8 border-white/50 bg-[#F8FBFF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-7 min-h-[410px] p-8 border-white/10 bg-[#1C1F2E]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Multi-PSP Comparison</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">Provider quality across success, latency, fee pressure, and webhook trust</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Multi-PSP Comparison</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">Provider quality across success, latency, fee pressure, and webhook trust</div>
         </div>
         <GlassUtilityPill tone="accent">Live</GlassUtilityPill>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-black/5 bg-white/85">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-white/10">
         <table className="w-full text-left text-[15px]">
-          <thead className="bg-[#F3F7FF]">
-            <tr className="text-[12px] uppercase tracking-[0.09em] text-black/55">
+          <thead className="bg-white/5">
+            <tr className="text-[12px] uppercase tracking-[0.09em] text-white/60">
               <th className="px-4 py-3">PSP</th>
               <th className="px-4 py-3">Success</th>
               <th className="px-4 py-3">P95 Latency</th>
@@ -2301,29 +2378,31 @@ function PspComparisonCard() {
             </tr>
           </thead>
           <tbody>
-            {PSP_ROWS.map((row) => (
-              <tr key={row.name} className="border-t border-black/5 text-[15px] text-black">
-                <td className="px-4 py-4 text-[16px] font-bold">{row.name}</td>
-                <td className="px-4 py-4 text-[16px] font-bold">{row.success}</td>
-                <td className="px-4 py-4 font-medium">{row.latency}</td>
-                <td className="px-4 py-4 font-medium" style={{ fontFamily: FONT_MONO }}>{row.fee}</td>
-                <td className="px-4 py-4 font-medium">{row.webhook}</td>
-                <td className="px-4 py-4 text-right">
-                  <span
-                    className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[12px] font-semibold uppercase tracking-wide ${
-                      row.tone === 'emerald'
-                        ? 'border-[#D8E4FF] bg-[#EEF4FF] text-[#2563EB]'
-                        : row.tone === 'amber'
-                        ? 'border-[#E2E8F0] bg-[#F6F8FC] text-[#475569]'
-                        : 'border-[#DCE5F3] bg-[#EDF2F9] text-[#0F172A]'
-                    }`}
-                  >
-                    <span className={`h-2 w-2 rounded-full ${row.tone === 'emerald' ? 'bg-[#2563EB]' : row.tone === 'amber' ? 'bg-[#64748B]' : 'bg-[#0F172A]'}`} />
-                    {row.severity}
-                  </span>
-                </td>
-              </tr>
-            ))}
+            {PSP_ROWS.map((row) => {
+              const tone = statusSurface(row.tone)
+              return (
+                <tr key={row.name} className="border-t border-white/10 text-[15px] text-white">
+                  <td className="px-4 py-4 text-[16px] font-bold">{row.name}</td>
+                  <td className="px-4 py-4 text-[16px] font-bold">{row.success}</td>
+                  <td className="px-4 py-4 font-medium">{row.latency}</td>
+                  <td className="px-4 py-4 font-medium" style={{ fontFamily: FONT_MONO }}>{row.fee}</td>
+                  <td className="px-4 py-4 font-medium">{row.webhook}</td>
+                  <td className="px-4 py-4 text-right">
+                    <span
+                      className="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[12px] font-semibold uppercase tracking-wide"
+                      style={{
+                        borderColor: tone.border,
+                        background: tone.chipBackground,
+                        color: tone.chipColor,
+                      }}
+                    >
+                      <span className="h-2 w-2 rounded-full" style={{ background: tone.dot, boxShadow: `0 0 12px ${tone.dot}` }} />
+                      {row.severity}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -2333,20 +2412,20 @@ function PspComparisonCard() {
 
 function ReconStateCard() {
   return (
-    <Card className="xl:col-span-5 min-h-[410px] p-8 border-white/50 bg-[#F5F9FF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
-      <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Funds at Risk Ladder</div>
-      <div className="mt-2 text-[17px] leading-7 text-[#64748B]">How much payout value is safe, waiting on proof, or still financially exposed</div>
+    <Card className="xl:col-span-5 min-h-[410px] p-8 border-white/10 bg-[#21253A]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+      <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Funds at Risk Ladder</div>
+      <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">How much payout value is safe, waiting on proof, or still financially exposed</div>
 
       <div className="mt-6 space-y-4">
         {RECON_ROWS.map((row) => (
           <div key={row.state}>
             <div className="flex items-center justify-between gap-3">
-              <div className="text-[17px] font-bold text-black">{row.state}</div>
-              <div className="text-[17px] font-bold text-black" style={{ fontFamily: FONT_MONO }}>
+              <div className="text-[17px] font-bold text-white">{row.state}</div>
+              <div className="text-[17px] font-bold text-white" style={{ fontFamily: FONT_MONO }}>
                 {row.value.toLocaleString()}
               </div>
             </div>
-            <div className="mt-2 h-2.5 rounded-full bg-[#E8EEF8]">
+            <div className="mt-2 h-2.5 rounded-full bg-white/10">
               <div className={`${row.tone} h-2.5 rounded-full`} style={{ width: `${row.pct}%` }} />
             </div>
           </div>
@@ -2354,13 +2433,13 @@ function ReconStateCard() {
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3">
-        <div className="rounded-[22px] border border-black/5 bg-white/85 p-5">
-          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-black/50">Variance</div>
-          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-black">₹3.2 L</div>
+        <div className="rounded-[22px] border border-white/10 bg-white/10 p-5">
+          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-white/50">Variance</div>
+          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-white">₹3.2 L</div>
         </div>
-        <div className="rounded-[22px] border border-black/5 bg-white/85 p-5">
-          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-black/50">Auto-close</div>
-          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-black">98.4%</div>
+        <div className="rounded-[22px] border border-white/10 bg-white/10 p-5">
+          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-white/50">Auto-close</div>
+          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-white">98.4%</div>
         </div>
       </div>
     </Card>
@@ -2369,30 +2448,30 @@ function ReconStateCard() {
 
 function BeneficiaryBanksCard() {
   return (
-    <Card className="xl:col-span-6 min-h-[400px] p-8 border-white/50 bg-[#F8FBFF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-6 min-h-[400px] p-8 border-white/10 bg-[#1C1F2E]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Failure Concentration by Bank</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">Focus escalation where bank-side failures create the most payout leakage</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Failure Concentration by Bank</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">Focus escalation where bank-side failures create the most payout leakage</div>
         </div>
         <GlassUtilityPill tone="smoke">Last 7 days</GlassUtilityPill>
       </div>
 
       <div className="mt-6 space-y-3">
         {BANK_FAILURE_ROWS.map((row) => (
-          <div key={row.bank} className="flex items-center justify-between rounded-[24px] border border-black/5 bg-white/85 px-5 py-5">
+          <div key={row.bank} className="flex items-center justify-between rounded-[24px] border border-white/10 bg-white/10 px-5 py-5">
             <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-full bg-white ring-1 ring-black/5">
+              <div className="h-11 w-11 rounded-full bg-white/90 ring-1 ring-white/10">
                 <Image src={row.logo} alt={`${row.bank} logo`} width={44} height={44} className="h-full w-full rounded-full object-contain p-1.5" />
               </div>
               <div>
-                <div className="text-[16px] font-bold text-black">{row.bank}</div>
-                <div className="mt-1 text-[13px] text-black/55">{row.total} payouts · {row.failed} failed</div>
+                <div className="text-[16px] font-bold text-white">{row.bank}</div>
+                <div className="mt-1 text-[13px] text-white/60">{row.total} payouts · {row.failed} failed</div>
               </div>
             </div>
             <div className="text-right">
-              <div className="text-[17px] font-bold text-black">{row.concentration}</div>
-              <div className={`mt-1 text-xs font-semibold ${row.dir === 'up' ? 'text-[#0F172A]' : 'text-[#2563EB]'}`}>{row.trend}</div>
+              <div className="text-[17px] font-bold text-white">{row.concentration}</div>
+              <div className={`mt-1 text-xs font-semibold ${row.dir === 'up' ? 'text-[#F0F2F5]' : 'text-[#6366F1]'}`}>{row.trend}</div>
             </div>
           </div>
         ))}
@@ -2403,19 +2482,19 @@ function BeneficiaryBanksCard() {
 
 function FailingIfscCard() {
   return (
-    <Card className="xl:col-span-6 min-h-[400px] p-8 border-white/50 bg-[#F5F9FF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-6 min-h-[400px] p-8 border-white/10 bg-[#21253A]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Branch / IFSC Data Friction</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">Correctable data errors that create avoidable payout failures and support cost</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Branch / IFSC Data Friction</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">Correctable data errors that create avoidable payout failures and support cost</div>
         </div>
         <GlassUtilityPill tone="smoke">Branch view</GlassUtilityPill>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-black/5 bg-white/85">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-white/10">
         <table className="w-full text-left text-[15px]">
-          <thead className="bg-[#F3F7FF]">
-            <tr className="text-[12px] uppercase tracking-[0.09em] text-black/55">
+          <thead className="bg-white/5">
+            <tr className="text-[12px] uppercase tracking-[0.09em] text-white/60">
               <th className="px-4 py-3">IFSC</th>
               <th className="px-4 py-3">Bank</th>
               <th className="px-4 py-3">Reason</th>
@@ -2424,10 +2503,10 @@ function FailingIfscCard() {
           </thead>
           <tbody>
             {IFSC_ROWS.map((row) => (
-              <tr key={row.ifsc} className="border-t border-black/5 text-[15px] text-black">
+              <tr key={row.ifsc} className="border-t border-white/10 text-[15px] text-white">
                 <td className="px-4 py-4 text-[15px] font-bold" style={{ fontFamily: FONT_MONO }}>{row.ifsc}</td>
                 <td className="px-4 py-4">{row.bank}</td>
-                <td className="px-4 py-4 text-black/65">{row.reason}</td>
+                <td className="px-4 py-4 text-white/70">{row.reason}</td>
                 <td className="px-4 py-4 text-right font-semibold">{row.failures}</td>
               </tr>
             ))}
@@ -2440,18 +2519,18 @@ function FailingIfscCard() {
 
 function SellerLookupCard() {
   return (
-    <Card className="p-8 border-white/50 bg-[#F8FBFF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="p-8 border-white/10 bg-[#1C1F2E]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Seller / Vendor Payout Status Lookup</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">Resolve payout complaints fast with seller status, UTR evidence, and ETA context</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Seller / Vendor Payout Status Lookup</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">Resolve payout complaints fast with seller status, UTR evidence, and ETA context</div>
         </div>
         <GlassUtilityPill tone="smoke">Export</GlassUtilityPill>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-black/5 bg-white/90 p-4">
-        <div className="flex items-center gap-3 rounded-xl border border-black/5 bg-[#F6F8FC] px-4 py-3 text-sm text-black/45">
-          <svg className="h-4 w-4 text-black/35" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <div className="mt-6 rounded-2xl border border-white/10 bg-white/10 p-4">
+        <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/50">
+          <svg className="h-4 w-4 text-white/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="7" />
             <path d="m20 20-3.5-3.5" />
           </svg>
@@ -2460,7 +2539,7 @@ function SellerLookupCard() {
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[900px] text-left">
-            <thead className="text-[12px] uppercase tracking-[0.09em] text-black/50">
+            <thead className="text-[12px] uppercase tracking-[0.09em] text-white/50">
               <tr>
                 <th className="px-3 py-3">Seller</th>
                 <th className="px-3 py-3">Intent</th>
@@ -2472,27 +2551,27 @@ function SellerLookupCard() {
             </thead>
             <tbody>
               {SELLER_ROWS.map((row) => (
-                <tr key={row.intent} className="border-t border-black/5 text-[15px] text-black">
+                <tr key={row.intent} className="border-t border-white/10 text-[15px] text-white">
                   <td className="px-3 py-4 font-semibold">{row.seller}</td>
                   <td className="px-3 py-4" style={{ fontFamily: FONT_MONO }}>{row.intent}</td>
                   <td className="px-3 py-4">
                     <span
                       className={`inline-flex rounded-full border px-3.5 py-1.5 text-[12px] font-semibold ${
                         row.status === 'CONFIRMED'
-                          ? 'border-[#D8E4FF] bg-[#EEF4FF] text-[#2563EB]'
+                          ? 'border-[rgba(34,197,94,0.24)] bg-[rgba(34,197,94,0.12)] text-[#BBF7D0]'
                           : row.status === 'FAILED'
-                          ? 'border-[#DCE5F3] bg-[#EDF2F9] text-[#0F172A]'
+                          ? 'border-[rgba(239,68,68,0.24)] bg-[rgba(239,68,68,0.12)] text-[#FECACA]'
                           : row.status === 'PROVISIONAL'
-                          ? 'border-[#E2E8F0] bg-[#F6F8FC] text-[#475569]'
-                          : 'border-slate-200 bg-slate-50 text-slate-700'
+                          ? 'border-[rgba(234,179,8,0.24)] bg-[rgba(234,179,8,0.12)] text-[#FEF3C7]'
+                          : 'border-[rgba(99,102,241,0.24)] bg-[rgba(99,102,241,0.12)] text-[#C7D2FE]'
                       }`}
                     >
                       {row.status}
                     </span>
                   </td>
                   <td className="px-3 py-4 font-semibold">{row.amount}</td>
-                  <td className="px-3 py-4 text-black/60">{row.utr}</td>
-                  <td className="px-3 py-4 text-black/60">{row.eta}</td>
+                  <td className="px-3 py-4 text-white/60">{row.utr}</td>
+                  <td className="px-3 py-4 text-white/60">{row.eta}</td>
                 </tr>
               ))}
             </tbody>
@@ -2544,11 +2623,11 @@ function SignalCoverageCard() {
   const selectedPlay = RECON_RECOVERY_PLAYS.find((item) => item.title === activePlay) ?? RECON_RECOVERY_PLAYS[0]
 
   return (
-    <Card className="xl:col-span-7 min-h-[410px] p-8 border-white/50 bg-[#F8FBFF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-7 min-h-[410px] p-8 border-white/10 bg-[#1C1F2E]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Reconciliation Savings Engine</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">Where evidence and automation are directly protecting client money and reducing finance drag</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Reconciliation Savings Engine</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">Where evidence and automation are directly protecting client money and reducing finance drag</div>
         </div>
           <div className="flex items-center gap-2">
             <GlassUtilityPill tone="smoke">24h window</GlassUtilityPill>
@@ -2556,7 +2635,7 @@ function SignalCoverageCard() {
               key={selectedPlay.title}
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
-              className="rounded-full border border-[#DCE7FF] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(238,244,255,0.92))] px-4 py-2 text-[13px] font-semibold text-[#2563EB] shadow-[0_12px_26px_rgba(37,99,235,0.12),inset_0_1px_0_rgba(255,255,255,0.95)]"
+              className="rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(39,44,68,0.96),rgba(28,31,46,0.92))] px-4 py-2 text-[13px] font-semibold text-[#6366F1] shadow-[0_12px_26px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.12)]"
             >
               Active play: {selectedPlay.title}
             </motion.div>
@@ -2564,26 +2643,26 @@ function SignalCoverageCard() {
       </div>
 
       <div className="mt-6 grid grid-cols-3 gap-3">
-        <div className="rounded-2xl border border-black/5 bg-white/92 p-5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
-          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Recovered value</div>
-          <div className="mt-3 text-3xl font-extrabold text-[#0F172A]">₹7.52 L</div>
-          <div className="mt-2 text-sm text-[#64748B]">Recovered through delayed evidence and auto-closure rules</div>
+        <div className="rounded-2xl border border-white/10 bg-white/10 p-5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Recovered value</div>
+          <div className="mt-3 text-3xl font-extrabold text-[#F0F2F5]">₹7.52 L</div>
+          <div className="mt-2 text-sm text-[#A8AFBF]">Recovered through delayed evidence and auto-closure rules</div>
         </div>
-        <div className="rounded-2xl border border-black/5 bg-white/92 p-5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
-          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Leakage prevented</div>
-          <div className="mt-3 text-3xl font-extrabold text-[#0F172A]">₹2.72 L</div>
-          <div className="mt-2 text-sm text-[#64748B]">Stopped from rolling into write-offs or duplicate finance actions</div>
+        <div className="rounded-2xl border border-white/10 bg-white/10 p-5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Leakage prevented</div>
+          <div className="mt-3 text-3xl font-extrabold text-[#F0F2F5]">₹2.72 L</div>
+          <div className="mt-2 text-sm text-[#A8AFBF]">Stopped from rolling into write-offs or duplicate finance actions</div>
         </div>
-        <div className="rounded-2xl border border-black/5 bg-white/92 p-5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
-          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Manual hours saved</div>
-          <div className="mt-3 text-3xl font-extrabold text-[#0F172A]">26.4h</div>
-          <div className="mt-2 text-sm text-[#64748B]">Reduced spreadsheet chasing and statement follow-up effort</div>
+        <div className="rounded-2xl border border-white/10 bg-white/10 p-5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Manual hours saved</div>
+          <div className="mt-3 text-3xl font-extrabold text-[#F0F2F5]">26.4h</div>
+          <div className="mt-2 text-sm text-[#A8AFBF]">Reduced spreadsheet chasing and statement follow-up effort</div>
         </div>
       </div>
 
       <div className="mt-4 grid grid-cols-[1.1fr_0.9fr] gap-4">
-        <div className="overflow-hidden rounded-2xl border border-black/5 bg-white/90">
-          <div className="border-b border-black/5 bg-[#F3F7FF] px-5 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-black/50">
+        <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/10">
+          <div className="border-b border-white/10 bg-white/5 px-5 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-white/50">
             Recovery plays
           </div>
           <div className="p-3">
@@ -2595,19 +2674,19 @@ function SignalCoverageCard() {
                 whileHover={{ y: -1 }}
                 className={`mb-3 w-full rounded-2xl border p-4 text-left last:mb-0 ${
                   activePlay === play.title
-                    ? 'border-[#D8E4FF] bg-[#F4F8FF] shadow-[0_12px_24px_rgba(37,99,235,0.10)]'
-                    : 'border-black/5 bg-white hover:bg-[#F8FBFF]'
+                    ? 'border-white/10 bg-white/5 shadow-[0_12px_24px_rgba(99,102,241,0.10)]'
+                    : 'border-white/10 bg-white/10 hover:bg-white/20'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-[17px] font-bold text-[#0F172A]">{play.title}</div>
-                    <div className="mt-2 text-[17px] leading-7 text-[#64748B]">{play.subtitle}</div>
+                    <div className="text-[17px] font-bold text-[#F0F2F5]">{play.title}</div>
+                    <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">{play.subtitle}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-extrabold text-[#0F172A]">{play.amount}</div>
+                    <div className="text-xl font-extrabold text-[#F0F2F5]">{play.amount}</div>
                     <div className={`mt-1 text-xs font-semibold ${
-                      play.tone === 'blue' ? 'text-[#2563EB]' : play.tone === 'amber' ? 'text-[#475569]' : 'text-[#0F172A]'
+                      play.tone === 'blue' ? 'text-[#6366F1]' : play.tone === 'amber' ? 'text-[#EAB308]' : 'text-[#22C55E]'
                     }`}>
                       {play.impact}
                     </div>
@@ -2622,23 +2701,23 @@ function SignalCoverageCard() {
           key={selectedPlay.title}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl border border-black/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(244,248,255,0.92))] p-5 shadow-[0_16px_32px_rgba(15,23,42,0.08)]"
+          className="rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(39,44,68,0.96),rgba(28,31,46,0.92))] p-5 shadow-[0_16px_32px_rgba(15,23,42,0.08)]"
         >
-          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Current savings driver</div>
-          <div className="mt-3 text-[30px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">{selectedPlay.amount}</div>
-          <div className="mt-2 text-base font-semibold text-[#0F172A]">{selectedPlay.title}</div>
-          <div className="mt-3 text-sm leading-6 text-[#64748B]">{selectedPlay.subtitle}</div>
+          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Current savings driver</div>
+          <div className="mt-3 text-[30px] font-black leading-none tracking-[-0.04em] text-[#F0F2F5]">{selectedPlay.amount}</div>
+          <div className="mt-2 text-base font-semibold text-[#F0F2F5]">{selectedPlay.title}</div>
+          <div className="mt-3 text-sm leading-6 text-[#A8AFBF]">{selectedPlay.subtitle}</div>
 
-          <div className="mt-5 rounded-2xl border border-black/5 bg-white/85 p-4">
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Why it matters</div>
-            <div className="mt-2 text-sm text-[#64748B]">
+          <div className="mt-5 rounded-2xl border border-white/10 bg-white/10 p-4">
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Why it matters</div>
+            <div className="mt-2 text-sm text-[#A8AFBF]">
               This play directly reduces unresolved money sitting in recon queues and lowers the probability of period-end leakage.
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-black/5 bg-white/85 p-4">
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Observed impact</div>
-            <div className="mt-2 text-lg font-semibold text-[#0F172A]">{selectedPlay.impact}</div>
+          <div className="mt-4 rounded-2xl border border-white/10 bg-white/10 p-4">
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Observed impact</div>
+            <div className="mt-2 text-lg font-semibold text-[#F0F2F5]">{selectedPlay.impact}</div>
           </div>
         </motion.div>
       </div>
@@ -2652,39 +2731,39 @@ function ConfidenceDistributionCard() {
   const activeBin = CONFIDENCE_BINS.find((item) => item.label === hoveredBin) ?? CONFIDENCE_BINS[CONFIDENCE_BINS.length - 1]
 
   return (
-    <Card className="xl:col-span-5 min-h-[410px] p-8 border-white/50 bg-[#F5F9FF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-5 min-h-[410px] p-8 border-white/10 bg-[#21253A]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Outcome Trust Distribution</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">How much closure volume is audit-ready versus still probabilistic</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Outcome Trust Distribution</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">How much closure volume is audit-ready versus still probabilistic</div>
         </div>
         <motion.div
           key={activeBin.label}
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl border border-[#D8E4FF] bg-white/95 px-4 py-3 text-right shadow-[0_12px_24px_rgba(37,99,235,0.10)]"
+          className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-right shadow-[0_12px_24px_rgba(99,102,241,0.10)]"
         >
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-black/45">{activeBin.label}</div>
-          <div className="mt-1 text-xl font-extrabold text-[#0F172A]">{activeBin.count}</div>
-          <div className="text-xs text-[#64748B]">intents in bucket</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">{activeBin.label}</div>
+          <div className="mt-1 text-xl font-extrabold text-[#F0F2F5]">{activeBin.count}</div>
+          <div className="text-xs text-[#A8AFBF]">intents in bucket</div>
         </motion.div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-white/40 bg-white/88 p-5">
+      <div className="mt-6 rounded-2xl border border-white/10 bg-white/10 p-5">
         <div className="flex h-[220px] items-end gap-4">
           {CONFIDENCE_BINS.map((bin) => {
             const height = Math.max(24, (bin.count / max) * 180)
             const isActive = hoveredBin === bin.label
             return (
               <div key={bin.label} className="flex flex-1 flex-col items-center gap-3">
-                <div className={`text-[11px] font-semibold ${isActive ? 'text-[#2563EB]' : 'text-black/50'}`}>{bin.count}</div>
+                <div className={`text-[11px] font-semibold ${isActive ? 'text-[#6366F1]' : 'text-white/50'}`}>{bin.count}</div>
                 <motion.div
                   onMouseEnter={() => setHoveredBin(bin.label)}
                   whileHover={{ y: -3 }}
-                  className="w-full rounded-t-[20px] bg-[linear-gradient(180deg,rgba(37,99,235,0.92),rgba(96,165,250,0.38))] shadow-[0_14px_28px_rgba(37,99,235,0.12)]"
+                  className="w-full rounded-t-[20px] bg-[linear-gradient(180deg,rgba(99,102,241,0.92),rgba(129,140,248,0.38))] shadow-[0_14px_28px_rgba(99,102,241,0.12)]"
                   style={{ height, opacity: isActive ? 1 : 0.62 }}
                 />
-                <div className="text-xs font-semibold text-[#64748B]">{bin.label}</div>
+                <div className="text-xs font-semibold text-[#A8AFBF]">{bin.label}</div>
               </div>
             )
           })}
@@ -2696,30 +2775,30 @@ function ConfidenceDistributionCard() {
 
 function SignalCoverageMatrixProofCard() {
   const colorFor = (state: 'green' | 'amber' | 'red') =>
-    state === 'green' ? 'bg-[#2563EB]' : state === 'amber' ? 'bg-[#64748B]' : 'bg-[#0F172A]'
+    state === 'green' ? 'bg-[#22C55E]' : state === 'amber' ? 'bg-[#EAB308]' : 'bg-[#EF4444]'
 
   return (
-    <Card className="xl:col-span-7 p-8 border-white/50 bg-[#F8FBFF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-7 p-8 border-white/10 bg-[#1C1F2E]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Signal Coverage Matrix</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">The exact proof grid showing which signals arrived, when they arrived, and where trust is blocked</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Signal Coverage Matrix</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">The exact proof grid showing which signals arrived, when they arrived, and where trust is blocked</div>
         </div>
-        <div className="rounded-full border border-[#D8E4FF] bg-[#EEF4FF] px-4.5 py-2 text-[13px] font-semibold text-[#2563EB]">Multi-signal proof</div>
+        <div className="rounded-full border border-white/10 bg-indigo-500/10 px-4.5 py-2 text-[13px] font-semibold text-[#6366F1]">Multi-signal proof</div>
       </div>
-      <div className="mt-6 overflow-hidden rounded-2xl border border-black/5 bg-white/90">
-        <div className="grid grid-cols-[1.4fr_repeat(3,1fr)] border-b border-black/5 bg-[#F3F7FF] text-xs font-semibold uppercase tracking-[0.08em] text-black/50">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-white/10">
+        <div className="grid grid-cols-[1.4fr_repeat(3,1fr)] border-b border-white/10 bg-white/5 text-xs font-semibold uppercase tracking-[0.08em] text-white/50">
           <div className="px-4 py-3">Time block</div>
           <div className="px-4 py-3 text-center">Webhook</div>
           <div className="px-4 py-3 text-center">Poll</div>
           <div className="px-4 py-3 text-center">Statement</div>
         </div>
         {SIGNAL_COVERAGE_MATRIX.map((row) => (
-          <div key={row.block} className="grid grid-cols-[1.4fr_repeat(3,1fr)] border-t border-black/5 text-sm">
-            <div className="px-4 py-4 font-semibold text-black">{row.block}</div>
+          <div key={row.block} className="grid grid-cols-[1.4fr_repeat(3,1fr)] border-t border-white/10 text-sm">
+            <div className="px-4 py-4 font-semibold text-white">{row.block}</div>
             {(['webhook', 'poll', 'statement'] as const).map((key) => (
               <div key={key} className="flex items-center justify-center px-4 py-4">
-                <div className="flex items-center gap-2 rounded-full border border-black/5 bg-[#F8FBFF] px-3 py-1.5 text-[13px] font-semibold text-black/70">
+                <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[13px] font-semibold text-white/70">
                   <span className={`h-2.5 w-2.5 rounded-full ${colorFor(row[key])}`} />
                   {row[key] === 'green' ? 'Received' : row[key] === 'amber' ? 'Delayed' : 'Missing'}
                 </div>
@@ -2734,26 +2813,26 @@ function SignalCoverageMatrixProofCard() {
 
 function ReconTimelineIntentCard() {
   return (
-    <Card className="xl:col-span-5 p-8 border-white/50 bg-[#F5F9FF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-5 p-8 border-white/10 bg-[#21253A]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Recon Timeline per Intent</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">Visual proof trail for a disputed payout from dispatch to finality</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Recon Timeline per Intent</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">Visual proof trail for a disputed payout from dispatch to finality</div>
         </div>
         <GlassUtilityPill tone="neutral" mono>
           INT-RC-88210
         </GlassUtilityPill>
       </div>
-      <div className="mt-6 rounded-[24px] border border-black/5 bg-white/90 p-6">
+      <div className="mt-6 rounded-[24px] border border-white/10 bg-white/10 p-6">
         {RECON_TIMELINE_EVENTS.map((event, index) => (
           <div key={event.label} className="flex gap-4">
             <div className="flex w-5 flex-col items-center">
-              <div className={`mt-1 h-3.5 w-3.5 rounded-full ${event.status === 'done' ? 'bg-[#2563EB]' : 'bg-slate-300'}`} />
-              {index < RECON_TIMELINE_EVENTS.length - 1 && <div className={`mt-2 h-10 w-[2px] ${event.status === 'done' ? 'bg-[#93C5FD]' : 'bg-slate-200'}`} />}
+              <div className={`mt-1 h-3.5 w-3.5 rounded-full ${event.status === 'done' ? 'bg-[#6366F1]' : 'bg-white/20'}`} />
+              {index < RECON_TIMELINE_EVENTS.length - 1 && <div className={`mt-2 h-10 w-[2px] ${event.status === 'done' ? 'bg-[#6366F1]/40' : 'bg-white/10'}`} />}
             </div>
             <div className="pb-6">
-              <div className="text-[17px] font-bold text-black">{event.label}</div>
-              <div className="mt-1 text-[13px] text-black/55">{event.time}</div>
+              <div className="text-[17px] font-bold text-white">{event.label}</div>
+              <div className="mt-1 text-[13px] text-white/60">{event.time}</div>
             </div>
           </div>
         ))}
@@ -2764,17 +2843,17 @@ function ReconTimelineIntentCard() {
 
 function UtrConsistencyCheckerCard() {
   return (
-    <Card className="xl:col-span-7 p-8 border-white/50 bg-[#F8FBFF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-7 p-8 border-white/10 bg-[#1C1F2E]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">UTR Consistency Checker</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">Flag mismatches across webhook, poll, and statement before finance trusts the wrong payout</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">UTR Consistency Checker</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">Flag mismatches across webhook, poll, and statement before finance trusts the wrong payout</div>
         </div>
         <GlassUtilityPill tone="dark">1 mismatch</GlassUtilityPill>
       </div>
-      <div className="mt-6 overflow-hidden rounded-2xl border border-black/5 bg-white/90">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-white/10">
         <table className="w-full text-left text-[15px]">
-          <thead className="bg-[#F3F7FF] text-[12px] uppercase tracking-[0.09em] text-black/50">
+          <thead className="bg-white/5 text-[12px] uppercase tracking-[0.09em] text-white/50">
             <tr>
               <th className="px-4 py-3">Intent</th>
               <th className="px-4 py-3">Webhook</th>
@@ -2785,7 +2864,7 @@ function UtrConsistencyCheckerCard() {
           </thead>
           <tbody>
             {UTR_CHECK_ROWS.map((row) => (
-              <tr key={row.intent} className="border-t border-black/5 text-[15px] text-black">
+              <tr key={row.intent} className="border-t border-white/10 text-[15px] text-white">
                 <td className="px-4 py-4 text-[15px] font-bold" style={{ fontFamily: FONT_MONO }}>{row.intent}</td>
                 <td className="px-4 py-4">{row.webhook}</td>
                 <td className="px-4 py-4">{row.poll}</td>
@@ -2794,10 +2873,10 @@ function UtrConsistencyCheckerCard() {
                   <span
                     className={`inline-flex rounded-full border px-3.5 py-1.5 text-[12px] font-semibold ${
                       row.status === 'Aligned'
-                        ? 'border-[#D8E4FF] bg-[#EEF4FF] text-[#2563EB]'
+                        ? 'border-[rgba(34,197,94,0.24)] bg-[rgba(34,197,94,0.12)] text-[#BBF7D0]'
                         : row.status === 'Mismatch'
-                        ? 'border-[#DCE5F3] bg-[#EDF2F9] text-[#0F172A]'
-                        : 'border-[#E2E8F0] bg-[#F6F8FC] text-[#475569]'
+                        ? 'border-[rgba(239,68,68,0.24)] bg-[rgba(239,68,68,0.12)] text-[#FECACA]'
+                        : 'border-[rgba(234,179,8,0.24)] bg-[rgba(234,179,8,0.12)] text-[#FEF3C7]'
                     }`}
                   >
                     {row.status}
@@ -2814,35 +2893,35 @@ function UtrConsistencyCheckerCard() {
 
 function StatementParserHealthCard() {
   return (
-    <Card className="xl:col-span-5 p-8 border-white/50 bg-[#F5F9FF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-5 p-8 border-white/10 bg-[#21253A]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Statement Parser Health</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">Parser reliability check so missing statements do not silently drag trust scores down</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Statement Parser Health</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">Parser reliability check so missing statements do not silently drag trust scores down</div>
         </div>
         <GlassUtilityPill tone="accent">{PARSER_HEALTH.success}</GlassUtilityPill>
       </div>
-      <div className="mt-6 space-y-4 rounded-[24px] border border-black/5 bg-white/90 p-6">
+      <div className="mt-6 space-y-4 rounded-[24px] border border-white/10 bg-white/10 p-6">
         <div>
-          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Latest file</div>
-          <div className="mt-2 text-[17px] font-bold text-black">{PARSER_HEALTH.filename}</div>
+          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Latest file</div>
+          <div className="mt-2 text-[17px] font-bold text-white">{PARSER_HEALTH.filename}</div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-black/5 bg-[#F8FBFF] p-4">
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Received</div>
-            <div className="mt-2 text-[24px] font-black tracking-[-0.03em] text-[#0F172A]">{PARSER_HEALTH.received}</div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Received</div>
+            <div className="mt-2 text-[24px] font-black tracking-[-0.03em] text-[#F0F2F5]">{PARSER_HEALTH.received}</div>
           </div>
-          <div className="rounded-2xl border border-black/5 bg-[#F8FBFF] p-4">
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Parse success</div>
-            <div className="mt-2 text-[24px] font-black tracking-[-0.03em] text-[#0F172A]">{PARSER_HEALTH.success}</div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Parse success</div>
+            <div className="mt-2 text-[24px] font-black tracking-[-0.03em] text-[#F0F2F5]">{PARSER_HEALTH.success}</div>
           </div>
-          <div className="rounded-2xl border border-black/5 bg-[#F8FBFF] p-4">
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Total lines</div>
-            <div className="mt-2 text-[24px] font-black tracking-[-0.03em] text-[#0F172A]">{PARSER_HEALTH.lines}</div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Total lines</div>
+            <div className="mt-2 text-[24px] font-black tracking-[-0.03em] text-[#F0F2F5]">{PARSER_HEALTH.lines}</div>
           </div>
-          <div className="rounded-2xl border border-black/5 bg-[#F8FBFF] p-4">
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Parsed lines</div>
-            <div className="mt-2 text-[24px] font-black tracking-[-0.03em] text-[#0F172A]">{PARSER_HEALTH.parsed}</div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Parsed lines</div>
+            <div className="mt-2 text-[24px] font-black tracking-[-0.03em] text-[#F0F2F5]">{PARSER_HEALTH.parsed}</div>
           </div>
         </div>
       </div>
@@ -2855,40 +2934,40 @@ function OpenReconItemsCard() {
   const activeRow = OPEN_RECON_ITEMS.find((row) => row.intent === activeIntent) ?? OPEN_RECON_ITEMS[0]
 
   return (
-    <Card className="xl:col-span-6 min-h-[400px] p-8 border-white/50 bg-[#F8FBFF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-6 min-h-[400px] p-8 border-white/10 bg-[#1C1F2E]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Cash Blocked in Recon</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">Prioritized by amount, missing proof, and how long money has stayed unresolved</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Cash Blocked in Recon</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">Prioritized by amount, missing proof, and how long money has stayed unresolved</div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="rounded-2xl border border-[#D8E4FF] bg-white/95 px-4 py-3 text-right shadow-[0_12px_24px_rgba(37,99,235,0.10)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-black/45">Active item</div>
-            <div className="mt-1 text-[17px] font-bold text-[#0F172A]" style={{ fontFamily: FONT_MONO }}>{activeRow.intent}</div>
-            <div className="text-xs text-[#64748B]">{activeRow.missing}</div>
+          <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-right shadow-[0_12px_24px_rgba(99,102,241,0.10)]">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">Active item</div>
+            <div className="mt-1 text-[17px] font-bold text-[#F0F2F5]" style={{ fontFamily: FONT_MONO }}>{activeRow.intent}</div>
+            <div className="text-xs text-[#A8AFBF]">{activeRow.missing}</div>
           </div>
           <GlassUtilityPill tone="smoke">Export</GlassUtilityPill>
         </div>
       </div>
 
       <div className="mt-6 grid grid-cols-3 gap-3">
-        <div className="rounded-[22px] border border-black/5 bg-white/90 p-5">
-          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Open amount</div>
-          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">₹9.18 L</div>
+        <div className="rounded-[22px] border border-white/10 bg-white/10 p-5">
+          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Open amount</div>
+          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#F0F2F5]">₹9.18 L</div>
         </div>
-        <div className="rounded-[22px] border border-black/5 bg-white/90 p-5">
-          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Awaiting statement</div>
-          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">4</div>
+        <div className="rounded-[22px] border border-white/10 bg-white/10 p-5">
+          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Awaiting statement</div>
+          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#F0F2F5]">4</div>
         </div>
-        <div className="rounded-[22px] border border-black/5 bg-white/90 p-5">
-          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Oldest pending</div>
-          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">47.3m</div>
+        <div className="rounded-[22px] border border-white/10 bg-white/10 p-5">
+          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Oldest pending</div>
+          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#F0F2F5]">47.3m</div>
         </div>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-2xl border border-black/5 bg-white/88">
+      <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-white/10">
         <table className="w-full text-left text-[15px]">
-          <thead className="bg-[#F3F7FF] text-[12px] uppercase tracking-[0.09em] text-black/50">
+          <thead className="bg-white/5 text-[12px] uppercase tracking-[0.09em] text-white/50">
             <tr>
               <th className="px-4 py-3">Intent</th>
               <th className="px-4 py-3">Amount</th>
@@ -2901,18 +2980,18 @@ function OpenReconItemsCard() {
               <tr
                 key={row.intent}
                 onMouseEnter={() => setActiveIntent(row.intent)}
-                className={`border-t border-black/5 text-sm text-black transition-colors ${
-                  row.intent === activeIntent ? 'bg-[#F4F8FF]' : 'hover:bg-[#F8FBFF]'
+                className={`border-t border-white/10 text-sm text-white transition-colors ${
+                  row.intent === activeIntent ? 'bg-white/5' : 'hover:bg-white/5'
                 }`}
               >
                 <td className="px-4 py-4 text-[15px] font-bold" style={{ fontFamily: FONT_MONO }}>{row.intent}</td>
                 <td className="px-4 py-4 font-semibold">{row.amount}</td>
-                <td className="px-4 py-4 text-black/65">
-                  <span className="inline-flex rounded-full border border-[#E2E8F0] bg-[#F6F8FC] px-4 py-1.5 text-[13px] font-semibold text-[#475569]">
+                <td className="px-4 py-4 text-white/70">
+                  <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-[13px] font-semibold text-[#A8AFBF]">
                     {row.missing}
                   </span>
                 </td>
-                <td className="px-4 py-4 text-right font-semibold text-[#0F172A]">{row.since}</td>
+                <td className="px-4 py-4 text-right font-semibold text-[#F0F2F5]">{row.since}</td>
               </tr>
             ))}
           </tbody>
@@ -2942,44 +3021,44 @@ function ClosureByHourCard() {
   const activeY = activePoint ? getY(activePoint.value) : 0
 
   return (
-    <Card className="xl:col-span-6 min-h-[400px] p-8 border-white/50 bg-[#F5F9FF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-6 min-h-[400px] p-8 border-white/10 bg-[#21253A]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Trust Restoration by Hour</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">When unresolved payouts move back into a defensible, close-ready state</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Trust Restoration by Hour</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">When unresolved payouts move back into a defensible, close-ready state</div>
         </div>
         {activePoint && (
           <motion.div
             key={activePoint.bucket}
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl border border-[#D8E4FF] bg-white/95 px-4 py-3 text-right shadow-[0_12px_24px_rgba(37,99,235,0.10)]"
+            className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-right shadow-[0_12px_24px_rgba(99,102,241,0.10)]"
           >
-            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-black/45">{activePoint.bucket}</div>
-            <div className="mt-1 text-xl font-extrabold text-[#0F172A]">{activePoint.value}</div>
-            <div className="text-xs text-[#64748B]">closures</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">{activePoint.bucket}</div>
+            <div className="mt-1 text-xl font-extrabold text-[#F0F2F5]">{activePoint.value}</div>
+            <div className="text-xs text-[#A8AFBF]">closures</div>
           </motion.div>
         )}
       </div>
 
-      <div className="mt-6 rounded-[24px] border border-white/40 bg-white/88 p-5">
+      <div className="mt-6 rounded-[24px] border border-white/10 bg-white/10 p-5">
         <svg viewBox={`0 0 ${width} ${height}`} className="h-[240px] w-full">
           <defs>
             <linearGradient id="closure-area-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#2563EB" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="#2563EB" stopOpacity="0.03" />
+              <stop offset="0%" stopColor="#6366F1" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="#6366F1" stopOpacity="0.03" />
             </linearGradient>
           </defs>
           {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
             const y = top + (bottom - top) * tick
-            return <line key={tick} x1={left} y1={y} x2={width - right} y2={y} stroke="rgba(15,23,42,0.06)" strokeWidth="1" />
+            return <line key={tick} x1={left} y1={y} x2={width - right} y2={y} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
           })}
           {hoveredIdx !== null && (
-            <rect x={Math.max(left, activeX - step / 2)} y={top} width={step} height={bottom - top + 14} rx="22" fill="rgba(37,99,235,0.06)" />
+            <rect x={Math.max(left, activeX - step / 2)} y={top} width={step} height={bottom - top + 14} rx="22" fill="rgba(99,102,241,0.06)" />
           )}
           <path d={areaPath} fill="url(#closure-area-fill)" />
-          <path d={linePath} fill="none" stroke="#2563EB" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-          {activePoint && <line x1={activeX} y1={top} x2={activeX} y2={bottom + 6} stroke="rgba(37,99,235,0.16)" strokeWidth="1.5" strokeDasharray="4 5" />}
+          <path d={linePath} fill="none" stroke="#6366F1" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+          {activePoint && <line x1={activeX} y1={top} x2={activeX} y2={bottom + 6} stroke="rgba(99,102,241,0.16)" strokeWidth="1.5" strokeDasharray="4 5" />}
           {CLOSURE_BY_HOUR.map((item, index) => {
             const x = left + index * step
             const y = getY(item.value)
@@ -2991,14 +3070,14 @@ function ClosureByHourCard() {
                     cx={x}
                     cy={y}
                     r="14"
-                    fill="rgba(37,99,235,0.10)"
+                    fill="rgba(99,102,241,0.10)"
                     animate={{ opacity: [0.25, 0.55, 0.25], scale: [1, 1.08, 1] }}
                     transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
                   />
                 )}
-                <circle cx={x} cy={y} r="6.5" fill="#fff" stroke="#2563EB" strokeWidth="3" />
+                <circle cx={x} cy={y} r="6.5" fill="#fff" stroke="#6366F1" strokeWidth="3" />
                 <rect x={x - step / 2} y={top} width={step} height={bottom - top + 16} fill="transparent" onMouseEnter={() => setHoveredIdx(index)} />
-                <text x={x} y="236" fontSize="12" fill="#64748B" textAnchor="middle">
+                <text x={x} y="236" fontSize="12" fill="#A8AFBF" textAnchor="middle">
                   {item.bucket}
                 </text>
               </g>
@@ -3015,40 +3094,40 @@ function AmountVarianceCard() {
   const highlightedVariance = VARIANCE_ROWS.find((row) => row.intent === activeVariance) ?? VARIANCE_ROWS[1]
 
   return (
-    <Card className="xl:col-span-7 p-8 border-white/50 bg-[#F8FBFF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-7 p-8 border-white/10 bg-[#1C1F2E]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Variance Leakage Register</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">Where settled value diverges from intended value and threatens close accuracy</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Variance Leakage Register</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">Where settled value diverges from intended value and threatens close accuracy</div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="rounded-2xl border border-[#D8E4FF] bg-white/95 px-4 py-3 text-right shadow-[0_12px_24px_rgba(37,99,235,0.08)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-black/45">Largest gap</div>
-            <div className="mt-1 text-[17px] font-bold text-[#0F172A]" style={{ fontFamily: FONT_MONO }}>{highlightedVariance.intent}</div>
-            <div className="text-xs text-[#0F172A]">{highlightedVariance.variance}</div>
+          <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-right shadow-[0_12px_24px_rgba(99,102,241,0.08)]">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">Largest gap</div>
+            <div className="mt-1 text-[17px] font-bold text-[#F0F2F5]" style={{ fontFamily: FONT_MONO }}>{highlightedVariance.intent}</div>
+            <div className="text-xs text-[#F0F2F5]">{highlightedVariance.variance}</div>
           </div>
           <GlassUtilityPill tone="smoke">Export</GlassUtilityPill>
         </div>
       </div>
 
       <div className="mt-6 grid grid-cols-3 gap-3">
-        <div className="rounded-[22px] border border-black/5 bg-white/90 p-5">
-          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Flagged intents</div>
-          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">4</div>
+        <div className="rounded-[22px] border border-white/10 bg-white/10 p-5">
+          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Flagged intents</div>
+          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#F0F2F5]">4</div>
         </div>
-        <div className="rounded-[22px] border border-black/5 bg-white/90 p-5">
-          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Cross-period</div>
-          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">2</div>
+        <div className="rounded-[22px] border border-white/10 bg-white/10 p-5">
+          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Cross-period</div>
+          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#F0F2F5]">2</div>
         </div>
-        <div className="rounded-[22px] border border-black/5 bg-white/90 p-5">
-          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Net variance</div>
-          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">₹11.9 K</div>
+        <div className="rounded-[22px] border border-white/10 bg-white/10 p-5">
+          <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Net variance</div>
+          <div className="mt-2 text-[30px] font-black leading-none tracking-[-0.04em] text-[#F0F2F5]">₹11.9 K</div>
         </div>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-2xl border border-black/5 bg-white/88">
+      <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-white/10">
         <table className="w-full text-left text-[15px]">
-          <thead className="bg-[#F3F7FF] text-[12px] uppercase tracking-[0.09em] text-black/50">
+          <thead className="bg-white/5 text-[12px] uppercase tracking-[0.09em] text-white/50">
             <tr>
               <th className="px-4 py-3">Intent</th>
               <th className="px-4 py-3">Intended</th>
@@ -3062,17 +3141,17 @@ function AmountVarianceCard() {
               <tr
                 key={row.intent}
                 onMouseEnter={() => setActiveVariance(row.intent)}
-                className={`border-t border-black/5 text-sm text-black transition-colors ${
-                  row.intent === activeVariance ? 'bg-[#FFF5F7]' : 'hover:bg-[#F8FBFF]'
+                className={`border-t border-white/10 text-sm text-white transition-colors ${
+                  row.intent === activeVariance ? 'bg-white/5' : 'hover:bg-white/5'
                 }`}
               >
                 <td className="px-4 py-4 text-[15px] font-bold" style={{ fontFamily: FONT_MONO }}>{row.intent}</td>
                 <td className="px-4 py-4">{row.intended}</td>
                 <td className="px-4 py-4">{row.settled}</td>
-                <td className="px-4 py-4 font-semibold text-[#0F172A]">{row.variance}</td>
-                <td className="px-4 py-4 text-right text-black/65">
+                <td className="px-4 py-4 font-semibold text-[#F0F2F5]">{row.variance}</td>
+                <td className="px-4 py-4 text-right text-white/70">
                   <span className={`inline-flex rounded-full px-4 py-1.5 text-[13px] font-semibold ${
-                    row.crossPeriod === 'Yes' ? 'bg-[#EDF2F9] text-[#0F172A]' : 'bg-[#F6F8FC] text-[#475569]'
+                    row.crossPeriod === 'Yes' ? 'bg-indigo-500/10 text-[#F0F2F5]' : 'bg-white/5 text-[#A8AFBF]'
                   }`}>
                     {row.crossPeriod}
                   </span>
@@ -3090,15 +3169,15 @@ function AutoManualClosureCard() {
   const [activeClosure, setActiveClosure] = useState<string>(AUTO_MANUAL_CLOSURE[0].name)
 
   return (
-    <Card className="xl:col-span-5 p-8 border-white/50 bg-[#F5F9FF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
-      <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Evidence Automation Coverage</div>
-      <div className="mt-2 text-[17px] leading-7 text-[#64748B]">How much trust is restored automatically versus handed to manual finance review</div>
+    <Card className="xl:col-span-5 p-8 border-white/10 bg-[#21253A]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+      <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Evidence Automation Coverage</div>
+      <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">How much trust is restored automatically versus handed to manual finance review</div>
 
-      <div className="mt-6 flex items-center gap-6 rounded-2xl border border-white/40 bg-white/88 p-5">
+      <div className="mt-6 flex items-center gap-6 rounded-2xl border border-white/10 bg-white/10 p-5">
         <div className="relative flex h-40 w-40 items-center justify-center rounded-full" style={{ background: `conic-gradient(${AUTO_MANUAL_CLOSURE[0].color} 0 ${AUTO_MANUAL_CLOSURE[0].pct}%, ${AUTO_MANUAL_CLOSURE[1].color} ${AUTO_MANUAL_CLOSURE[0].pct}% 100%)` }}>
-          <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-white">
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Auto</div>
-            <div className="text-[30px] font-black leading-none tracking-[-0.04em] text-black">{AUTO_MANUAL_CLOSURE[0].pct}%</div>
+          <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-[#1C1F2E] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]">
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Auto</div>
+            <div className="text-[30px] font-black leading-none tracking-[-0.04em] text-white">{AUTO_MANUAL_CLOSURE[0].pct}%</div>
           </div>
         </div>
         <div className="flex-1 space-y-3">
@@ -3108,22 +3187,22 @@ function AutoManualClosureCard() {
               onMouseEnter={() => setActiveClosure(item.name)}
               whileHover={{ y: -2 }}
               className={`rounded-2xl border p-4 transition-colors ${
-                activeClosure === item.name ? 'border-[#D8E4FF] bg-white shadow-[0_12px_24px_rgba(37,99,235,0.08)]' : 'border-black/5 bg-[#F7FAFF]'
+                activeClosure === item.name ? 'border-white/10 bg-white/10 shadow-[0_12px_24px_rgba(99,102,241,0.08)]' : 'border-white/10 bg-white/5'
               }`}
             >
               <div className="flex items-center justify-between">
-                <div className="text-[17px] font-bold text-black">{item.name}</div>
-                <div className="text-[17px] font-bold text-black">{item.pct}%</div>
+                <div className="text-[17px] font-bold text-white">{item.name}</div>
+                <div className="text-[17px] font-bold text-white">{item.pct}%</div>
               </div>
-              <div className="mt-2 h-2.5 rounded-full bg-[#E8EEF8]">
+              <div className="mt-2 h-2.5 rounded-full bg-white/10">
                 <div className="h-2.5 rounded-full" style={{ width: `${item.pct}%`, background: item.color }} />
               </div>
             </motion.div>
           ))}
-          <div className="rounded-[24px] border border-black/5 bg-white p-5">
-            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-black/45">Statement parser health</div>
-            <div className="mt-2 text-lg font-semibold text-black">Healthy</div>
-            <div className="mt-1 text-xs text-[#64748B]">{activeClosure === 'Auto-close' ? 'Auto-closure remains dominant this window' : 'Manual review share increased in flagged cohorts'}</div>
+          <div className="rounded-[24px] border border-white/10 bg-white/10 p-5">
+            <div className="text-[12px] font-bold uppercase tracking-[0.09em] text-white/50">Statement parser health</div>
+            <div className="mt-2 text-lg font-semibold text-white">Healthy</div>
+            <div className="mt-1 text-xs text-[#A8AFBF]">{activeClosure === 'Auto-close' ? 'Auto-closure remains dominant this window' : 'Manual review share increased in flagged cohorts'}</div>
           </div>
         </div>
       </div>
@@ -3133,11 +3212,11 @@ function AutoManualClosureCard() {
 
 function CrossPeriodFlagsCard() {
   return (
-    <Card className="xl:col-span-5 min-h-[400px] p-8 border-white/50 bg-[#F8FBFF]/70 backdrop-blur-[20px] ring-1 ring-[#9CC4FF]/20 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
+    <Card className="xl:col-span-5 min-h-[400px] p-8 border-white/10 bg-[#1C1F2E]/95 backdrop-blur-[20px] ring-1 ring-white/10 shadow-[0_26px_80px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#0F172A]">Period-Boundary Leakage</div>
-          <div className="mt-2 text-[17px] leading-7 text-[#64748B]">Transactions settling outside intended close windows and distorting period reporting</div>
+          <div className="text-[26px] font-bold tracking-[-0.03em] text-[#F0F2F5]">Period-Boundary Leakage</div>
+          <div className="mt-2 text-[17px] leading-7 text-[#A8AFBF]">Transactions settling outside intended close windows and distorting period reporting</div>
         </div>
         <GlassUtilityPill tone="smoke">Export</GlassUtilityPill>
       </div>
@@ -3147,14 +3226,14 @@ function CrossPeriodFlagsCard() {
           <motion.div
             key={row.intent}
             whileHover={{ y: -3, scale: 1.01 }}
-            className="rounded-[24px] border border-[#DCE7FF] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(240,246,255,0.92))] p-5 shadow-[0_14px_30px_rgba(37,99,235,0.10)]"
+            className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(39,44,68,0.96),rgba(28,31,46,0.92))] p-5 shadow-[0_14px_30px_rgba(99,102,241,0.10)]"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[16px] font-bold text-[#0F172A]" style={{ fontFamily: FONT_MONO }}>{row.intent}</div>
-                <div className="mt-3 text-[30px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">{row.variance}</div>
+                <div className="text-[16px] font-bold text-[#F0F2F5]" style={{ fontFamily: FONT_MONO }}>{row.intent}</div>
+                <div className="mt-3 text-[30px] font-black leading-none tracking-[-0.04em] text-[#F0F2F5]">{row.variance}</div>
               </div>
-              <span className="inline-flex rounded-full border border-[#DCE5F3] bg-white/88 px-4 py-2 text-[12px] font-semibold text-[#0F172A] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+              <span className="inline-flex rounded-full border border-white/10 bg-white/10 px-4 py-2 text-[12px] font-semibold text-[#F0F2F5] shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]">
                 {row.status}
               </span>
             </div>
@@ -3222,19 +3301,19 @@ export default function CorePage() {
               <div
                 className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[12px] font-bold uppercase tracking-[0.18em]"
                 style={{
-                  color: NEO_TEXT,
-                  background: NEO_CREAM,
-                  border: '1px solid rgba(255,255,255,0.8)',
+                  color: TEXT_ON_STRONG,
+                  background: 'linear-gradient(180deg, #21253A 0%, #1C1F2E 100%)',
+                  border: '1px solid rgba(255,255,255,0.07)',
                   boxShadow: NEO_RAISED_SHADOW,
                 }}
               >
                 <span className="h-2.5 w-2.5 rounded-full" style={{ background: NEO_ACTIVE }} />
                 {header.eyebrow}
               </div>
-              <h1 className="mt-5 text-[40px] font-black leading-none tracking-[-0.05em]" style={{ color: NEO_TEXT }}>
+              <h1 className="mt-5 text-[40px] font-black leading-none tracking-[-0.05em]" style={{ color: PAGE_TEXT }}>
                 {header.title}
               </h1>
-              <p className="mt-3 text-[18px] leading-8" style={{ color: NEO_MUTED }}>
+              <p className="mt-3 text-[18px] leading-8" style={{ color: PAGE_MUTED }}>
                 {header.subtitle}
               </p>
             </div>
@@ -3242,9 +3321,9 @@ export default function CorePage() {
             <button
               className="inline-flex items-center gap-2 rounded-[18px] px-4 py-3 transition-colors"
               style={{
-                color: NEO_MUTED,
-                background: NEO_CREAM,
-                border: '1px solid rgba(255,255,255,0.78)',
+                color: TEXT_ON_STRONG,
+                background: 'linear-gradient(180deg, #21253A 0%, #1C1F2E 100%)',
+                border: '1px solid rgba(255,255,255,0.07)',
                 boxShadow: NEO_RAISED_SHADOW,
               }}
             >

@@ -41,6 +41,21 @@ const GRID_TICKS = [0, 0.143, 0.286, 0.429, 0.571]
 const Y_LABELS = ['70k', '60k', '50k', '40k', '30k']
 
 const NS = 'http://www.w3.org/2000/svg'
+const NEO_BASE = '#F0F4F8'
+const NEO_PANEL = '#F7FAFC'
+const NEO_LIGHT = '#FFFFFF'
+const NEO_DARK = '#D4DCE8'
+const NEO_TEXT = '#1E293B'
+const NEO_MUTED = '#64748B'
+const NEO_ACCENT = '#2563EB'
+const NEO_ACCENT_SOFT = '#E9F0FF'
+const NEO_BORDER = '1px solid rgba(255,255,255,0.78)'
+const SHELL_SHADOW =
+  '16px 16px 32px rgba(212,220,232,0.92), -14px -14px 30px rgba(255,255,255,0.96), inset 0 1px 0 rgba(255,255,255,0.82)'
+const CARD_SHADOW = '12px 12px 24px #D4DCE8, -12px -12px 24px #FFFFFF'
+const RAISED_SHADOW = '4px 4px 10px #D4DCE8, -4px -4px 10px #FFFFFF'
+const INSET_SHADOW = 'inset 6px 6px 12px #D4DCE8, inset -6px -6px 12px #FFFFFF'
+const ACTIVE_SHADOW = '0 10px 24px rgba(37,99,235,0.18), inset 0 1px 0 rgba(255,255,255,0.24)'
 
 function mk<K extends keyof SVGElementTagNameMap>(
   tag: K,
@@ -101,14 +116,14 @@ export function PaymentsCard() {
     hovElRef.current.style.transform = 'none'
     hovElRef.current.style.display = 'block'
     hovElRef.current.innerHTML = `
-      <div style="background:rgba(255,255,255,.97);border:1px solid rgba(200,215,240,.80);
+      <div style="background:${NEO_PANEL};border:1px solid rgba(255,255,255,.82);
         border-radius:20px;padding:0 18px;width:${tw}px;height:${th}px;line-height:${th}px;
         font-size:12.5px;font-family:'IBM Plex Mono',monospace;white-space:nowrap;
-        box-shadow:0 4px 18px rgba(0,0,0,.09);overflow:hidden;text-overflow:ellipsis">
-        <b style="color:#1e3a8a">${s.display}</b>
-        <span style="color:#9CA3AF"> transactions  ·  Conv: </span>
-        <b style="color:#0A0A0A">${s.conv}%</b>
-        <span style="color:#9CA3AF">  ·  Drop-off: </span>
+        box-shadow:${RAISED_SHADOW};overflow:hidden;text-overflow:ellipsis">
+        <b style="color:${NEO_ACCENT}">${s.display}</b>
+        <span style="color:${NEO_MUTED}"> transactions  ·  Conv: </span>
+        <b style="color:${NEO_TEXT}">${s.conv}%</b>
+        <span style="color:${NEO_MUTED}">  ·  Drop-off: </span>
         <b style="color:${dc}">${s.drop === 0 ? '—' : `${s.drop}%`}</b>
       </div>`
   }, [])
@@ -209,10 +224,10 @@ export function PaymentsCard() {
         },
         svg,
       )
-      mk('line', { x1: 0, y1: y, x2: 8, y2: y, stroke: 'rgba(15,23,42,.22)', 'stroke-width': 1 }, svg)
+      mk('line', { x1: 0, y1: y, x2: 8, y2: y, stroke: 'rgba(100,116,139,.24)', 'stroke-width': 1 }, svg)
     })
 
-    mk('line', { x1: 0, y1: PT - 2, x2: 0, y2: BASE_Y + 2, stroke: 'rgba(15,23,42,.22)', 'stroke-width': 1.2 }, svg)
+    mk('line', { x1: 0, y1: PT - 2, x2: 0, y2: BASE_Y + 2, stroke: 'rgba(100,116,139,.22)', 'stroke-width': 1.2 }, svg)
 
     const BARS: BarGeometry[] = STAGES.map((s, i) => {
       const bh = Math.round((s.value / MAX_VAL) * CH)
@@ -234,7 +249,7 @@ export function PaymentsCard() {
           y1: 2,
           x2: fx.toFixed(1),
           y2: fTopY,
-          stroke: isA ? 'rgba(59,91,219,.22)' : 'rgba(180,200,240,.24)',
+          stroke: isA ? 'rgba(37,99,235,.22)' : 'rgba(148,163,184,.24)',
           'stroke-width': isA ? 1.2 : 0.7,
           'stroke-dasharray': isA ? 'none' : '4 4',
         },
@@ -373,7 +388,7 @@ export function PaymentsCard() {
     const ty = tyA < 4 ? ab.fTopY + 12 : tyA
 
     const tg = mk('g', {}, svg)
-    mk('rect', { x: tx + 1, y: ty + 4, width: tw, height: th, rx: 20, fill: 'rgba(0,0,0,.055)' }, tg)
+    mk('rect', { x: tx + 1, y: ty + 4, width: tw, height: th, rx: 20, fill: 'rgba(212,220,232,.88)' }, tg)
     mk(
       'rect',
       {
@@ -382,8 +397,8 @@ export function PaymentsCard() {
         width: tw,
         height: th,
         rx: 20,
-        fill: 'rgba(255,255,255,.97)',
-        stroke: 'rgba(200,215,240,.80)',
+        fill: NEO_PANEL,
+        stroke: 'rgba(255,255,255,.82)',
         'stroke-width': 0.8,
       },
       tg,
@@ -408,10 +423,10 @@ export function PaymentsCard() {
       tt.appendChild(ts)
     }
     const as = ab.s
-    span(as.display, '#1e3a8a', '700')
-    span(' transactions  ·  Conv: ', '#9CA3AF', '400')
-    span(`${as.conv}%`, '#0A0A0A', '600')
-    span('  ·  Drop-off: ', '#9CA3AF', '400')
+    span(as.display, NEO_ACCENT, '700')
+    span(' transactions  ·  Conv: ', NEO_MUTED, '400')
+    span(`${as.conv}%`, NEO_TEXT, '600')
+    span('  ·  Drop-off: ', NEO_MUTED, '400')
     span(as.drop === 0 ? '—' : `${as.drop}%`, as.drop < 0 ? '#EF4444' : '#22C55E', '600')
   }, [active, hideHoverTip, hovered, showHoverTip])
 
@@ -443,10 +458,10 @@ export function PaymentsCard() {
 
       <div
         style={{
-          background: '#FFFFFF',
-          borderRadius: 20,
-          border: '1px solid #E8E5E0',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          background: NEO_BASE,
+          borderRadius: 24,
+          border: NEO_BORDER,
+          boxShadow: SHELL_SHADOW,
           overflow: 'hidden',
           fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
         }}
@@ -457,7 +472,7 @@ export function PaymentsCard() {
             justifyContent: 'space-between',
             alignItems: 'center',
             padding: '20px 24px 16px',
-            borderBottom: '1px solid rgba(0,0,0,0.05)',
+            borderBottom: '1px solid rgba(255,255,255,0.62)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -465,17 +480,18 @@ export function PaymentsCard() {
               style={{
                 fontSize: 9,
                 fontWeight: 700,
-                color: '#6366F1',
-                background: '#EEF2FF',
+                color: NEO_ACCENT,
+                background: NEO_ACCENT_SOFT,
                 borderRadius: 6,
                 padding: '3px 8px',
                 textTransform: 'uppercase',
                 letterSpacing: '.5px',
+                boxShadow: RAISED_SHADOW,
               }}
             >
               Funnel
             </span>
-            <span style={{ fontSize: 18, fontWeight: 700, color: '#0F0F0F', letterSpacing: -0.3 }}>
+            <span style={{ fontSize: 18, fontWeight: 700, color: NEO_TEXT, letterSpacing: -0.3 }}>
               Payment Flow
             </span>
           </div>
@@ -485,14 +501,15 @@ export function PaymentsCard() {
               width: 32,
               height: 32,
               borderRadius: '50%',
-              border: '1px solid #ECEAE6',
-              background: '#F5F4F2',
+              border: NEO_BORDER,
+              background: NEO_PANEL,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#C4C4C4',
+              color: NEO_MUTED,
               fontSize: 14,
+              boxShadow: RAISED_SHADOW,
             }}
           >
             ...
@@ -505,7 +522,8 @@ export function PaymentsCard() {
             borderBottom: '1px solid rgba(0,0,0,0.06)',
             position: 'relative',
             paddingLeft: Y_COL_OFFSET,
-            background: '#FCFDFE',
+            background: NEO_BASE,
+            boxShadow: INSET_SHADOW,
           }}
         >
           {STAGES.map((s, i) => {
@@ -522,15 +540,13 @@ export function PaymentsCard() {
                   padding: '14px 16px 15px',
                   minHeight: 86,
                   cursor: 'pointer',
-                  borderRight: i < STAGES.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none',
-                  borderBottom: isA ? '2px solid #3B5BDB' : '2px solid transparent',
+                  borderRight: i < STAGES.length - 1 ? '1px solid rgba(255,255,255,0.55)' : 'none',
+                  borderBottom: isA ? `2px solid ${NEO_ACCENT}` : '2px solid transparent',
                   transition: 'all .18s',
                   background: isA
-                    ? `linear-gradient(180deg,rgba(219,234,254,.22) 0%,rgba(255,255,255,0) 55%),
-                       radial-gradient(ellipse 140% 120% at 50% 100%,rgba(147,197,253,.28) 0%,rgba(255,255,255,0) 65%),
-                       #fff`
-                    : '#fff',
-                  boxShadow: isA ? 'inset 0 1px 0 rgba(255,255,255,.85)' : 'none',
+                    ? NEO_PANEL
+                    : 'transparent',
+                  boxShadow: isA ? ACTIVE_SHADOW : 'none',
                 }}
               >
                 <div
@@ -540,7 +556,7 @@ export function PaymentsCard() {
                     letterSpacing: '.24px',
                     textTransform: 'uppercase',
                     marginBottom: 6,
-                    color: isA ? '#3B5BDB' : '#BBBBBB',
+                    color: isA ? NEO_ACCENT : '#94A3B8',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -554,7 +570,7 @@ export function PaymentsCard() {
                     fontSize: 24,
                     fontWeight: 700,
                     letterSpacing: -0.9,
-                    color: isA ? '#1e3a8a' : '#C8CEDA',
+                    color: isA ? NEO_TEXT : '#A8B4C5',
                     fontFamily: "'IBM Plex Mono', monospace",
                     fontVariantNumeric: 'tabular-nums',
                     transition: 'color .18s',
@@ -576,8 +592,9 @@ export function PaymentsCard() {
               width: Y_COL_OFFSET,
               boxSizing: 'border-box',
               padding: '12px 8px 28px 14px',
-              borderRight: '1px solid rgba(15,23,42,.08)',
-              background: 'linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,250,255,0.96))',
+              borderRight: '1px solid rgba(255,255,255,0.58)',
+              background: NEO_BASE,
+              boxShadow: INSET_SHADOW,
             }}
           >
             {Y_LABELS.map((l) => (
@@ -585,7 +602,7 @@ export function PaymentsCard() {
                 key={l}
                 style={{
                   fontSize: 11,
-                  color: '#64748B',
+                  color: NEO_MUTED,
                   textAlign: 'right',
                   fontFamily: "'IBM Plex Mono', monospace",
                   fontWeight: 600,
@@ -605,10 +622,11 @@ export function PaymentsCard() {
         <div
           style={{
             position: 'relative',
-            background: 'linear-gradient(135deg, #EEF2FF 0%, #F8FAFF 48%, #EEF4FF 100%)',
-            borderTop: '1px solid rgba(99,102,241,.14)',
+            background: NEO_BASE,
+            borderTop: '1px solid rgba(255,255,255,0.6)',
             padding: '14px 18px 18px',
             overflow: 'hidden',
+            boxShadow: INSET_SHADOW,
           }}
         >
           <div
@@ -617,7 +635,7 @@ export function PaymentsCard() {
               width: 180,
               height: 180,
               borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(99,102,241,0.14) 0%, transparent 72%)',
+              background: 'radial-gradient(circle, rgba(37,99,235,0.12) 0%, transparent 72%)',
               right: -60,
               top: -80,
               pointerEvents: 'none',
@@ -641,15 +659,16 @@ export function PaymentsCard() {
                 gap: 8,
                 padding: '5px 10px',
                 borderRadius: 999,
-                border: '1px solid rgba(99,102,241,.22)',
-                background: 'rgba(255,255,255,.62)',
-                color: '#4338CA',
+                border: NEO_BORDER,
+                background: NEO_PANEL,
+                color: NEO_ACCENT,
                 fontSize: 11.5,
                 fontWeight: 600,
+                boxShadow: RAISED_SHADOW,
               }}
             >
               <svg width="13" height="13" viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
-                <path d="M7 1l1.5 4h4l-3 2.5 1 4L7 9l-3.5 2.5 1-4L1.5 5h4z" fill="#4338CA" />
+                <path d="M7 1l1.5 4h4l-3 2.5 1 4L7 9l-3.5 2.5 1-4L1.5 5h4z" fill="#2563EB" />
               </svg>
               What would you like to explore next?
             </div>
@@ -657,14 +676,15 @@ export function PaymentsCard() {
             <button
               type="button"
               style={{
-                border: '1px solid rgba(99,102,241,.22)',
-                background: 'rgba(255,255,255,.72)',
-                color: '#5B5BD6',
+                border: NEO_BORDER,
+                background: NEO_PANEL,
+                color: NEO_TEXT,
                 borderRadius: 999,
                 padding: '4px 10px',
                 fontSize: 11,
                 fontWeight: 600,
                 cursor: 'pointer',
+                boxShadow: RAISED_SHADOW,
               }}
             >
               Suggestions
@@ -678,13 +698,13 @@ export function PaymentsCard() {
               alignItems: 'center',
               flexWrap: 'wrap',
               gap: 7,
-              background: 'rgba(255,255,255,.9)',
+              background: NEO_PANEL,
               borderRadius: 12,
               padding: '11px 14px',
-              border: '1px solid rgba(99,102,241,.15)',
+              border: NEO_BORDER,
               fontSize: 13,
-              color: '#59647A',
-              boxShadow: '0 8px 20px rgba(99,102,241,.08), inset 0 1px 0 rgba(255,255,255,.85)',
+              color: NEO_MUTED,
+              boxShadow: INSET_SHADOW,
             }}
           >
             <span style={{ fontWeight: 500 }}>I want to know what caused the drop-off from authorized to</span>
@@ -692,14 +712,15 @@ export function PaymentsCard() {
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                background: '#EEF2FF',
-                border: '1px solid rgba(99,102,241,.32)',
+                background: NEO_ACCENT_SOFT,
+                border: '1px solid rgba(37,99,235,.24)',
                 borderRadius: 7,
                 padding: '3px 11px',
-                color: '#3730A3',
+                color: NEO_ACCENT,
                 fontWeight: 600,
                 fontSize: 12,
                 flexShrink: 0,
+                boxShadow: RAISED_SHADOW,
               }}
             >
               /successful payments
@@ -709,7 +730,7 @@ export function PaymentsCard() {
                 display: 'inline-block',
                 width: 2,
                 height: 14,
-                background: '#5B5BD6',
+                background: NEO_ACCENT,
                 borderRadius: 1,
                 verticalAlign: 'middle',
                 flexShrink: 0,
@@ -724,14 +745,15 @@ export function PaymentsCard() {
                 key={suggestion}
                 type="button"
                 style={{
-                  border: '1px solid rgba(99,102,241,.18)',
-                  background: 'rgba(255,255,255,.66)',
-                  color: '#4C58A8',
+                  border: NEO_BORDER,
+                  background: NEO_PANEL,
+                  color: NEO_TEXT,
                   borderRadius: 999,
                   padding: '4px 10px',
                   fontSize: 11,
                   fontWeight: 500,
                   cursor: 'pointer',
+                  boxShadow: RAISED_SHADOW,
                 }}
               >
                 {suggestion}

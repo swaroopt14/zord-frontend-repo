@@ -15,6 +15,8 @@
 | --- | --- | --- |
 | `v1.0` | 2026-04-07 | Initial implementation summary |
 | `v1.1` | 2026-04-07 | Added review framing, screenshot references, runbook links, and approval checklist |
+| `v1.2` | 2026-04-07 | Added Docker runtime validation, post-pull integration notes, and defects found during live testing |
+| `v1.3` | 2026-04-07 | Added admin console flow for creating login users after tenant registration |
 
 ## Reports Included
 
@@ -53,14 +55,40 @@ We completed a full-stack auth upgrade across `zord-edge` and `zord-console`.
 | No workspace login identity | `tenants.workspace_code` |
 | No secure refresh/session lifecycle | Rotating refresh token implementation |
 | Recurring Next chunk/CSS 404s | Single-process dev wrapper and stale-cache cleanup |
+| Docker auth startup drift | Compose/env updates plus fresh-schema correction for local testing |
+| False Docker unhealthy signal for `zord-edge` | Removed invalid container healthcheck from root compose |
+| No UI to create email logins after tenant registration | Added a backend-driven admin management page under `/admin/tenants` |
+
+## Post-Pull Integration Notes
+
+| Area | Status |
+| --- | --- |
+| Latest integration branch | `swaroop/zord-auth-login-latest-20260407` |
+| Base sync point | Merged onto latest `origin/main` |
+| Goal of sync | Preserve auth/login work while rebasing the implementation onto current repo state |
+
+## Runtime Bugs Found During Testing
+
+| Bug found in live test | Impact | Fix |
+| --- | --- | --- |
+| `pq: column "status" does not exist` on `ingress_envelopes` | `zord-edge` crashed during Docker startup against an older local volume | Kept `status` defined directly in the base schema and documented that old local DB volumes should be recreated for fresh auth testing |
+| Docker marked `zord-edge` as unhealthy even though `/health` returned `200` | Misleading stack state during auth testing | Removed invalid `wget` healthcheck from root `docker-compose.yml` because the image is `scratch` |
+| Root stack console startup hit host port conflicts (`5434`, local `3000`) | Full stack could not be brought up in one shot on this laptop | Validated console auth path using a temporary container on `3001` and documented the blocker in the runbook |
 
 ## Verification Summary
 
 | Area | Command | Result |
 | --- | --- | --- |
 | Go auth tests | `go test ./auth/... -v` | Passed |
+| Full Go suite | `go test ./...` | Passed |
+| Go static analysis | `go vet ./...` | Passed |
+| Go build | `go build ./cmd/main.go` | Passed |
 | Console production build | `npm run build` | Passed |
 | Dev wrapper syntax | `node --check backend/zord-console/scripts/dev-single-process.mjs` | Passed |
+| Root compose validation | `docker compose config` | Passed |
+| Dockerized backend health | `curl -i http://localhost:8080/health` | Passed (`200 OK`) |
+| Dockerized console login route | `curl -I http://localhost:3001/console/login` | Passed (`200 OK`) |
+| Console auth proxy to backend | `POST /api/auth/login` with invalid workspace | Passed, returned real backend auth error (`Workspace not found`) |
 
 ## Visual Review Assets
 
@@ -76,7 +104,10 @@ We completed a full-stack auth upgrade across `zord-edge` and `zord-console`.
 | Backend JWT auth foundation | Ready for review | Core auth flow and tests complete |
 | Frontend cookie-backed auth integration | Ready for review | Mock auth removed from primary flow |
 | Login UX alignment | Ready for review | New field order, validation, and errors integrated |
+| `/app-final` auth protection | Ready for review | `/app-final` now follows the same protected customer-role access model as `/console` |
+| Admin user management UI | Ready for review | `/admin/tenants` now lists workspaces, creates login users, and toggles account status |
 | Local dev reliability | Ready for review | Duplicate Next process issue addressed |
+| Docker auth runtime validation | Ready for review | Backend stack and Dockerized console auth path exercised locally |
 | MFA enforcement | Deferred | Schema/response ready, not yet enabled |
 | Password reset/invite flows | Deferred | Out of current scope |
 

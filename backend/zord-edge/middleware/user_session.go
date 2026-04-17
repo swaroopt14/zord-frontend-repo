@@ -56,7 +56,7 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 			"code":    "FORBIDDEN",
-			"message": "Admin access required",
+			"message": "Insufficient role for this route",
 		})
 	}
 }

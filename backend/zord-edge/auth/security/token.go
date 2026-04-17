@@ -5,14 +5,11 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 )
@@ -51,8 +48,8 @@ type IssueAccessTokenInput struct {
 	JWTID         string
 }
 
-func NewTokenManager(signingKeyPath string, signingKeyBase64 string, issuer string, audience string, accessTTL time.Duration) (*TokenManager, error) {
-	privateKey, err := loadEd25519PrivateKey(signingKeyPath, signingKeyBase64)
+func NewTokenManager(signingKeyPath string, signingKeyBase64 string, issuer string, audience string, accessTTL time.Duration, allowEphemeral bool) (*TokenManager, error) {
+	privateKey, err := LoadEd25519PrivateKey(signingKeyPath, signingKeyBase64, allowEphemeral)
 	if err != nil {
 		return nil, err
 	}
@@ -167,48 +164,4 @@ func encodeSegment(value any) (string, error) {
 		return "", fmt.Errorf("marshal jwt segment: %w", err)
 	}
 	return base64.RawURLEncoding.EncodeToString(payload), nil
-}
-
-func loadEd25519PrivateKey(signingKeyPath string, signingKeyBase64 string) (ed25519.PrivateKey, error) {
-	switch {
-	case strings.TrimSpace(signingKeyBase64) != "":
-		return parseEd25519PrivateKey([]byte(signingKeyBase64), true)
-	case strings.TrimSpace(signingKeyPath) != "":
-		keyBytes, err := os.ReadFile(signingKeyPath)
-		if err != nil {
-			return nil, fmt.Errorf("read jwt signing key: %w", err)
-		}
-		return parseEd25519PrivateKey(keyBytes, false)
-	default:
-		return nil, errors.New("jwt signing key not configured")
-	}
-}
-
-func parseEd25519PrivateKey(raw []byte, base64Input bool) (ed25519.PrivateKey, error) {
-	if base64Input {
-		decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(raw)))
-		if err == nil {
-			raw = decoded
-		}
-	}
-
-	if block, _ := pem.Decode(raw); block != nil {
-		raw = block.Bytes
-	}
-
-	if key, err := x509.ParsePKCS8PrivateKey(raw); err == nil {
-		if edKey, ok := key.(ed25519.PrivateKey); ok {
-			return edKey, nil
-		}
-	}
-
-	if len(raw) == ed25519.PrivateKeySize {
-		return ed25519.PrivateKey(raw), nil
-	}
-
-	if len(raw) == ed25519.SeedSize {
-		return ed25519.NewKeyFromSeed(raw), nil
-	}
-
-	return nil, errors.New("unsupported jwt signing key format")
 }

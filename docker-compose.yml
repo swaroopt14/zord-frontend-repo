@@ -3,8 +3,6 @@
 # Complete microservices deployment with all dependencies
 # ============================================================================
 
-version: "3.8"
-
 services:
   # ============================================================================
   # INFRASTRUCTURE SERVICES (Databases, Message Queues, etc.)
@@ -20,7 +18,6 @@ services:
       - POSTGRES_DB=zord_edge_db
     volumes:
       - postgres_edge_data:/var/lib/postgresql/data
-      - ./backend/zord-edge/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "5433:5432"
     networks:
@@ -235,28 +232,45 @@ services:
       - ENVIRONMENT=production
       - JAEGER_ENDPOINT=http://host.docker.internal:14268/api/traces
       - REDIS_ADDR=zord-redis:6379
+      - KAFKA_BROKERS=zord-kafka-1:9092,zord-kafka-2:9092,zord-kafka-3:9092
+      - KAFKA_TOPIC=vault.envelope.accepted.v1
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - AWS_EC2_METADATA_DISABLED=true
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-localtest}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-localtest}
+      - S3_BUCKET=${AWS_S3_BUCKET:-arealis-zord-vault}
+      - ZORD_VAULT_KEY=${ZORD_VAULT_KEY:-MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
+      - JWT_ISSUER=${JWT_ISSUER:-zord-edge}
+      - JWT_AUDIENCE=${JWT_AUDIENCE:-zord-console}
+      - JWT_ACCESS_TOKEN_TTL=${JWT_ACCESS_TOKEN_TTL:-15m}
+      - JWT_REFRESH_TOKEN_TTL=${JWT_REFRESH_TOKEN_TTL:-720h}
+      - JWT_LOCKOUT_THRESHOLD=${JWT_LOCKOUT_THRESHOLD:-5}
+      - JWT_LOCKOUT_DURATION=${JWT_LOCKOUT_DURATION:-15m}
+      - AUTH_ALLOW_EPHEMERAL_SIGNING_KEY=${AUTH_ALLOW_EPHEMERAL_SIGNING_KEY:-true}
+      - JWT_SIGNING_PRIVATE_KEY_BASE64=${JWT_SIGNING_PRIVATE_KEY_BASE64:-}
+      - JWT_SIGNING_PRIVATE_KEY_PATH=${JWT_SIGNING_PRIVATE_KEY_PATH:-}
+      - BOOTSTRAP_ADMIN_NAME=${BOOTSTRAP_ADMIN_NAME:-}
+      - BOOTSTRAP_ADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL:-}
+      - BOOTSTRAP_ADMIN_PASSWORD=${BOOTSTRAP_ADMIN_PASSWORD:-}
+      - BOOTSTRAP_ADMIN_TENANT_ID=${BOOTSTRAP_ADMIN_TENANT_ID:-}
+      - BOOTSTRAP_ADMIN_WORKSPACE_CODE=${BOOTSTRAP_ADMIN_WORKSPACE_CODE:-}
     depends_on:
       zord-edge-postgres:
         condition: service_healthy
       zord-redis:
         condition: service_healthy
+      zord-kafka-1:
+        condition: service_started
+      zord-kafka-2:
+        condition: service_started
+      zord-kafka-3:
+        condition: service_started
     networks:
       - zord-network
     restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "http://localhost:8080/health",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    # zord-edge uses a scratch runtime image, so Docker healthchecks cannot rely on
+    # shell tools like wget/curl being present inside the container. Use host-side
+    # probes or orchestrator HTTP checks against /health instead.
 
   # Zord Vault Journal - Secure Storage and Audit
   zord-vault-journal:
@@ -360,7 +374,7 @@ services:
     ports:
       - "8082:8082"
     environment:
-      - KAFKA_BROKERS=zord-kafka-1:9092,zord-kafka-2:9093,zord-kafka-3:9094
+      - KAFKA_BROKERS=zord-kafka-1:9092,zord-kafka-2:9092,zord-kafka-3:9092
       - KAFKA_CONSUMER_GROUP=zord-relay-group
       - KAFKA_READY_TOPIC=z.intent.ready.v1
       - KAFKA_DLQ_TOPIC=z.intent.dlq.v1
@@ -400,6 +414,11 @@ services:
       - NEXT_TELEMETRY_DISABLED=1
       - PORT=3000
       - HOSTNAME=0.0.0.0
+      - AUTH_COOKIE_SECURE=false
+      - ZORD_EDGE_URL=http://zord-edge:8080
+      - ZORD_VAULT_URL=http://zord-vault-journal:8081
+      - ZORD_RELAY_URL=http://zord-relay:8082
+      - ZORD_INTENT_ENGINE_URL=http://zord-intent-engine:8083
     depends_on:
       - zord-edge
       - zord-vault-journal

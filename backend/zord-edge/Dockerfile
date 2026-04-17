@@ -27,6 +27,7 @@ COPY --from=builder /out/zord-edge /app/zord-edge
 COPY --from=builder /src/schemas /app/schemas
 
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+ENV USER=nonroot
 USER 65532:65532
 
 EXPOSE 8080

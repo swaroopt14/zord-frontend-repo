@@ -75,7 +75,7 @@ export default function RiskPage() {
             </InfoStrip>
             <div className="space-y-4">
               {fraudRows.map((row) => (
-                <div key={row.cluster} className="rounded-[24px] p-5" style={{ background: NEO_CREAM, border: '1px solid rgba(255,255,255,0.34)', boxShadow: '8px 8px 18px rgba(154,159,141,0.14), -6px -6px 12px rgba(255,255,255,0.62)' }}>
+                <div key={row.cluster} className="rounded-[24px] p-5" style={{ background: NEO_CREAM, border: '1px solid rgba(255,255,255,0.82)', boxShadow: '6px 6px 14px rgba(118,84,111,0.10), -4px -4px 10px rgba(255,255,255,0.72), inset 1px 1px 0 rgba(255,255,255,0.44)' }}>
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div className="text-[22px] font-black tracking-[-0.03em]" style={{ color: NEO_TEXT }}>{row.cluster}</div>
@@ -132,7 +132,7 @@ export default function RiskPage() {
             </InfoStrip>
             <div className="space-y-4">
               {duplicateRows.map((row) => (
-                <div key={row.intent} className="rounded-[24px] p-5" style={{ background: NEO_CREAM, border: '1px solid rgba(255,255,255,0.34)', boxShadow: '8px 8px 18px rgba(154,159,141,0.14), -6px -6px 12px rgba(255,255,255,0.62)' }}>
+                <div key={row.intent} className="rounded-[24px] p-5" style={{ background: NEO_CREAM, border: '1px solid rgba(255,255,255,0.82)', boxShadow: '6px 6px 14px rgba(118,84,111,0.10), -4px -4px 10px rgba(255,255,255,0.72), inset 1px 1px 0 rgba(255,255,255,0.44)' }}>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
                     <div><div className="text-[12px] font-black uppercase tracking-[0.16em]" style={{ color: NEO_MUTED }}>Intent</div><div className="mt-2 text-[18px] font-bold" style={{ color: NEO_TEXT }}>{row.intent}</div></div>
                     <div><div className="text-[12px] font-black uppercase tracking-[0.16em]" style={{ color: NEO_MUTED }}>Seller</div><div className="mt-2 text-[18px] font-bold" style={{ color: NEO_TEXT }}>{row.seller}</div></div>

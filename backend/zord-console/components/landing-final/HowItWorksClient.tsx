@@ -4,17 +4,10 @@ import Link from 'next/link'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { useEffect, useRef } from 'react'
 
-import { ZordLogo } from '@/components/ZordLogo'
+import { FinalLandingAssistantButton } from '@/components/landing-final/FinalLandingAssistantButton'
+import { FinalLandingNavbar } from '@/components/landing-final/FinalLandingNavbar'
 
 const dockItems = ['Intent intake', 'Dynamic routing', 'Live tracking', 'Proof export']
-const navLinks = [
-  { label: 'Product', href: '/final-landing/page' },
-  { label: 'How it works', href: '/final-landing/how-it-works' },
-  { label: 'Use Cases', href: '/final-landing/page#use-cases' },
-  { label: 'Security', href: '/final-landing/page#security' },
-  { label: 'Developers', href: '/final-landing/page#developers' },
-  { label: 'Pricing', href: '/final-landing/page#pricing' },
-]
 
 const metricItems = [
   { label: 'Routing', value: '12', unit: 'ms' },
@@ -151,45 +144,6 @@ function PulseIcon() {
       <div className="absolute h-full w-full animate-ping rounded-full bg-indigo-500/20" />
       <div className="h-2 w-2 rounded-full bg-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.9)]" />
     </div>
-  )
-}
-
-function HowNavbar() {
-  return (
-    <header className="fixed top-0 z-50 w-full px-4 py-4 sm:px-6">
-      <div className="mx-auto flex max-w-[1180px] items-center justify-between rounded-full border border-white/40 bg-white/16 px-5 py-3 shadow-[0_18px_60px_rgba(15,23,42,0.16)] backdrop-blur-2xl">
-        <Link href="/final-landing/page" className="z-10">
-          <ZordLogo size="sm" variant="light" className="text-slate-900" />
-        </Link>
-
-        <nav className="hidden items-center gap-7 md:flex">
-          {navLinks.map((link) => (
-            <Link
-              key={link.label}
-              href={link.href}
-              className={`text-[15px] font-light transition-colors ${
-                link.label === 'How it works' ? 'text-indigo-600' : 'text-slate-800 hover:text-indigo-600'
-              }`}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="hidden items-center gap-4 md:flex">
-          <Link href="/console/login" className="text-[15px] font-light text-slate-800 transition-colors hover:text-indigo-600">
-            Sign in
-          </Link>
-          <a
-            href="mailto:hello@arelais.com?subject=Book%20Demo%20for%20Zord"
-            className="flex items-center gap-1 rounded-full bg-indigo-600 px-4 py-1.5 text-[15px] font-light text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow"
-          >
-            Book Demo
-            <ArrowRightIcon className="h-4 w-4" />
-          </a>
-        </div>
-      </div>
-    </header>
   )
 }
 
@@ -567,12 +521,13 @@ export default function HowItWorksClient() {
       className="relative h-screen overflow-y-auto overflow-x-hidden snap-y snap-mandatory scroll-smooth [scrollbar-gutter:stable] bg-[#030712] font-sans text-slate-200 antialiased selection:bg-indigo-500 selection:text-white"
       style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif' }}
     >
-      <HowNavbar />
+      <FinalLandingNavbar active="Product" />
+      <FinalLandingAssistantButton />
       <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-0 h-full w-full opacity-60" />
       <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_center,transparent_0%,#030712_100%)]" />
       <div className="pointer-events-none fixed inset-0 z-0 opacity-[0.03] [background-image:repeating-linear-gradient(45deg,#ffffff_0px,#ffffff_1px,transparent_1px,transparent_16px)]" />
 
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1600px] snap-start [scroll-snap-stop:always] items-center justify-center overflow-hidden p-4 pt-24 sm:p-8 sm:pt-28 lg:p-10 lg:pt-32">
+      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1600px] snap-start [scroll-snap-stop:always] items-center justify-center overflow-hidden p-4 pt-28 sm:p-8 sm:pt-36 lg:p-10 lg:pt-40">
         <div className="relative mx-auto w-full max-w-[1480px] overflow-hidden rounded-[3rem] border border-white/50 bg-[#f6f9fc] shadow-[0_40px_120px_rgba(15,23,42,0.18)]">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_78%_18%,rgba(255,122,89,0.34),transparent_28%),radial-gradient(circle_at_66%_42%,rgba(255,105,180,0.26),transparent_26%),radial-gradient(circle_at_24%_0%,rgba(106,90,205,0.28),transparent_34%),radial-gradient(circle_at_92%_82%,rgba(0,191,255,0.22),transparent_28%)]" />
           <div className="pointer-events-none absolute left-0 top-1/4 h-px w-[120%] origin-left -rotate-[7deg] bg-gradient-to-r from-transparent via-black/5 to-transparent" />

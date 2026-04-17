@@ -8,6 +8,14 @@ export const ROLE_COOKIE_NAME = 'zord_role'
 
 const DEFAULT_REFRESH_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 
+function resolveCookieSecure() {
+  const explicitValue = process.env.AUTH_COOKIE_SECURE
+  if (typeof explicitValue === 'string' && explicitValue.trim() !== '') {
+    return explicitValue === 'true'
+  }
+  return process.env.NODE_ENV === 'production'
+}
+
 export interface BackendAuthUser {
   id: string
   email: string
@@ -43,12 +51,18 @@ export interface BackendErrorEnvelope {
   message?: string
 }
 
+interface AuthorizedEdgeFetchResult {
+  edgeResponse?: Response
+  refreshedPayload?: BackendAuthEnvelope
+  errorResponse?: NextResponse
+}
+
 function cookieBaseOptions() {
   const domain = process.env.AUTH_COOKIE_DOMAIN || undefined
 
   return {
     sameSite: 'lax' as const,
-    secure: process.env.NODE_ENV === 'production',
+    secure: resolveCookieSecure(),
     path: '/',
     ...(domain ? { domain } : {}),
   }
@@ -97,7 +111,7 @@ export function applySessionMarkerCookies(response: NextResponse, role: string) 
   response.cookies.set({
     name: ROLE_COOKIE_NAME,
     value: role,
-    httpOnly: false,
+    httpOnly: true,
     maxAge: DEFAULT_REFRESH_COOKIE_MAX_AGE_SECONDS,
     ...baseOptions,
   })
@@ -110,7 +124,10 @@ export function clearAuthCookies(response: NextResponse) {
     response.cookies.set({
       name: cookieName,
       value: '',
-      httpOnly: cookieName === ACCESS_COOKIE_NAME || cookieName === REFRESH_COOKIE_NAME,
+      httpOnly:
+        cookieName === ACCESS_COOKIE_NAME ||
+        cookieName === REFRESH_COOKIE_NAME ||
+        cookieName === ROLE_COOKIE_NAME,
       maxAge: 0,
       ...baseOptions,
     })
@@ -157,4 +174,111 @@ export function buildForwardHeaders(request: NextRequest, accessToken?: string):
 
 export function edgeAuthUrl(path: string) {
   return `${BACKEND_SERVICES.EDGE.BASE_URL}${path}`
+}
+
+async function refreshFromCookie(request: NextRequest): Promise<{ payload?: BackendAuthEnvelope; errorResponse?: NextResponse }> {
+  const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value
+  if (!refreshToken) {
+    const response = NextResponse.json({ code: 'INVALID_SESSION', message: 'Session expired' }, { status: 401 })
+    clearAuthCookies(response)
+    return { errorResponse: response }
+  }
+
+  let refreshResponse: Response
+  try {
+    refreshResponse = await fetch(edgeAuthUrl(BACKEND_SERVICES.EDGE.ENDPOINTS.AUTH_REFRESH), {
+      method: 'POST',
+      headers: buildForwardHeaders(request),
+      cache: 'no-store',
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+  } catch {
+    const response = NextResponse.json(
+      { code: 'AUTH_SERVICE_UNAVAILABLE', message: 'Authentication service is unavailable right now.' },
+      { status: 503 },
+    )
+    clearAuthCookies(response)
+    return { errorResponse: response }
+  }
+
+  if (!refreshResponse.ok) {
+    const errorBody = await parseJSONSafe<BackendErrorEnvelope>(refreshResponse)
+    const response = NextResponse.json(
+      {
+        code: errorBody?.code ?? 'INVALID_SESSION',
+        message: errorBody?.message ?? 'Session expired',
+      },
+      { status: refreshResponse.status },
+    )
+    clearAuthCookies(response)
+    return { errorResponse: response }
+  }
+
+  const payload = await parseJSONSafe<BackendAuthEnvelope>(refreshResponse)
+  if (!payload?.access_token || !payload.refresh_token) {
+    const response = NextResponse.json(
+      { code: 'AUTH_RESPONSE_INVALID', message: 'Refresh response was incomplete.' },
+      { status: 502 },
+    )
+    clearAuthCookies(response)
+    return { errorResponse: response }
+  }
+
+  return { payload }
+}
+
+// This helper centralizes "call zord-edge with the logged-in user's session".
+// It tries the access token first, then refreshes once if needed, so admin pages
+// do not break as soon as a short-lived access token expires.
+export async function authorizedEdgeFetch(
+  request: NextRequest,
+  path: string,
+  init: {
+    method?: string
+    body?: string
+  } = {},
+): Promise<AuthorizedEdgeFetchResult> {
+  const method = init.method ?? 'GET'
+
+  const callEdge = async (accessToken?: string) =>
+    fetch(edgeAuthUrl(path), {
+      method,
+      headers: buildForwardHeaders(request, accessToken),
+      cache: 'no-store',
+      body: init.body,
+    })
+
+  const accessToken = request.cookies.get(ACCESS_COOKIE_NAME)?.value
+  if (accessToken) {
+    try {
+      const edgeResponse = await callEdge(accessToken)
+      if (edgeResponse.status !== 401) {
+        return { edgeResponse }
+      }
+    } catch {
+      // Fall through and try a refresh token if one exists.
+    }
+  }
+
+  const refreshResult = await refreshFromCookie(request)
+  if (refreshResult.errorResponse || !refreshResult.payload?.access_token) {
+    return { errorResponse: refreshResult.errorResponse }
+  }
+
+  let edgeResponse: Response
+  try {
+    edgeResponse = await callEdge(refreshResult.payload.access_token)
+  } catch {
+    return {
+      errorResponse: NextResponse.json(
+        { code: 'AUTH_SERVICE_UNAVAILABLE', message: 'Authentication service is unavailable right now.' },
+        { status: 503 },
+      ),
+    }
+  }
+
+  return {
+    edgeResponse,
+    refreshedPayload: refreshResult.payload,
+  }
 }

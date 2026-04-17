@@ -11,6 +11,7 @@ services:
       - NEXT_TELEMETRY_DISABLED=1
       - PORT=3000
       - HOSTNAME=0.0.0.0
+      - AUTH_COOKIE_SECURE=false
       - ZORD_EDGE_URL=${ZORD_EDGE_URL:-http://host.docker.internal:8080}
       - ZORD_VAULT_URL=${ZORD_VAULT_URL:-http://host.docker.internal:8081}
       - ZORD_RELAY_URL=${ZORD_RELAY_URL:-http://host.docker.internal:8082}

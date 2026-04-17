@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"zord-edge/db"
@@ -20,21 +21,22 @@ type Config struct {
 }
 
 type AuthConfig struct {
-	Issuer                 string
-	Audience               string
-	AccessTokenTTL         time.Duration
-	RefreshTokenTTL        time.Duration
-	SigningKeyPath         string
-	SigningKeyBase64       string
-	CookieDomain           string
-	CookieSecure           bool
-	LockoutThreshold       int
-	LockoutDuration        time.Duration
-	BootstrapAdminName     string
-	BootstrapAdminEmail    string
-	BootstrapAdminPassword string
-	BootstrapAdminTenantID string
-	BootstrapWorkspaceCode string
+	Issuer                   string
+	Audience                 string
+	AccessTokenTTL           time.Duration
+	RefreshTokenTTL          time.Duration
+	SigningKeyPath           string
+	SigningKeyBase64         string
+	AllowEphemeralSigningKey bool
+	CookieDomain             string
+	CookieSecure             bool
+	LockoutThreshold         int
+	LockoutDuration          time.Duration
+	BootstrapAdminName       string
+	BootstrapAdminEmail      string
+	BootstrapAdminPassword   string
+	BootstrapAdminTenantID   string
+	BootstrapWorkspaceCode   string
 }
 
 func InitDB() {
@@ -77,24 +79,32 @@ func InitDB() {
 }
 
 func LoadConfig() *Config {
+	signingKeyBase64 := os.Getenv("JWT_SIGNING_PRIVATE_KEY_BASE64")
+	allowEphemeralSigningKey := envBool("AUTH_ALLOW_EPHEMERAL_SIGNING_KEY", false)
+	signingKeyPath := firstNonEmpty(os.Getenv("JWT_SIGNING_PRIVATE_KEY_PATH"), os.Getenv("SIGNING_KEY_PATH"))
+	if signingKeyPath == "" && strings.TrimSpace(signingKeyBase64) == "" && !allowEphemeralSigningKey {
+		signingKeyPath = "ed25519_private.pem"
+	}
+
 	return &Config{
 		VaultKey: os.Getenv("ZORD_VAULT_KEY"),
 		Auth: AuthConfig{
-			Issuer:                 firstNonEmpty(os.Getenv("JWT_ISSUER"), "zord-edge"),
-			Audience:               firstNonEmpty(os.Getenv("JWT_AUDIENCE"), "zord-console"),
-			AccessTokenTTL:         envDuration("JWT_ACCESS_TOKEN_TTL", 15*time.Minute),
-			RefreshTokenTTL:        envDuration("JWT_REFRESH_TOKEN_TTL", 30*24*time.Hour),
-			SigningKeyPath:         firstNonEmpty(os.Getenv("JWT_SIGNING_PRIVATE_KEY_PATH"), os.Getenv("SIGNING_KEY_PATH"), "ed25519_private.pem"),
-			SigningKeyBase64:       os.Getenv("JWT_SIGNING_PRIVATE_KEY_BASE64"),
-			CookieDomain:           os.Getenv("AUTH_COOKIE_DOMAIN"),
-			CookieSecure:           envBool("AUTH_COOKIE_SECURE", false),
-			LockoutThreshold:       envInt("JWT_LOCKOUT_THRESHOLD", 5),
-			LockoutDuration:        envDuration("JWT_LOCKOUT_DURATION", 15*time.Minute),
-			BootstrapAdminName:     os.Getenv("BOOTSTRAP_ADMIN_NAME"),
-			BootstrapAdminEmail:    os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),
-			BootstrapAdminPassword: os.Getenv("BOOTSTRAP_ADMIN_PASSWORD"),
-			BootstrapAdminTenantID: os.Getenv("BOOTSTRAP_ADMIN_TENANT_ID"),
-			BootstrapWorkspaceCode: os.Getenv("BOOTSTRAP_ADMIN_WORKSPACE_CODE"),
+			Issuer:                   firstNonEmpty(os.Getenv("JWT_ISSUER"), "zord-edge"),
+			Audience:                 firstNonEmpty(os.Getenv("JWT_AUDIENCE"), "zord-console"),
+			AccessTokenTTL:           envDuration("JWT_ACCESS_TOKEN_TTL", 15*time.Minute),
+			RefreshTokenTTL:          envDuration("JWT_REFRESH_TOKEN_TTL", 30*24*time.Hour),
+			SigningKeyPath:           signingKeyPath,
+			SigningKeyBase64:         signingKeyBase64,
+			AllowEphemeralSigningKey: allowEphemeralSigningKey,
+			CookieDomain:             os.Getenv("AUTH_COOKIE_DOMAIN"),
+			CookieSecure:             envBool("AUTH_COOKIE_SECURE", false),
+			LockoutThreshold:         envInt("JWT_LOCKOUT_THRESHOLD", 5),
+			LockoutDuration:          envDuration("JWT_LOCKOUT_DURATION", 15*time.Minute),
+			BootstrapAdminName:       os.Getenv("BOOTSTRAP_ADMIN_NAME"),
+			BootstrapAdminEmail:      os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),
+			BootstrapAdminPassword:   os.Getenv("BOOTSTRAP_ADMIN_PASSWORD"),
+			BootstrapAdminTenantID:   os.Getenv("BOOTSTRAP_ADMIN_TENANT_ID"),
+			BootstrapWorkspaceCode:   os.Getenv("BOOTSTRAP_ADMIN_WORKSPACE_CODE"),
 		},
 	}
 }

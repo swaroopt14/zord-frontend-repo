@@ -4,8 +4,14 @@ import { Header } from '@/components/landing/Header'
 import { Hero } from '@/components/landing/Hero'
 import { LogoStrip } from '@/components/landing/LogoStrip'
 import { FeaturesBento } from '@/components/landing/FeaturesBento'
+import { ProductShowcase } from '@/components/landing/ProductShowcase'
 import { DashboardShowcase } from '@/components/landing/DashboardShowcase'
 import { TrustLayer } from '@/components/landing/TrustLayer'
+import { HowItWorks } from '@/components/landing/HowItWorks'
+import { UseCases } from '@/components/landing/UseCases'
+import { Security } from '@/components/landing/Security'
+import { Developers } from '@/components/landing/Developers'
+import { Pricing } from '@/components/landing/Pricing'
 import { ZordLogo } from '@/components/ZordLogo'
 
 const footerColumns = [
@@ -58,9 +64,19 @@ export default function HomePage() {
         
         <LogoStrip />
         
-        <FeaturesBento />
+        <ProductShowcase />
+        
+        <HowItWorks />
         
         <DashboardShowcase />
+        
+        <UseCases />
+        
+        <Security />
+        
+        <Developers />
+        
+        <Pricing />
         
         <TrustLayer />
 

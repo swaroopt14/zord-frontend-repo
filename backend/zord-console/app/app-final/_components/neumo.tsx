@@ -2,14 +2,30 @@
 
 import type { ReactNode } from 'react'
 
-export const NEO_BASE = '#B2B8A3'
-export const NEO_LIGHT = '#CAD1B9'
-export const NEO_DARK = '#9A9F8D'
-export const NEO_INSET_LIGHT = '#D5DCBF'
-export const NEO_INSET_DARK = '#8E9382'
-export const NEO_CREAM = '#F7F1E3'
-export const NEO_TEXT = '#243225'
-export const NEO_MUTED = '#5C6455'
+export const NEO_BASE = '#B8BBC4'
+export const NEO_LIGHT = '#EDF0F4'
+export const NEO_DARK = '#ADB0BA'
+export const NEO_INSET_LIGHT = '#FFFFFF'
+export const NEO_INSET_DARK = '#B2B5BE'
+export const NEO_CREAM = '#C2C5CE'
+export const NEO_TEXT = '#0E1016'
+export const NEO_MUTED = '#52555E'
+export const NEO_ACTIVE = '#6B6E7A'
+export const NEO_ACCENT_SURFACE = 'linear-gradient(180deg, #787B86 0%, #6B6E7A 100%)'
+export const NEO_ACCENT_BORDER = '1px solid rgba(255,255,255,0.16)'
+export const NEO_ACCENT_SHADOW =
+  '0 16px 30px rgba(100,105,122,0.22), inset 1px 1px 0 rgba(255,255,255,0.18), inset -4px -4px 12px rgba(0,0,0,0.12)'
+export const NEO_ACCENT_TEXT = '#FFFFFF'
+export const NEO_ACCENT_MUTED = 'rgba(236,239,243,0.82)'
+export const NEO_SURFACE_BORDER = '1px solid rgba(255,255,255,0.42)'
+export const NEO_CARD_SHADOW =
+  '6px 6px 14px rgba(100,105,122,0.28), -3px -3px 9px rgba(255,255,255,0.52), inset 0.5px 0.5px 0 rgba(255,255,255,0.36)'
+export const NEO_RAISED_SHADOW =
+  '4px 4px 10px rgba(100,105,122,0.22), -3px -3px 8px rgba(255,255,255,0.48), inset 0.5px 0.5px 0 rgba(255,255,255,0.32)'
+export const NEO_INSET_SHADOW =
+  'inset 5px 5px 12px rgba(100,105,122,0.24), inset -5px -5px 12px rgba(255,255,255,0.54)'
+export const NEO_SHELL_SHADOW =
+  '14px 14px 28px rgba(100,105,122,0.26), -10px -10px 22px rgba(255,255,255,0.58), inset 1px 1px 0 rgba(255,255,255,0.38)'
 
 export function ModuleBadge({ children }: { children: ReactNode }) {
   return (
@@ -18,11 +34,11 @@ export function ModuleBadge({ children }: { children: ReactNode }) {
       style={{
         color: NEO_TEXT,
         background: NEO_CREAM,
-        border: '1px solid rgba(255,255,255,0.24)',
-        boxShadow: `6px 6px 14px ${NEO_DARK}, -6px -6px 14px ${NEO_LIGHT}`,
+        border: NEO_SURFACE_BORDER,
+        boxShadow: NEO_RAISED_SHADOW,
       }}
     >
-      <span className="h-2.5 w-2.5 rounded-full" style={{ background: NEO_TEXT }} />
+      <span className="h-2.5 w-2.5 rounded-full" style={{ background: NEO_ACTIVE }} />
       {children}
     </div>
   )
@@ -35,8 +51,8 @@ export function UtilityPill({ children }: { children: ReactNode }) {
       style={{
         color: NEO_TEXT,
         background: NEO_CREAM,
-        border: '1px solid rgba(255,255,255,0.3)',
-        boxShadow: `6px 6px 16px ${NEO_DARK}, -5px -5px 14px rgba(255,255,255,0.72)`,
+        border: NEO_SURFACE_BORDER,
+        boxShadow: NEO_RAISED_SHADOW,
       }}
     >
       {children}
@@ -58,9 +74,8 @@ export function SegmentedTabs<T extends string>({
       className="inline-flex items-center gap-1.5 rounded-[20px] p-1.5"
       style={{
         background: NEO_BASE,
-        border: '2px solid rgba(255,255,255,0.2)',
-        boxShadow:
-          '4px 4px 10px rgba(107,115,96,0.28), -4px -4px 10px rgba(255,255,255,0.7), inset 6px 6px 12px rgba(88,93,77,0.55), inset -6px -6px 12px rgba(194,201,171,0.34)',
+        border: NEO_SURFACE_BORDER,
+        boxShadow: NEO_INSET_SHADOW,
       }}
     >
       {items.map((item) => {
@@ -73,9 +88,11 @@ export function SegmentedTabs<T extends string>({
             className="rounded-[16px] px-4 py-2.5 text-[14px] font-bold transition-all"
             style={{
               background: isActive ? NEO_CREAM : 'transparent',
-              color: isActive ? NEO_TEXT : '#5E6557',
-              boxShadow: isActive ? '6px 6px 14px rgba(107,115,96,0.22), -4px -4px 12px rgba(255,255,255,0.72)' : 'none',
-              textShadow: isActive ? '1px 1px 0 rgba(255,255,255,0.24)' : '1px 1px 0 rgba(213,220,191,0.45)',
+              color: isActive ? NEO_TEXT : NEO_MUTED,
+              boxShadow: isActive ? NEO_RAISED_SHADOW : 'none',
+              textShadow: isActive
+                ? '1px 1px 0 rgba(255,255,255,0.34)'
+                : '1px 1px 0 rgba(255,255,255,0.48)',
             }}
           >
             {item}
@@ -104,8 +121,8 @@ export function NeumoCard({
       className={`rounded-[30px] p-7 ${className}`}
       style={{
         background: NEO_BASE,
-        border: '1px solid rgba(255,255,255,0.16)',
-        boxShadow: '18px 18px 36px rgba(154,159,141,0.42), -14px -14px 30px rgba(213,220,191,0.82), inset 1px 1px 0 rgba(255,255,255,0.18)',
+        border: NEO_SURFACE_BORDER,
+        boxShadow: NEO_SHELL_SHADOW,
       }}
     >
       <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -129,18 +146,26 @@ export function SummaryCard({ label, value, note }: { label: string; value: stri
     <div
       className="rounded-[28px] px-6 py-6"
       style={{
-        background: NEO_BASE,
-        border: '1px solid rgba(255,255,255,0.12)',
-        boxShadow: '16px 16px 34px rgba(154,159,141,0.4), -12px -12px 26px rgba(202,209,185,0.82), inset 0 1px 0 rgba(255,255,255,0.18)',
+        background: NEO_ACCENT_SURFACE,
+        border: NEO_ACCENT_BORDER,
+        boxShadow: NEO_ACCENT_SHADOW,
       }}
     >
-      <div className="text-[12px] font-black uppercase tracking-[0.18em]" style={{ color: NEO_MUTED, textShadow: '1px 1px 0 rgba(213,220,191,0.55)' }}>
+      <div
+        className="inline-flex rounded-full px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.16em]"
+        style={{
+          color: NEO_ACCENT_MUTED,
+          background: 'rgba(255,255,255,0.10)',
+          border: '1px solid rgba(255,255,255,0.14)',
+          boxShadow: 'inset 1px 1px 0 rgba(255,255,255,0.14)',
+        }}
+      >
         {label}
       </div>
-      <div className="mt-4 text-[42px] font-black leading-none tracking-[-0.05em]" style={{ color: NEO_TEXT }}>
+      <div className="mt-4 text-[42px] font-black leading-none tracking-[-0.05em]" style={{ color: NEO_ACCENT_TEXT }}>
         {value}
       </div>
-      <div className="mt-3 text-[16px] leading-7" style={{ color: NEO_MUTED }}>
+      <div className="mt-3 text-[16px] leading-7" style={{ color: NEO_ACCENT_MUTED }}>
         {note}
       </div>
     </div>
@@ -156,10 +181,10 @@ export function StatusChip({
 }) {
   const styles =
     tone === 'healthy'
-      ? { background: '#D9E7D3', border: '1px solid rgba(161,172,157,0.85)', color: '#30402F' }
+      ? { background: 'rgba(50,110,65,0.16)', border: '1px solid rgba(46,110,62,0.24)', color: '#235530' }
       : tone === 'watch'
-      ? { background: '#DBCFAC', border: '1px solid rgba(188,177,147,0.9)', color: '#5C4A2D' }
-      : { background: '#94A7AE', border: '1px solid rgba(126,142,148,0.9)', color: '#F8FAFC' }
+      ? { background: 'rgba(145,105,0,0.16)', border: '1px solid rgba(158,112,0,0.24)', color: '#6A4E00' }
+      : { background: 'rgba(160,65,45,0.16)', border: '1px solid rgba(160,56,40,0.24)', color: '#782A18' }
 
   return (
     <span className="inline-flex items-center rounded-full px-3 py-1.5 text-[12px] font-bold" style={styles}>
@@ -173,15 +198,23 @@ export function InfoStrip({ label, children }: { label: string; children: ReactN
     <div
       className="mb-6 rounded-[24px] px-5 py-4"
       style={{
-        background: NEO_BASE,
-        border: '1px solid rgba(255,255,255,0.12)',
-        boxShadow: `inset 6px 6px 12px ${NEO_INSET_DARK}, inset -6px -6px 12px ${NEO_INSET_LIGHT}`,
+        background: NEO_ACCENT_SURFACE,
+        border: NEO_ACCENT_BORDER,
+        boxShadow: NEO_ACCENT_SHADOW,
       }}
     >
-      <div className="text-[12px] font-black uppercase tracking-[0.18em]" style={{ color: NEO_TEXT }}>
+      <div
+        className="inline-flex rounded-full px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.16em]"
+        style={{
+          color: NEO_ACCENT_MUTED,
+          background: 'rgba(255,255,255,0.10)',
+          border: '1px solid rgba(255,255,255,0.14)',
+          boxShadow: 'inset 1px 1px 0 rgba(255,255,255,0.14)',
+        }}
+      >
         {label}
       </div>
-      <div className="mt-2 text-[16px] leading-7" style={{ color: NEO_MUTED }}>
+      <div className="mt-3 text-[16px] leading-7" style={{ color: NEO_ACCENT_MUTED }}>
         {children}
       </div>
     </div>
@@ -200,12 +233,12 @@ export function ActionButton({
       type="button"
       className="rounded-[18px] px-4 py-2.5 text-[14px] font-bold"
       style={{
-        color: NEO_TEXT,
-        background: active ? NEO_CREAM : NEO_BASE,
-        border: '1px solid rgba(255,255,255,0.2)',
+        color: active ? '#FFFFFF' : NEO_TEXT,
+        background: active ? NEO_ACTIVE : NEO_BASE,
+        border: NEO_SURFACE_BORDER,
         boxShadow: active
-          ? '6px 6px 14px rgba(107,115,96,0.22), -4px -4px 12px rgba(255,255,255,0.72)'
-          : '4px 4px 10px rgba(107,115,96,0.28), -4px -4px 10px rgba(255,255,255,0.7), inset 6px 6px 12px rgba(88,93,77,0.55), inset -6px -6px 12px rgba(194,201,171,0.34)',
+          ? '0 10px 22px rgba(100,105,122,0.22), inset 1px 1px 0 rgba(255,255,255,0.14), inset -3px -3px 8px rgba(0,0,0,0.14)'
+          : NEO_INSET_SHADOW,
       }}
     >
       {children}

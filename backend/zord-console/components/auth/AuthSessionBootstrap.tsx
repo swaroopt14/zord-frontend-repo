@@ -9,21 +9,22 @@ function getLoginRoute(pathname: string) {
   if (pathname.startsWith('/admin')) return '/admin/login'
   if (pathname.startsWith('/ops')) return '/ops/login'
   if (pathname.startsWith('/customer')) return '/customer/login'
+  if (pathname.startsWith('/app-final')) return '/app-final/login'
   return '/console/login'
 }
 
 function isProtectedPath(pathname: string) {
-  return pathname.startsWith('/console') || pathname.startsWith('/customer') || pathname.startsWith('/ops') || pathname.startsWith('/admin')
+  return pathname.startsWith('/console') || pathname.startsWith('/customer') || pathname.startsWith('/ops') || pathname.startsWith('/admin') || pathname.startsWith('/app-final')
 }
 
 function isLoginPath(pathname: string) {
-  return pathname === '/console/login' || pathname === '/customer/login' || pathname === '/ops/login' || pathname === '/admin/login'
+  return pathname === '/console/login' || pathname === '/customer/login' || pathname === '/ops/login' || pathname === '/admin/login' || pathname === '/app-final/login'
 }
 
 function roleMatchesPath(pathname: string, role: UserRole) {
   if (pathname.startsWith('/admin')) return role === 'ADMIN'
   if (pathname.startsWith('/ops')) return role === 'OPS'
-  if (pathname.startsWith('/customer') || pathname.startsWith('/console')) {
+  if (pathname.startsWith('/customer') || pathname.startsWith('/console') || pathname.startsWith('/app-final')) {
     return role === 'CUSTOMER_USER' || role === 'CUSTOMER_ADMIN'
   }
   return true

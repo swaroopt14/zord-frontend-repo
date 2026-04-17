@@ -38,11 +38,19 @@ export async function GET(request: NextRequest) {
   }
 
   if (accessToken) {
-    const meResponse = await fetch(edgeAuthUrl(BACKEND_SERVICES.EDGE.ENDPOINTS.AUTH_ME), {
-      method: 'GET',
-      headers: buildForwardHeaders(request, accessToken),
-      cache: 'no-store',
-    })
+    let meResponse: Response
+    try {
+      meResponse = await fetch(edgeAuthUrl(BACKEND_SERVICES.EDGE.ENDPOINTS.AUTH_ME), {
+        method: 'GET',
+        headers: buildForwardHeaders(request, accessToken),
+        cache: 'no-store',
+      })
+    } catch {
+      return NextResponse.json(
+        { code: 'AUTH_SERVICE_UNAVAILABLE', message: 'Authentication service is unavailable right now.' },
+        { status: 503 },
+      )
+    }
 
     if (meResponse.ok) {
       const payload = await parseJSONSafe<BackendMeEnvelope>(meResponse)
@@ -60,12 +68,20 @@ export async function GET(request: NextRequest) {
     return response
   }
 
-  const refreshResponse = await fetch(edgeAuthUrl(BACKEND_SERVICES.EDGE.ENDPOINTS.AUTH_REFRESH), {
-    method: 'POST',
-    headers: buildForwardHeaders(request),
-    cache: 'no-store',
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  })
+  let refreshResponse: Response
+  try {
+    refreshResponse = await fetch(edgeAuthUrl(BACKEND_SERVICES.EDGE.ENDPOINTS.AUTH_REFRESH), {
+      method: 'POST',
+      headers: buildForwardHeaders(request),
+      cache: 'no-store',
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+  } catch {
+    return NextResponse.json(
+      { code: 'AUTH_SERVICE_UNAVAILABLE', message: 'Authentication service is unavailable right now.' },
+      { status: 503 },
+    )
+  }
 
   if (!refreshResponse.ok) {
     const errorBody = await parseJSONSafe<BackendErrorEnvelope>(refreshResponse)

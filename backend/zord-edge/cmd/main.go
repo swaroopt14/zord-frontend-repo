@@ -87,12 +87,11 @@ func main() {
 		log.Println("No .env file found")
 	}
 
-
 	bucket := os.Getenv("S3_BUCKET")
 	region := os.Getenv("AWS_REGION")
 
 	if bucket == "" || region == "" {
-		log.Fatal("S3_BUCKET or S3_REGION not set in environment")
+		log.Fatal("S3_BUCKET or AWS_REGION not set in environment")
 	}
 
 	s3store, err := storage.NewS3Store(context.Background(), bucket, region)
@@ -124,6 +123,7 @@ func main() {
 		cfg.Auth.Issuer,
 		cfg.Auth.Audience,
 		cfg.Auth.AccessTokenTTL,
+		cfg.Auth.AllowEphemeralSigningKey,
 	)
 	if err != nil {
 		log.Fatal("failed to initialize auth token manager:", err)
@@ -152,11 +152,11 @@ func main() {
 	if err != nil {
 		log.Fatal("failed to initialize vault key:", err)
 	}
-	signingKeyPath := os.Getenv("SIGNING_KEY_PATH")
-	if signingKeyPath == "" {
-		signingKeyPath = "ed25519_private.pem"
-	}
-	err = vault.InitSigningKey(signingKeyPath)
+	err = vault.InitSigningKeyFromConfig(
+		cfg.Auth.SigningKeyPath,
+		cfg.Auth.SigningKeyBase64,
+		cfg.Auth.AllowEphemeralSigningKey,
+	)
 	if err != nil {
 		log.Fatal("failed to load signing key:", err)
 	}

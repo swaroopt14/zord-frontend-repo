@@ -149,8 +149,25 @@ function inferEntityFromHotspot(hotspot: string) {
   return null
 }
 
-const NEUMO_POP = '12px 12px 28px rgba(142,147,125,0.34), -10px -10px 24px rgba(202,209,185,0.88), inset 0 1px 0 rgba(213,220,191,0.58)'
-const NEUMO_PRESS = 'inset 8px 8px 18px rgba(142,147,125,0.24), inset -8px -8px 18px rgba(213,220,191,0.72)'
+const TRACE_BASE = '#FFFFFF'
+const TRACE_DARK = '#F8FAFC'
+const TRACE_CREAM = '#FFFFFF'
+const TRACE_TEXT = '#0F172A'
+const TRACE_MUTED = '#64748B'
+const TRACE_ACCENT = '#4F46E5'
+const TRACE_ALT = '#F8FAFC'
+const TRACE_HOVER = '#F1F5F9'
+const TRACE_PANEL = '#FFFFFF'
+const TRACE_TABLE_HEAD = 'linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%)'
+const TRACE_DRAWER = 'linear-gradient(145deg, #F8FAFC, #FFFFFF)'
+const TRACE_BORDER = 'rgba(0, 0, 0, 0.06)'
+const TRACE_BORDER_SOFT = 'rgba(0, 0, 0, 0.04)'
+const NEUMO_POP =
+  '0 8px 24px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
+const NEUMO_PRESS =
+  'inset 4px 4px 8px rgba(15, 23, 42, 0.04), inset -4px -4px 8px rgba(255, 255, 255, 0.8)'
+const TRACE_PAGE_SPOTS =
+  'radial-gradient(circle at 18% 10%, rgba(255,255,255,0.80), transparent 28%), radial-gradient(circle at 78% 8%, rgba(206,211,222,0.34), transparent 32%), radial-gradient(circle at 82% 72%, rgba(227,230,236,0.42), transparent 28%)'
 
 function parseCompactAmount(value: string) {
   const cleaned = value.replace(/[₹,\s]/g, '')
@@ -205,14 +222,14 @@ function comparePrimitive(a: string | number, b: string | number) {
 function TraceCaretIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path d="M4 6l4 4 4-4" stroke="#687361" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 6l4 4 4-4" stroke={TRACE_MUTED} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
 
 function TraceSortGlyph({ active = false, direction = 'asc' }: { active?: boolean; direction?: SortDirection }) {
   return (
-    <span className={`inline-flex items-center gap-0.5 ${active ? 'text-[#495441]' : 'text-[#73806B]'}`}>
+    <span className="inline-flex items-center gap-0.5" style={{ color: active ? TRACE_ACCENT : TRACE_MUTED }}>
       <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden>
         <path d="M6 2v8M6 2 3.8 4.2M6 2l2.2 2.2" stroke="currentColor" strokeWidth={active && direction === 'asc' ? '1.6' : '1.2'} strokeLinecap="round" strokeLinejoin="round" opacity={active && direction === 'asc' ? '1' : '0.58'} />
       </svg>
@@ -242,13 +259,13 @@ function TraceHeadLabel({
       style={
         active
           ? {
-              background: '#A8AE94',
-              color: '#414B3B',
-              border: '1px solid rgba(255,255,255,0.18)',
-              boxShadow: '4px 4px 10px rgba(107,115,96,0.24), -4px -4px 10px rgba(202,209,185,0.7), inset 6px 6px 12px rgba(88,93,77,0.52), inset -6px -6px 12px rgba(194,201,171,0.34)',
+              background: TRACE_CREAM,
+              color: TRACE_TEXT,
+              border: '1px solid rgba(255,255,255,0.78)',
+              boxShadow: NEUMO_POP,
             }
           : {
-              color: '#576152',
+              color: TRACE_MUTED,
             }
       }
     >
@@ -273,21 +290,21 @@ function TraceRangePill({
       onClick={onClick}
       className="flex min-h-[70px] w-full min-w-[220px] flex-col items-start justify-center gap-2 rounded-[28px] border px-5 py-4 text-left transition-transform duration-200 hover:-translate-y-0.5"
       style={{
-        background: 'linear-gradient(180deg, #FFFDF8 0%, #F6EEDC 100%)',
-        borderColor: '#E0D4BB',
-        color: '#283226',
-        boxShadow: '0 12px 24px rgba(188,177,147,0.16), inset 0 1px 0 rgba(255,255,255,0.84)',
+        background: TRACE_BASE,
+        borderColor: TRACE_BORDER,
+        color: TRACE_TEXT,
+        boxShadow: NEUMO_POP,
       }}
     >
-      <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8A7B5B]">{label}</span>
+      <span className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: TRACE_MUTED }}>{label}</span>
       <span className="flex w-full items-center gap-3">
-        <span className="flex-1 truncate text-[15px] font-black tracking-[-0.02em] text-[#283226]">{value}</span>
+        <span className="flex-1 truncate text-[15px] font-black tracking-[-0.02em]" style={{ color: TRACE_TEXT }}>{value}</span>
         <span
           className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border"
           style={{
-            borderColor: '#E5D8C1',
-            background: '#FBF7EE',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.82)',
+            borderColor: TRACE_BORDER,
+            background: TRACE_BASE,
+            boxShadow: NEUMO_PRESS,
           }}
         >
           <TraceCaretIcon />
@@ -325,10 +342,10 @@ function TraceRangeToolbar() {
     top: 'calc(100% + 10px)',
     left: 0,
     minWidth: 220,
-    background: 'linear-gradient(180deg, #FFFDF8 0%, #F6EEDC 100%)',
-    border: '1px solid #E0D4BB',
+    background: TRACE_BASE,
+    border: `1px solid ${TRACE_BORDER}`,
     borderRadius: 22,
-    boxShadow: '18px 18px 32px rgba(188,177,147,0.18), -12px -12px 24px rgba(255,255,255,0.72)',
+    boxShadow: NEUMO_POP,
     padding: 8,
     zIndex: 30,
   }
@@ -337,15 +354,15 @@ function TraceRangeToolbar() {
     ({
       width: '100%',
       border: 'none',
-      background: active ? '#EEF1E4' : 'transparent',
+      background: active ? TRACE_CREAM : 'transparent',
       borderRadius: 14,
       textAlign: 'left' as const,
       padding: '10px 12px',
       fontSize: 13,
       fontWeight: 700,
-      color: '#374135',
+      color: TRACE_TEXT,
       cursor: 'pointer',
-      boxShadow: active ? 'inset 5px 5px 12px rgba(169,176,149,0.3), inset -5px -5px 12px rgba(255,255,255,0.84)' : 'none',
+      boxShadow: active ? NEUMO_POP : 'none',
     })
 
   return (
@@ -353,9 +370,9 @@ function TraceRangeToolbar() {
       ref={toolbarRef}
       className="mb-6 rounded-[36px] border p-3.5"
       style={{
-        background: 'linear-gradient(180deg, #FFFDF8 0%, #F6EFE1 100%)',
-        borderColor: '#E4D9C3',
-        boxShadow: '0 18px 34px rgba(188,177,147,0.14), inset 0 1px 0 rgba(255,255,255,0.88)',
+        background: TRACE_BASE,
+        borderColor: TRACE_BORDER,
+        boxShadow: NEUMO_POP,
       }}
     >
       <div className="flex w-full flex-wrap items-stretch gap-3">
@@ -385,11 +402,12 @@ function TraceRangeToolbar() {
         </div>
 
         <div
-          className="flex min-h-[70px] min-w-[88px] flex-col items-center justify-center rounded-[24px] border px-4 py-3 text-[#55614E]"
+          className="flex min-h-[70px] min-w-[88px] flex-col items-center justify-center rounded-[24px] border px-4 py-3"
           style={{
-            background: '#A8AE94',
-            borderColor: 'rgba(255,255,255,0.24)',
-            boxShadow: 'inset 7px 7px 14px rgba(142,147,130,0.48), inset -7px -7px 14px rgba(213,220,191,0.74)',
+            background: TRACE_BASE,
+            borderColor: TRACE_BORDER,
+            color: TRACE_MUTED,
+            boxShadow: NEUMO_PRESS,
           }}
         >
           <span className="text-[10px] font-black uppercase tracking-[0.16em]">Compare</span>
@@ -450,11 +468,12 @@ function TraceRangeToolbar() {
           <button
             type="button"
             aria-label="Add"
-            className="inline-flex h-[70px] w-[70px] items-center justify-center rounded-[24px] border text-[30px] font-bold leading-none text-[#4A5D4E]"
+            className="inline-flex h-[70px] w-[70px] items-center justify-center rounded-[24px] border text-[30px] font-bold leading-none"
             style={{
-              background: 'linear-gradient(180deg, #FFF9ED 0%, #F2E6D2 100%)',
-              borderColor: '#E0D4BB',
-              boxShadow: '0 12px 24px rgba(188,177,147,0.16), inset 0 1px 0 rgba(255,255,255,0.86)',
+              background: TRACE_CREAM,
+              borderColor: TRACE_BORDER,
+              color: TRACE_ACCENT,
+              boxShadow: NEUMO_POP,
             }}
           >
             +
@@ -478,9 +497,9 @@ function NeumoTabs<T extends string>({
     <div
       className="trace-switch-track inline-flex flex-wrap items-center gap-2 rounded-[34px] border px-2.5 py-2.5"
       style={{
-        background: '#A8AE94',
-        border: '2px solid rgba(255,255,255,0.2)',
-        boxShadow: '4px 4px 10px rgba(107,115,96,0.3), -4px -4px 10px rgba(213,220,191,0.72), inset 6px 6px 12px rgba(88,93,77,0.6), inset -6px -6px 12px rgba(194,201,171,0.4)',
+        background: TRACE_BASE,
+        border: '1px solid rgba(255,255,255,0.78)',
+        boxShadow: NEUMO_PRESS,
       }}
     >
       {items.map((item) => {
@@ -494,14 +513,14 @@ function NeumoTabs<T extends string>({
             style={
               activeItem
                 ? {
-                    background: '#F7F1E3',
-                    color: '#4B5345',
-                    boxShadow: '6px 6px 16px rgba(107,115,96,0.24), -4px -4px 14px rgba(255,255,255,0.42)',
-                    textShadow: '1px 1px 0 rgba(255,255,255,0.22)',
+                    background: TRACE_CREAM,
+                    color: TRACE_TEXT,
+                    boxShadow: NEUMO_POP,
+                    textShadow: '1px 1px 0 rgba(255,255,255,0.28)',
                   }
                 : {
-                    color: '#5C6455',
-                    textShadow: '1px 1px 0 rgba(255,255,255,0.18)',
+                    color: TRACE_MUTED,
+                    textShadow: '1px 1px 0 rgba(255,255,255,0.28)',
                   }
             }
           >
@@ -516,39 +535,48 @@ function NeumoTabs<T extends string>({
 function TraceHeaderPill({ children }: { children: ReactNode }) {
   return (
     <div
-      className="inline-flex items-center gap-2 rounded-full border border-[#D6DCCA] px-4 py-2 text-[12px] font-bold uppercase tracking-[0.12em] text-[#66705D]"
+      className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[12px] font-bold uppercase tracking-[0.12em]"
       style={{
-        background: 'linear-gradient(180deg, #F9F2E4 0%, #F5E8D1 100%)',
-        boxShadow: '8px 8px 18px rgba(181,139,98,0.16), -8px -8px 18px rgba(243,186,132,0.48), inset 0 1px 0 rgba(251,237,198,0.62)',
+        background: TRACE_CREAM,
+        color: TRACE_MUTED,
+        borderColor: TRACE_BORDER,
+        boxShadow: NEUMO_POP,
       }}
     >
-      <span className="h-2.5 w-2.5 rounded-full bg-[#7A8A76]" />
+      <span className="h-2.5 w-2.5 rounded-full" style={{ background: TRACE_ACCENT }} />
       {children}
     </div>
   )
 }
 
-function TraceMetricCard({ label, value, note }: { label: string; value: string; note: string; tone?: 'neutral' | 'accent' }) {
-  const toneStyle = {
-    background: '#A8AE94',
-    borderColor: 'rgba(255,255,255,0.2)',
-    boxShadow: '4px 4px 10px rgba(107,115,96,0.3), -4px -4px 10px rgba(213,220,191,0.72), inset 6px 6px 12px rgba(88,93,77,0.6), inset -6px -6px 12px rgba(194,201,171,0.4)',
-  }
+function TraceMetricCard({ label, value, note, tone = 'neutral' }: { label: string; value: string; note: string; tone?: 'neutral' | 'accent' }) {
+  const toneStyle =
+    tone === 'accent'
+      ? {
+          background: 'linear-gradient(180deg, rgba(33,37,58,0.98) 0%, rgba(28,31,46,0.98) 100%)',
+          borderColor: 'rgba(255,255,255,0.07)',
+          boxShadow: '0 22px 52px rgba(20,22,38,0.30), 0 2px 8px rgba(20,22,38,0.22), inset 0 0.5px 0 rgba(255,255,255,0.10)',
+        }
+      : {
+          background: 'linear-gradient(180deg, rgba(33,37,58,0.98) 0%, rgba(28,31,46,0.98) 100%)',
+          borderColor: 'rgba(255,255,255,0.07)',
+          boxShadow: '0 22px 52px rgba(20,22,38,0.30), 0 2px 8px rgba(20,22,38,0.22), inset 0 0.5px 0 rgba(255,255,255,0.10)',
+        }
   return (
-    <div className="rounded-[30px] border p-6" style={toneStyle}>
+    <div className="rounded-[30px] border p-6 transition-all duration-300 hover:-translate-y-1" style={toneStyle}>
       <div
-        className="inline-flex rounded-full border px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[#5A6452]"
+        className="inline-flex rounded-full border px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.16em]"
         style={{
-          background: '#A8AE94',
-          borderColor: 'rgba(255,255,255,0.16)',
-          boxShadow: 'inset 5px 5px 10px #8E9382, inset -5px -5px 10px #D5DCBF',
-          textShadow: '1px 1px 1px rgba(213,220,191,0.65)',
+          background: 'rgba(255,255,255,0.05)',
+          color: 'rgba(255,255,255,0.65)',
+          borderColor: 'rgba(255,255,255,0.12)',
+          boxShadow: 'inset 1px 1px 0 rgba(255,255,255,0.08)',
         }}
       >
         {label}
       </div>
-      <div className="mt-5 text-[38px] font-black leading-none tracking-[-0.05em] text-[#142015]">{value}</div>
-      <div className="mt-3 text-[15px] leading-7 text-[#4E5749]">{note}</div>
+      <div className="mt-5 text-[38px] font-black leading-none tracking-[-0.05em]" style={{ color: '#ffffff' }}>{value}</div>
+      <div className="mt-3 text-[15px] leading-7" style={{ color: 'rgba(255,255,255,0.65)' }}>{note}</div>
     </div>
   )
 }
@@ -558,15 +586,15 @@ function ToolbarShell({ title, subtitle, right, children }: { title: string; sub
     <div
       className="rounded-[38px] border p-7"
       style={{
-        background: 'linear-gradient(180deg, #FFFFFF 0%, #FBFAF7 100%)',
-        borderColor: '#E8E1D2',
-        boxShadow: '0 18px 36px rgba(15,23,42,0.06), 0 3px 8px rgba(15,23,42,0.03), inset 0 1px 0 rgba(255,255,255,0.94)',
+        background: '#FFFFFF',
+        borderColor: TRACE_BORDER,
+        boxShadow: '0 12px 32px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.02)',
       }}
     >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <div className="text-[32px] font-black tracking-[-0.04em] text-[#101828]">{title}</div>
-          <div className="mt-2 max-w-[780px] text-[16px] leading-8 text-[#667085]">{subtitle}</div>
+          <div className="text-[32px] font-black tracking-[-0.04em]" style={{ color: TRACE_TEXT }}>{title}</div>
+          <div className="mt-2 max-w-[780px] text-[16px] leading-8" style={{ color: TRACE_MUTED }}>{subtitle}</div>
         </div>
         {right}
       </div>
@@ -580,13 +608,13 @@ function SearchField({ placeholder }: { placeholder: string }) {
     <div
       className="flex min-w-[320px] flex-1 items-center gap-3 rounded-[24px] border px-4 py-4"
       style={{
-        background: '#FFFFFF',
-        borderColor: '#E7E2D6',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.92), 0 6px 18px rgba(15,23,42,0.04)',
+        background: TRACE_ALT,
+        borderColor: TRACE_BORDER,
+        boxShadow: NEUMO_PRESS,
       }}
     >
-      <div className="flex h-11 w-11 items-center justify-center rounded-[16px] border border-[#ECE7DC] bg-[#FCFBF8] shadow-[0_4px_10px_rgba(15,23,42,0.04)]">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#6B7280]">
+      <div className="flex h-11 w-11 items-center justify-center rounded-[16px] border shadow-sm" style={{ borderColor: TRACE_BORDER, background: '#FFFFFF' }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: TRACE_MUTED }}>
           <circle cx="11" cy="11" r="7" />
           <path d="m20 20-3.5-3.5" strokeLinecap="round" />
         </svg>
@@ -595,7 +623,8 @@ function SearchField({ placeholder }: { placeholder: string }) {
         readOnly
         value=""
         placeholder={placeholder}
-        className="w-full bg-transparent text-[15px] font-semibold text-[#1F2937] outline-none placeholder:text-[#98A2B3]"
+        className="w-full bg-transparent text-[15px] font-semibold outline-none"
+        style={{ color: TRACE_TEXT }}
       />
     </div>
   )
@@ -604,14 +633,39 @@ function SearchField({ placeholder }: { placeholder: string }) {
 function ActionPill({ children }: { children: ReactNode }) {
   return (
     <div
-      className="inline-flex min-h-[52px] items-center rounded-[18px] border px-5 py-3.5 text-[15px] font-bold text-[#344054]"
+      className="inline-flex min-h-[52px] items-center rounded-[18px] border px-5 py-3.5 text-[15px] font-bold"
       style={{
         background: '#FFFFFF',
-        borderColor: '#E7E2D6',
-        boxShadow: '0 8px 18px rgba(15,23,42,0.05), inset 0 1px 0 rgba(255,255,255,0.94)',
+        borderColor: TRACE_BORDER,
+        color: TRACE_TEXT,
+        boxShadow: NEUMO_POP,
       }}
     >
       {children}
+    </div>
+  )
+}
+
+function AIStrip({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="relative mb-6 overflow-hidden rounded-[24px] p-[2px] transition-all duration-300 hover:shadow-lg"
+      style={{
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.9) 0%, rgba(236,72,153,0.4) 50%, rgba(99,102,241,0.2) 100%)',
+        boxShadow: '0 12px 28px rgba(99,102,241,0.22), inset 1px 1px 0 rgba(255,255,255,0.9)',
+      }}
+    >
+      <div className="relative flex w-full flex-col gap-1 rounded-[22px] px-6 py-5 sm:flex-row sm:items-start" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f4f6f9 100%)' }}>
+        <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-[0_4px_12px_rgba(99,102,241,0.35)]" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', color: '#fff' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15 9L22 12L15 15L12 22L9 15L2 12L9 9L12 2Z"/></svg>
+        </div>
+        <div className="ml-1 sm:ml-3">
+          <div className="text-[11px] font-black uppercase tracking-[0.24em]" style={{ color: '#4f46e5' }}>Zord AI Readout</div>
+          <div className="mt-1 text-[16px] font-semibold leading-7" style={{ color: '#334155' }}>
+            {children}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -628,23 +682,23 @@ function TraceActionButton({
   const toneStyle =
     tone === 'olive'
       ? {
-          background: '#A8AE94',
-          borderColor: 'rgba(255,255,255,0.2)',
-          color: '#30402F',
-          boxShadow: '4px 4px 10px rgba(107,115,96,0.24), -4px -4px 10px rgba(202,209,185,0.66), inset 6px 6px 12px rgba(88,93,77,0.56), inset -6px -6px 12px rgba(194,201,171,0.32)',
+          background: '#F4EAF0',
+          borderColor: 'rgba(123,108,135,0.22)',
+          color: TRACE_ACCENT,
+          boxShadow: NEUMO_POP,
         }
       : tone === 'slate'
       ? {
-          background: '#A8AE94',
-          borderColor: 'rgba(255,255,255,0.22)',
-          color: '#32444B',
-          boxShadow: '4px 4px 10px rgba(107,115,96,0.24), -4px -4px 10px rgba(202,209,185,0.66), inset 6px 6px 12px rgba(88,93,77,0.56), inset -6px -6px 12px rgba(194,201,171,0.32)',
+          background: TRACE_CREAM,
+          borderColor: TRACE_BORDER,
+          color: TRACE_TEXT,
+          boxShadow: NEUMO_POP,
         }
       : {
-          background: '#A8AE94',
-          borderColor: 'rgba(255,255,255,0.22)',
-          color: '#5B4E37',
-          boxShadow: '4px 4px 10px rgba(107,115,96,0.24), -4px -4px 10px rgba(202,209,185,0.66), inset 6px 6px 12px rgba(88,93,77,0.56), inset -6px -6px 12px rgba(194,201,171,0.32)',
+          background: TRACE_ALT,
+          borderColor: TRACE_BORDER_SOFT,
+          color: TRACE_MUTED,
+          boxShadow: NEUMO_POP,
         }
 
   return (
@@ -666,41 +720,43 @@ function TraceSubChip({
   children: ReactNode
   tone?: 'olive' | 'slate' | 'stone'
 }) {
-  const toneClass =
+  const toneStyle =
     tone === 'olive'
-      ? 'border-[#C8D4C1] bg-[#EEF5EA] text-[#4B6341]'
+      ? { border: '1px solid rgba(123,108,135,0.18)', background: '#F4EAF0', color: TRACE_ACCENT }
       : tone === 'slate'
-      ? 'border-[#C5D2D7] bg-[#ECF3F5] text-[#42555D]'
-      : 'border-[#E5DAC0] bg-[#F8F0DF] text-[#756243]'
+      ? { border: `1px solid ${TRACE_BORDER}`, background: TRACE_CREAM, color: TRACE_TEXT }
+      : { border: `1px solid ${TRACE_BORDER_SOFT}`, background: TRACE_ALT, color: TRACE_MUTED }
 
-  return <span className={`inline-flex rounded-full border px-3 py-1 text-[12px] font-semibold ${toneClass}`}>{children}</span>
+  return <span className="inline-flex rounded-full px-3 py-1 text-[12px] font-semibold" style={toneStyle}>{children}</span>
 }
 
 function WideTableCard({ children }: { children: ReactNode }) {
   return (
     <div
-      className="overflow-hidden rounded-[36px] border"
+      className="overflow-hidden rounded-[36px] border p-[8px]"
       style={{
-        background: 'linear-gradient(180deg, #FFFFFF 0%, #FBFAF7 100%)',
-        borderColor: '#E8E1D2',
-        boxShadow: '0 22px 44px rgba(15,23,42,0.06), 0 4px 12px rgba(15,23,42,0.03), inset 0 1px 0 rgba(255,255,255,0.96)',
+        background: '#F8FAFC',
+        borderColor: TRACE_BORDER,
+        boxShadow: '0 24px 48px rgba(15, 23, 42, 0.05), 0 12px 24px rgba(15, 23, 42, 0.03)',
       }}
     >
-      {children}
+      <div className="rounded-[28px] overflow-hidden border" style={{ borderColor: 'rgba(0,0,0,0.02)', background: TRACE_PANEL, boxShadow: '0 4px 12px rgba(15, 23, 42, 0.02)' }}>
+        {children}
+      </div>
     </div>
   )
 }
 
 function StatusTag({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'success' | 'warn' | 'dark' }) {
-  const toneClasses =
+  const toneStyle =
     tone === 'success'
-      ? 'border-[#C7D4BE] bg-[#EAF2E5] text-[#4B6341]'
+      ? { border: '1px solid rgba(165,193,171,0.54)', background: '#EEF3EC', color: '#4F6558' }
       : tone === 'warn'
-      ? 'border-[#E7D3BC] bg-[#F5E6D7] text-[#8D5E34]'
+      ? { border: '1px solid rgba(224,197,138,0.52)', background: '#FFF4DB', color: '#8D5E34' }
       : tone === 'dark'
-      ? 'border-[#B4C2C7] bg-[#E6EEF1] text-[#41535B]'
-      : 'border-[#D9D0BF] bg-[#F5EEDA] text-[#6B6555]'
-  return <span className={`inline-flex rounded-full border px-3.5 py-1.5 text-[12px] font-semibold ${toneClasses}`}>{children}</span>
+      ? { border: '1px solid rgba(123,108,135,0.22)', background: '#F4EAF0', color: TRACE_ACCENT }
+      : { border: `1px solid ${TRACE_BORDER_SOFT}`, background: TRACE_ALT, color: TRACE_MUTED }
+  return <span className="inline-flex rounded-full px-3.5 py-1.5 text-[12px] font-semibold" style={toneStyle}>{children}</span>
 }
 
 function IntentJournalView() {
@@ -766,6 +822,9 @@ function IntentJournalView() {
       </section>
 
       <section className="mb-5">
+        <AIStrip>
+          The highest volume of intent failures (84 intents) is concentrated around ICICI Bank timeouts in the W15 cohort. The confidence interval for auto-resolving these is 92% based on previous batch cycles.
+        </AIStrip>
         <ToolbarShell
           title="Intent Journal"
           subtitle="Primary debug surface for payment-level truth — search any payout and inspect the exact operational trail."
@@ -784,11 +843,11 @@ function IntentJournalView() {
       </section>
 
       <WideTableCard>
-        <div className="m-3 max-h-[720px] overflow-auto rounded-[30px] bg-[#FFFFFF] shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+        <div className="m-3 max-h-[720px] overflow-auto rounded-[30px]" style={{ background: TRACE_CREAM, boxShadow: 'inset 1px 1px 0 rgba(255,255,255,0.92), inset 5px 5px 12px rgba(118,84,111,0.08)' }}>
           <table className="min-w-[1400px] w-full">
-            <thead className="sticky top-0 z-20 border-b border-[#EAE5DC] bg-[linear-gradient(180deg,#FBFAF7,#F3F0E8)]">
-              <tr className="text-left text-[13px] font-bold uppercase tracking-[0.08em] text-[#667085]">
-                <th className="sticky left-0 z-30 px-6 py-5 bg-[linear-gradient(180deg,#FBFAF7,#F3F0E8)]" style={{ boxShadow: '18px 0 24px rgba(15,23,42,0.08)' }}><TraceHeadLabel active={sortKey === 'intentId'} direction={sortDirection} onClick={() => onSort('intentId')}>Intent / Seller</TraceHeadLabel></th>
+            <thead className="sticky top-0 z-20 border-b" style={{ borderColor: TRACE_BORDER_SOFT, background: TRACE_TABLE_HEAD }}>
+              <tr className="text-left text-[13px] font-bold uppercase tracking-[0.08em]" style={{ color: TRACE_MUTED }}>
+                <th className="sticky left-0 z-30 px-6 py-5" style={{ background: TRACE_TABLE_HEAD, boxShadow: '18px 0 24px rgba(118,84,111,0.08)' }}><TraceHeadLabel active={sortKey === 'intentId'} direction={sortDirection} onClick={() => onSort('intentId')}>Intent / Seller</TraceHeadLabel></th>
                 <th className="px-6 py-5"><TraceHeadLabel active={sortKey === 'amount'} direction={sortDirection} onClick={() => onSort('amount')}>Amount</TraceHeadLabel></th>
                 <th className="px-6 py-5"><TraceHeadLabel active={sortKey === 'psp'} direction={sortDirection} onClick={() => onSort('psp')}>PSP</TraceHeadLabel></th>
                 <th className="px-6 py-5"><TraceHeadLabel active={sortKey === 'rail'} direction={sortDirection} onClick={() => onSort('rail')}>Rail</TraceHeadLabel></th>
@@ -802,19 +861,20 @@ function IntentJournalView() {
             <tbody>
               {rows.map((row, index) => {
                 const expanded = expandedIntent === row.intentId
+                const rowBg = index % 2 === 0 ? TRACE_CREAM : TRACE_ALT
 
                 return (
                   <Fragment key={row.intentId}>
-                    <tr key={row.intentId} className={`border-b border-[#F0ECE4] ${index % 2 === 0 ? 'bg-[#FFFFFF]' : 'bg-[#FCFBF8]'} transition-colors hover:bg-[#F8F5EE]`}>
+                    <tr key={row.intentId} className="border-b transition-colors" style={{ borderColor: TRACE_BORDER_SOFT, background: rowBg }}>
                       <td
                         className="sticky left-0 z-10 px-6 py-5"
-                        style={{ background: index % 2 === 0 ? '#FFFFFF' : '#FCFBF8', boxShadow: '14px 0 22px rgba(15,23,42,0.08)' }}
+                        style={{ background: rowBg, boxShadow: '14px 0 22px rgba(118,84,111,0.08)' }}
                       >
-                        <div className="text-[18px] font-bold text-[#111827]" style={{ fontFamily: FONT_MONO }}>{row.intentId}</div>
-                        <div className="mt-2 text-[16px] font-semibold text-[#344054]">{row.seller}</div>
-                        <div className="mt-1 text-[14px] text-[#7B8190]">{row.sellerId}</div>
+                        <div className="text-[18px] font-bold" style={{ fontFamily: FONT_MONO, color: TRACE_TEXT }}>{row.intentId}</div>
+                        <div className="mt-2 text-[16px] font-semibold" style={{ color: TRACE_TEXT }}>{row.seller}</div>
+                        <div className="mt-1 text-[14px]" style={{ color: TRACE_MUTED }}>{row.sellerId}</div>
                       </td>
-                      <td className="px-6 py-5 text-[19px] font-black text-[#182230]">{row.amount}</td>
+                      <td className="px-6 py-5 text-[19px] font-black" style={{ color: TRACE_TEXT }}>{row.amount}</td>
                       <td className="px-6 py-5">
                         <div className="flex items-center">
                           <EntityLogo name={row.psp} kind="psp" size={48} className="rounded-[20px]" />
@@ -829,19 +889,19 @@ function IntentJournalView() {
                         </StatusTag>
                       </td>
                       <td className="px-6 py-5">
-                        <div className="text-[15px] font-bold text-[#1D2939]" style={{ fontFamily: FONT_MONO }}>{row.traceId}</div>
+                        <div className="text-[15px] font-bold" style={{ fontFamily: FONT_MONO, color: TRACE_TEXT }}>{row.traceId}</div>
                         <div className="mt-2 flex items-center gap-3">
                           {inferBankNameFromReference(row.bankRef) ? (
                             <EntityLogo name={inferBankNameFromReference(row.bankRef) ?? ''} kind="bank" size={42} className="rounded-[18px]" />
                           ) : null}
-                          <div className="text-[14px] text-[#7B8190]">{row.bankRef}</div>
+                          <div className="text-[14px]" style={{ color: TRACE_MUTED }}>{row.bankRef}</div>
                         </div>
                       </td>
                       <td className="px-6 py-5">
-                        <div className="text-[16px] font-semibold text-[#1D2939]">{row.lastEvent}</div>
-                        <div className="mt-2 text-[14px] text-[#7B8190]">Updated {row.updated}</div>
+                        <div className="text-[16px] font-semibold" style={{ color: TRACE_TEXT }}>{row.lastEvent}</div>
+                        <div className="mt-2 text-[14px]" style={{ color: TRACE_MUTED }}>Updated {row.updated}</div>
                       </td>
-                      <td className="px-6 py-5 text-[15px] text-[#5F6C80]">{row.explainability}</td>
+                      <td className="px-6 py-5 text-[15px]" style={{ color: TRACE_MUTED }}>{row.explainability}</td>
                       <td className="px-6 py-5 text-right">
                         <TraceActionButton
                           tone={row.status === 'SUCCESS' ? 'olive' : row.status === 'FAILED' || row.status === 'DLQ' ? 'slate' : 'stone'}
@@ -852,15 +912,20 @@ function IntentJournalView() {
                       </td>
                     </tr>
                     {expanded ? (
-                      <tr key={`${row.intentId}-drawer`} className="border-b border-[#EAE5DC] bg-[#F8F5EE]">
+                      <tr key={`${row.intentId}-drawer`} className="border-b" style={{ borderColor: TRACE_BORDER_SOFT, background: TRACE_HOVER }}>
                         <td colSpan={9} className="px-6 py-5">
                           <div
-                            className="grid gap-4 rounded-[24px] border border-[#D6CFBF] bg-[linear-gradient(145deg,#F7F1E4,#EFE4CF)] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),8px_8px_18px_rgba(188,177,147,0.14)] md:grid-cols-4"
-                            style={{ animation: 'traceDrawerIn 220ms ease-out' }}
+                            className="grid gap-4 rounded-[24px] border p-5 md:grid-cols-4"
+                            style={{
+                              borderColor: TRACE_BORDER,
+                              background: TRACE_DRAWER,
+                              boxShadow: 'inset 1px 1px 0 rgba(255,255,255,0.85), 8px 8px 18px rgba(118,84,111,0.10)',
+                              animation: 'traceDrawerIn 220ms ease-out',
+                            }}
                           >
                             <div>
-                              <div className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#7A735F]">Trace Path</div>
-                              <div className="mt-2 text-[15px] font-semibold text-[#1D2939]">{row.psp} dispatch -&gt; {row.lastEvent}</div>
+                              <div className="text-[12px] font-bold uppercase tracking-[0.12em]" style={{ color: TRACE_MUTED }}>Trace Path</div>
+                              <div className="mt-2 text-[15px] font-semibold" style={{ color: TRACE_TEXT }}>{row.psp} dispatch -&gt; {row.lastEvent}</div>
                               <div className="mt-3 flex flex-wrap gap-2">
                                 <TraceSubChip tone="olive">Dispatch ack</TraceSubChip>
                                 <TraceSubChip tone={row.status === 'SUCCESS' ? 'olive' : 'stone'}>{row.lastEvent}</TraceSubChip>
@@ -868,12 +933,12 @@ function IntentJournalView() {
                               </div>
                             </div>
                             <div>
-                              <div className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#7A735F]">Operator Read</div>
-                              <div className="mt-2 text-[15px] text-[#5E6557]">{row.explainability}. Bank ref: {row.bankRef}.</div>
+                              <div className="text-[12px] font-bold uppercase tracking-[0.12em]" style={{ color: TRACE_MUTED }}>Operator Read</div>
+                              <div className="mt-2 text-[15px]" style={{ color: TRACE_MUTED }}>{row.explainability}. Bank ref: {row.bankRef}.</div>
                             </div>
                             <div>
-                              <div className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#7A735F]">Recommended Move</div>
-                              <div className="mt-2 text-[15px] text-[#5E6557]">{row.action} for this intent. Escalate if it remains unchanged beyond the next polling window.</div>
+                              <div className="text-[12px] font-bold uppercase tracking-[0.12em]" style={{ color: TRACE_MUTED }}>Recommended Move</div>
+                              <div className="mt-2 text-[15px]" style={{ color: TRACE_MUTED }}>{row.action} for this intent. Escalate if it remains unchanged beyond the next polling window.</div>
                             </div>
                             <div className="flex items-start justify-end gap-2 md:justify-start">
                               <TraceActionButton tone="olive">Open intent trail</TraceActionButton>
@@ -889,8 +954,8 @@ function IntentJournalView() {
             </tbody>
           </table>
         </div>
-        <div className="mx-3 mb-3 flex flex-col gap-4 rounded-[24px] border border-[#E8E1D2] bg-[#FFFFFF] px-6 py-5 md:flex-row md:items-center md:justify-between" style={{ boxShadow: '0 10px 20px rgba(15,23,42,0.04)' }}>
-          <div className="text-[15px] text-[#667085]">Showing <span className="font-bold text-[#152218]">{rows.length}</span> of 124 intents in this trace window</div>
+        <div className="mx-3 mb-3 flex flex-col gap-4 rounded-[24px] border px-6 py-5 md:flex-row md:items-center md:justify-between" style={{ borderColor: TRACE_BORDER, background: TRACE_CREAM, boxShadow: '8px 8px 18px rgba(118,84,111,0.08), inset 1px 1px 0 rgba(255,255,255,0.92)' }}>
+          <div className="text-[15px]" style={{ color: TRACE_MUTED }}>Showing <span className="font-bold" style={{ color: TRACE_TEXT }}>{rows.length}</span> of 124 intents in this trace window</div>
           <div className="flex items-center gap-2">
             {['1', '2', '3', '4'].map((page) => (
               <button
@@ -899,16 +964,16 @@ function IntentJournalView() {
                 style={
                   page === '1'
                     ? {
-                        background: 'linear-gradient(145deg, #BDC9B8 0%, #AEB9A8 100%)',
-                        borderColor: '#A1AC9D',
-                        color: '#243225',
-                        boxShadow: '6px 6px 14px rgba(161,172,157,0.24), -6px -6px 14px rgba(217,231,211,0.72), inset 0 1px 0 rgba(255,255,255,0.44)',
+                        background: '#F4EAF0',
+                        borderColor: 'rgba(123,108,135,0.22)',
+                        color: TRACE_ACCENT,
+                        boxShadow: NEUMO_POP,
                       }
                     : {
-                        background: 'linear-gradient(145deg, #F7F0DF 0%, #EFE4C9 100%)',
-                        borderColor: '#E1D4B2',
-                        color: '#6B6555',
-                        boxShadow: '5px 5px 12px rgba(188,177,147,0.18), -5px -5px 12px rgba(251,237,198,0.68)',
+                        background: TRACE_CREAM,
+                        borderColor: TRACE_BORDER,
+                        color: TRACE_MUTED,
+                        boxShadow: NEUMO_POP,
                       }
                 }
               >
@@ -984,6 +1049,9 @@ function ErrorTaxonomyView() {
       </section>
 
       <section className="mb-5">
+        <AIStrip>
+          Recommend shifting volume from PayU due to an emerging error cluster. Detected a 2.3x spike in GATEWAY_TIMEOUTs over the last 45 minutes targeting urgent traffic.
+        </AIStrip>
         <ToolbarShell
           title="Error Taxonomy"
           subtitle="Root-cause table for clustered payout failures, retry behavior, and financial blast radius."
@@ -1001,11 +1069,11 @@ function ErrorTaxonomyView() {
       </section>
 
       <WideTableCard>
-        <div className="m-3 max-h-[720px] overflow-auto rounded-[30px] bg-[#FFFFFF] shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+        <div className="m-3 max-h-[720px] overflow-auto rounded-[30px]" style={{ background: TRACE_CREAM, boxShadow: 'inset 1px 1px 0 rgba(255,255,255,0.92), inset 5px 5px 12px rgba(118,84,111,0.08)' }}>
           <table className="min-w-[1380px] w-full">
-            <thead className="sticky top-0 z-20 border-b border-[#EAE5DC] bg-[linear-gradient(180deg,#FBFAF7,#F3F0E8)]">
-              <tr className="text-left text-[13px] font-bold uppercase tracking-[0.08em] text-[#667085]">
-                <th className="sticky left-0 z-30 px-6 py-5 bg-[linear-gradient(180deg,#FBFAF7,#F3F0E8)]" style={{ boxShadow: '18px 0 24px rgba(15,23,42,0.08)' }}><TraceHeadLabel active={sortKey === 'family'} direction={sortDirection} onClick={() => onSort('family')}>Error Family</TraceHeadLabel></th>
+            <thead className="sticky top-0 z-20 border-b" style={{ borderColor: TRACE_BORDER_SOFT, background: TRACE_TABLE_HEAD }}>
+              <tr className="text-left text-[13px] font-bold uppercase tracking-[0.08em]" style={{ color: TRACE_MUTED }}>
+                <th className="sticky left-0 z-30 px-6 py-5" style={{ background: TRACE_TABLE_HEAD, boxShadow: '18px 0 24px rgba(118,84,111,0.08)' }}><TraceHeadLabel active={sortKey === 'family'} direction={sortDirection} onClick={() => onSort('family')}>Error Family</TraceHeadLabel></th>
                 <th className="px-6 py-5"><TraceHeadLabel active={sortKey === 'domain'} direction={sortDirection} onClick={() => onSort('domain')}>Domain</TraceHeadLabel></th>
                 <th className="px-6 py-5"><TraceHeadLabel active={sortKey === 'code'} direction={sortDirection} onClick={() => onSort('code')}>Code Cluster</TraceHeadLabel></th>
                 <th className="px-6 py-5"><TraceHeadLabel active={sortKey === 'intents'} direction={sortDirection} onClick={() => onSort('intents')}>Failed Intents</TraceHeadLabel></th>
@@ -1017,21 +1085,23 @@ function ErrorTaxonomyView() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, index) => (
-                <tr key={row.code} className={`border-b border-[#F0ECE4] ${index % 2 === 0 ? 'bg-[#FFFFFF]' : 'bg-[#FCFBF8]'} hover:bg-[#F8F5EE] transition-colors`}>
+              {rows.map((row, index) => {
+                const rowBg = index % 2 === 0 ? TRACE_CREAM : TRACE_ALT
+                return (
+                <tr key={row.code} className="border-b transition-colors" style={{ borderColor: TRACE_BORDER_SOFT, background: rowBg }}>
                   <td
                     className="sticky left-0 z-10 px-6 py-5"
-                    style={{ background: index % 2 === 0 ? '#FFFFFF' : '#FCFBF8', boxShadow: '14px 0 22px rgba(15,23,42,0.08)' }}
+                    style={{ background: rowBg, boxShadow: '14px 0 22px rgba(118,84,111,0.08)' }}
                   >
-                    <div className="text-[17px] font-bold text-[#111827]">{row.family}</div>
+                    <div className="text-[17px] font-bold" style={{ color: TRACE_TEXT }}>{row.family}</div>
                   </td>
                   <td className="px-6 py-5"><StatusTag tone={row.domain === 'Provider' ? 'neutral' : row.domain === 'Bank' ? 'warn' : 'dark'}>{row.domain}</StatusTag></td>
-                  <td className="px-6 py-5 text-[15px] font-bold text-[#1D2939]" style={{ fontFamily: FONT_MONO }}>{row.code}</td>
-                  <td className="px-6 py-5 text-[18px] font-black text-[#101828]">{row.intents}</td>
-                  <td className="px-6 py-5 text-[16px] font-semibold text-[#4B6341]">{row.retrySuccess}</td>
-                  <td className="px-6 py-5 text-[18px] font-black text-[#101828]">{row.money}</td>
+                  <td className="px-6 py-5 text-[15px] font-bold" style={{ fontFamily: FONT_MONO, color: TRACE_TEXT }}>{row.code}</td>
+                  <td className="px-6 py-5 text-[18px] font-black" style={{ color: TRACE_TEXT }}>{row.intents}</td>
+                  <td className="px-6 py-5 text-[16px] font-semibold" style={{ color: '#4F6558' }}>{row.retrySuccess}</td>
+                  <td className="px-6 py-5 text-[18px] font-black" style={{ color: TRACE_TEXT }}>{row.money}</td>
                   <td className="px-6 py-5">
-                    <div className="flex items-center gap-3 text-[15px] text-[#475467]">
+                    <div className="flex items-center gap-3 text-[15px]" style={{ color: TRACE_MUTED }}>
                       {inferEntityFromHotspot(row.hotspot) ? (
                         <EntityLogo
                           name={inferEntityFromHotspot(row.hotspot)?.name ?? ''}
@@ -1043,19 +1113,19 @@ function ErrorTaxonomyView() {
                       <span>{row.hotspot}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-5 text-[15px] text-[#667085]">{row.cause}</td>
+                  <td className="px-6 py-5 text-[15px]" style={{ color: TRACE_MUTED }}>{row.cause}</td>
                   <td className="px-6 py-5 text-right">
                     <TraceActionButton tone={row.domain === 'Provider' ? 'slate' : row.domain === 'Bank' ? 'stone' : 'olive'}>
                       {row.action}
                     </TraceActionButton>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
-        <div className="mx-3 mb-3 flex flex-col gap-4 rounded-[24px] border border-[#E8E1D2] bg-[#FFFFFF] px-6 py-5 md:flex-row md:items-center md:justify-between" style={{ boxShadow: '0 10px 20px rgba(15,23,42,0.04)' }}>
-          <div className="text-[15px] text-[#667085]">Tracking <span className="font-bold text-[#152218]">{rows.length}</span> active error clusters with retry and value context</div>
+        <div className="mx-3 mb-3 flex flex-col gap-4 rounded-[24px] border px-6 py-5 md:flex-row md:items-center md:justify-between" style={{ borderColor: TRACE_BORDER, background: TRACE_CREAM, boxShadow: '8px 8px 18px rgba(118,84,111,0.08), inset 1px 1px 0 rgba(255,255,255,0.92)' }}>
+          <div className="text-[15px]" style={{ color: TRACE_MUTED }}>Tracking <span className="font-bold" style={{ color: TRACE_TEXT }}>{rows.length}</span> active error clusters with retry and value context</div>
           <div className="flex items-center gap-2">
             <TraceActionButton tone="stone">Export taxonomy evidence</TraceActionButton>
             <TraceActionButton tone="olive">Open Queue</TraceActionButton>
@@ -1133,6 +1203,9 @@ function EventExplorerView() {
       </section>
 
       <section className="mb-5">
+        <AIStrip>
+          Detected 41 polling events misaligned with statement confirmation records. Auto-reconciliation paused. Recommend verifying the raw SFTP file integrity from HDFC endpoints.
+        </AIStrip>
         <ToolbarShell
           title="Event Explorer (Advanced)"
           subtitle="Raw event visibility across webhook, poll, statement, and parser layers with trace-level drilldowns."
@@ -1150,11 +1223,11 @@ function EventExplorerView() {
       </section>
 
       <WideTableCard>
-        <div className="m-3 max-h-[720px] overflow-auto rounded-[30px] bg-[#FFFFFF] shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
+        <div className="m-3 max-h-[720px] overflow-auto rounded-[30px]" style={{ background: TRACE_CREAM, boxShadow: 'inset 1px 1px 0 rgba(255,255,255,0.92), inset 5px 5px 12px rgba(118,84,111,0.08)' }}>
           <table className="min-w-[1440px] w-full">
-            <thead className="sticky top-0 z-20 border-b border-[#EAE5DC] bg-[linear-gradient(180deg,#FBFAF7,#F3F0E8)]">
-              <tr className="text-left text-[13px] font-bold uppercase tracking-[0.08em] text-[#667085]">
-                <th className="sticky left-0 z-30 px-6 py-5 bg-[linear-gradient(180deg,#FBFAF7,#F3F0E8)]" style={{ boxShadow: '18px 0 24px rgba(15,23,42,0.08)' }}><TraceHeadLabel active={sortKey === 'eventId'} direction={sortDirection} onClick={() => onSort('eventId')}>Event ID</TraceHeadLabel></th>
+            <thead className="sticky top-0 z-20 border-b" style={{ borderColor: TRACE_BORDER_SOFT, background: TRACE_TABLE_HEAD }}>
+              <tr className="text-left text-[13px] font-bold uppercase tracking-[0.08em]" style={{ color: TRACE_MUTED }}>
+                <th className="sticky left-0 z-30 px-6 py-5" style={{ background: TRACE_TABLE_HEAD, boxShadow: '18px 0 24px rgba(118,84,111,0.08)' }}><TraceHeadLabel active={sortKey === 'eventId'} direction={sortDirection} onClick={() => onSort('eventId')}>Event ID</TraceHeadLabel></th>
                 <th className="px-6 py-5"><TraceHeadLabel active={sortKey === 'traceId'} direction={sortDirection} onClick={() => onSort('traceId')}>Trace / Intent</TraceHeadLabel></th>
                 <th className="px-6 py-5"><TraceHeadLabel active={sortKey === 'source'} direction={sortDirection} onClick={() => onSort('source')}>Source</TraceHeadLabel></th>
                 <th className="px-6 py-5"><TraceHeadLabel active={sortKey === 'stage'} direction={sortDirection} onClick={() => onSort('stage')}>Stage</TraceHeadLabel></th>
@@ -1169,27 +1242,28 @@ function EventExplorerView() {
             <tbody>
               {rows.map((row, index) => {
                 const expanded = expandedEvent === row.eventId
+                const rowBg = index % 2 === 0 ? TRACE_CREAM : TRACE_ALT
 
                 return (
                   <Fragment key={row.eventId}>
-                    <tr key={row.eventId} className={`border-b border-[#F0ECE4] ${index % 2 === 0 ? 'bg-[#FFFFFF]' : 'bg-[#FCFBF8]'} transition-colors hover:bg-[#F8F5EE]`}>
+                    <tr key={row.eventId} className="border-b transition-colors" style={{ borderColor: TRACE_BORDER_SOFT, background: rowBg }}>
                       <td
-                        className="sticky left-0 z-10 px-6 py-5 text-[15px] font-bold text-[#1D2939]"
-                        style={{ fontFamily: FONT_MONO, background: index % 2 === 0 ? '#FFFFFF' : '#FCFBF8', boxShadow: '14px 0 22px rgba(15,23,42,0.08)' }}
+                        className="sticky left-0 z-10 px-6 py-5 text-[15px] font-bold"
+                        style={{ fontFamily: FONT_MONO, color: TRACE_TEXT, background: rowBg, boxShadow: '14px 0 22px rgba(118,84,111,0.08)' }}
                       >
                         {row.eventId}
                       </td>
                       <td className="px-6 py-5">
-                        <div className="text-[15px] font-bold text-[#1D2939]" style={{ fontFamily: FONT_MONO }}>{row.traceId}</div>
-                        <div className="mt-2 text-[14px] text-[#7B8190]">{row.intentId}</div>
+                        <div className="text-[15px] font-bold" style={{ fontFamily: FONT_MONO, color: TRACE_TEXT }}>{row.traceId}</div>
+                        <div className="mt-2 text-[14px]" style={{ color: TRACE_MUTED }}>{row.intentId}</div>
                       </td>
                       <td className="px-6 py-5"><StatusTag tone={row.source === 'Webhook' ? 'neutral' : row.source === 'Statement' ? 'warn' : 'dark'}>{row.source}</StatusTag></td>
-                      <td className="px-6 py-5 text-[16px] font-semibold text-[#111827]">{row.stage}</td>
-                      <td className="px-6 py-5 text-[15px] text-[#475467]">{row.receivedAt}</td>
-                      <td className="px-6 py-5 text-[16px] font-bold text-[#111827]">{row.latency}</td>
-                      <td className="px-6 py-5 text-[15px] text-[#475467]">{row.payload}</td>
+                      <td className="px-6 py-5 text-[16px] font-semibold" style={{ color: TRACE_TEXT }}>{row.stage}</td>
+                      <td className="px-6 py-5 text-[15px]" style={{ color: TRACE_MUTED }}>{row.receivedAt}</td>
+                      <td className="px-6 py-5 text-[16px] font-bold" style={{ color: TRACE_TEXT }}>{row.latency}</td>
+                      <td className="px-6 py-5 text-[15px]" style={{ color: TRACE_MUTED }}>{row.payload}</td>
                       <td className="px-6 py-5"><StatusTag tone={row.status === 'Healthy' ? 'success' : row.status === 'Delayed' ? 'warn' : 'dark'}>{row.status}</StatusTag></td>
-                      <td className="px-6 py-5 text-[15px] text-[#667085]">{row.note}</td>
+                      <td className="px-6 py-5 text-[15px]" style={{ color: TRACE_MUTED }}>{row.note}</td>
                       <td className="px-6 py-5 text-right">
                         <TraceActionButton
                           tone={row.status === 'Healthy' ? 'olive' : row.status === 'Delayed' ? 'stone' : 'slate'}
@@ -1200,19 +1274,24 @@ function EventExplorerView() {
                       </td>
                     </tr>
                     {expanded ? (
-                      <tr key={`${row.eventId}-drawer`} className="border-b border-[#EAE5DC] bg-[#F8F5EE]">
+                      <tr key={`${row.eventId}-drawer`} className="border-b" style={{ borderColor: TRACE_BORDER_SOFT, background: TRACE_HOVER }}>
                         <td colSpan={10} className="px-6 py-5">
                           <div
-                            className="grid gap-4 rounded-[24px] border border-[#D6CFBF] bg-[linear-gradient(145deg,#F7F1E4,#EFE4CF)] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),8px_8px_18px_rgba(188,177,147,0.14)] md:grid-cols-4"
-                            style={{ animation: 'traceDrawerIn 220ms ease-out' }}
+                            className="grid gap-4 rounded-[24px] border p-5 md:grid-cols-4"
+                            style={{
+                              borderColor: TRACE_BORDER,
+                              background: TRACE_DRAWER,
+                              boxShadow: 'inset 1px 1px 0 rgba(255,255,255,0.85), 8px 8px 18px rgba(118,84,111,0.10)',
+                              animation: 'traceDrawerIn 220ms ease-out',
+                            }}
                           >
                             <div>
-                              <div className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#7A735F]">Trace Anchor</div>
-                              <div className="mt-2 text-[15px] font-semibold text-[#1D2939]" style={{ fontFamily: FONT_MONO }}>{row.traceId}</div>
+                              <div className="text-[12px] font-bold uppercase tracking-[0.12em]" style={{ color: TRACE_MUTED }}>Trace Anchor</div>
+                              <div className="mt-2 text-[15px] font-semibold" style={{ fontFamily: FONT_MONO, color: TRACE_TEXT }}>{row.traceId}</div>
                             </div>
                             <div>
-                              <div className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#7A735F]">Payload Summary</div>
-                              <div className="mt-2 text-[15px] text-[#5E6557]">{row.payload} captured from {row.source}. Stage: {row.stage}.</div>
+                              <div className="text-[12px] font-bold uppercase tracking-[0.12em]" style={{ color: TRACE_MUTED }}>Payload Summary</div>
+                              <div className="mt-2 text-[15px]" style={{ color: TRACE_MUTED }}>{row.payload} captured from {row.source}. Stage: {row.stage}.</div>
                               <div className="mt-3 flex flex-wrap gap-2">
                                 <TraceSubChip tone="slate">{row.source}</TraceSubChip>
                                 <TraceSubChip tone={row.status === 'Healthy' ? 'olive' : row.status === 'Delayed' ? 'stone' : 'slate'}>{row.status}</TraceSubChip>
@@ -1220,8 +1299,8 @@ function EventExplorerView() {
                               </div>
                             </div>
                             <div>
-                              <div className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#7A735F]">Explainability</div>
-                              <div className="mt-2 text-[15px] text-[#5E6557]">{row.note}. Latency landed at {row.latency}.</div>
+                              <div className="text-[12px] font-bold uppercase tracking-[0.12em]" style={{ color: TRACE_MUTED }}>Explainability</div>
+                              <div className="mt-2 text-[15px]" style={{ color: TRACE_MUTED }}>{row.note}. Latency landed at {row.latency}.</div>
                             </div>
                             <div className="flex items-start justify-end gap-2 md:justify-start">
                               <TraceActionButton tone="slate">Open raw payload</TraceActionButton>
@@ -1237,8 +1316,8 @@ function EventExplorerView() {
             </tbody>
           </table>
         </div>
-        <div className="mx-3 mb-3 flex flex-col gap-4 rounded-[24px] border border-[#E8E1D2] bg-[#FFFFFF] px-6 py-5 md:flex-row md:items-center md:justify-between" style={{ boxShadow: '0 10px 20px rgba(15,23,42,0.04)' }}>
-          <div className="text-[15px] text-[#667085]">Showing <span className="font-bold text-[#152218]">{rows.length}</span> of 286 events inside this explorer window</div>
+        <div className="mx-3 mb-3 flex flex-col gap-4 rounded-[24px] border px-6 py-5 md:flex-row md:items-center md:justify-between" style={{ borderColor: TRACE_BORDER, background: TRACE_CREAM, boxShadow: '8px 8px 18px rgba(118,84,111,0.08), inset 1px 1px 0 rgba(255,255,255,0.92)' }}>
+          <div className="text-[15px]" style={{ color: TRACE_MUTED }}>Showing <span className="font-bold" style={{ color: TRACE_TEXT }}>{rows.length}</span> of 286 events inside this explorer window</div>
           <div className="flex items-center gap-2">
             <TraceActionButton tone="stone">Prev</TraceActionButton>
             <TraceActionButton tone="olive">1</TraceActionButton>
@@ -1255,13 +1334,20 @@ export default function TracePage() {
   const [activeTab, setActiveTab] = useState<TraceTab>('Intent Journal')
 
   return (
-    <DashboardLayout>
-      <div className="font-sans">
+    <DashboardLayout mainClassName="relative z-10 !px-2 md:!px-2">
+      <div className="font-sans relative">
+        <div className="pointer-events-none fixed inset-0 z-0" aria-hidden="true" style={{ background: '#F0F2F5' }}>
+          <div className="absolute inset-0 bg-noise opacity-30" />
+          <div className="absolute inset-0" style={{ background: TRACE_PAGE_SPOTS }} />
+          <div className="absolute -left-20 top-24 h-72 w-72 rounded-full opacity-60" style={{ background: 'rgba(255,255,255,0.5)', filter: 'blur(120px)' }} />
+        </div>
+
+        <div className="relative z-10">
         <section className="mb-6 flex items-center justify-between gap-4">
           <div>
             <TraceHeaderPill>Trace & Debug</TraceHeaderPill>
-            <h1 className="mt-4 text-[38px] font-black leading-none tracking-[-0.05em] text-[#0F172A]">Intent-level truth, system-level failure context, and raw event visibility</h1>
-            <p className="mt-3 max-w-[980px] text-[18px] leading-8 text-[#667085]">
+            <h1 className="mt-4 text-[38px] font-black leading-none tracking-[-0.05em]" style={{ color: TRACE_TEXT }}>Intent-level truth, system-level failure context, and raw event visibility</h1>
+            <p className="mt-3 max-w-[980px] text-[18px] leading-8" style={{ color: TRACE_MUTED }}>
               TRACE is the operator workspace for proving what happened, why it happened, and where the payout system is breaking before support and finance lose time.
             </p>
           </div>
@@ -1288,6 +1374,7 @@ export default function TracePage() {
             }
           }
         `}</style>
+        </div>
       </div>
     </DashboardLayout>
   )

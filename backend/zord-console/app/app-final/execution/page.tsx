@@ -4,18 +4,45 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { DashboardLayout } from '@/components/fintech-dashboard'
 
 const FONT_MONO = "'IBM Plex Mono', monospace"
-const NEO_BASE = '#94A7AE'
-const NEO_LIGHT = '#AABFC6'
-const NEO_DARK = '#7E8E94'
-const NEO_INSET_LIGHT = '#AABFC6'
-const NEO_INSET_DARK = '#7E8E94'
-const NEO_CREAM = '#F5F8FB'
-const NEO_TEXT = '#23343A'
-const NEO_MUTED = '#5B6E75'
-const NEO_ACTIVE = '#3D5158'
-const EXECUTION_PAGE_BG = 'linear-gradient(180deg, #FCFBFA 0%, #F4F7FB 100%)'
+
+// Updated Base Theme to match the user's explicit request:
+const EXECUTION_PAGE_BG = '#F0F2F5'
+const NEO_BASE = '#FFFFFF'
+const NEO_CREAM = '#FFFFFF'
+const NEO_PRESSED = '#F8FAFC'
+const NEO_TEXT = '#0F172A'
+const NEO_MUTED = '#64748B'
+const NEO_DIM = '#94A3B8'
+
+// Premium Obsidian "Operational Recommendation" KPI styling (same as core)
+const ACCENT_SURFACE = 'linear-gradient(180deg, rgba(33,37,58,0.98) 0%, rgba(28,31,46,0.98) 100%)'
+const ACCENT_BORDER = 'rgba(255,255,255,0.07)'
+const ACCENT_TEXT = '#F0F2F5'
+const ACCENT_MUTED = 'rgba(240,242,245,0.72)'
+const ACCENT_SHADOW = 
+  '0 22px 52px rgba(20,22,38,0.30), 0 2px 8px rgba(20,22,38,0.22), inset 0 0.5px 0 rgba(255,255,255,0.10)'
+
+// Unified Light Glass Shell Shadows
+const SURFACE_BORDER = '1px solid rgba(0,0,0,0.06)'
+const SURFACE_BORDER_STRONG = '1px solid rgba(0,0,0,0.04)'
+const SHELL_SHADOW =
+  '0 12px 32px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.02)'
+const CARD_SHADOW =
+  '0 8px 24px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
+const INSET_SHADOW =
+  'inset 4px 4px 8px rgba(15, 23, 42, 0.04), inset -4px -4px 8px rgba(255, 255, 255, 0.8)'
+
 const EXECUTION_PAGE_SPOTS =
-  'radial-gradient(circle at 18% 10%, rgba(255,105,180,0.08), transparent 24%), radial-gradient(circle at 78% 8%, rgba(99,102,241,0.10), transparent 28%), radial-gradient(circle at 82% 72%, rgba(56,189,248,0.08), transparent 24%)'
+  'radial-gradient(circle at 18% 10%, rgba(255,255,255,0.44), transparent 28%), radial-gradient(circle at 78% 8%, rgba(220,222,228,0.28), transparent 32%), radial-gradient(circle at 82% 72%, rgba(230,232,236,0.32), transparent 28%)'
+
+const SIGNAL_HEALTHY_BG = 'rgba(50, 110, 65, 0.12)'
+const SIGNAL_HEALTHY_TEXT = '#184A24'
+const SIGNAL_WARN_BG = 'rgba(145, 105, 0, 0.12)'
+const SIGNAL_WARN_TEXT = '#5B4200'
+const SIGNAL_RISK_BG = 'rgba(160, 65, 45, 0.12)'
+const SIGNAL_RISK_TEXT = '#6C2312'
+const SIGNAL_INFO_BG = 'rgba(30, 80, 150, 0.12)'
+const SIGNAL_INFO_TEXT = '#123774'
 
 type ProviderView = 'Live status' | 'Latency' | 'Errors'
 type RailView = 'Scoreboard' | 'Load curve'
@@ -85,11 +112,11 @@ function HeaderPill({ children }: { children: ReactNode }) {
       style={{
         color: NEO_TEXT,
         background: NEO_CREAM,
-        border: '1px solid rgba(255,255,255,0.24)',
-        boxShadow: `6px 6px 14px ${NEO_DARK}, -6px -6px 14px ${NEO_LIGHT}`,
+        border: SURFACE_BORDER_STRONG,
+        boxShadow: CARD_SHADOW,
       }}
     >
-      <span className="h-2.5 w-2.5 rounded-full" style={{ background: NEO_TEXT }} />
+      <span className="h-2.5 w-2.5 rounded-full bg-[#6b6e7a]" />
       {children}
     </div>
   )
@@ -102,8 +129,8 @@ function UtilityPill({ children }: { children: ReactNode }) {
       style={{
         color: NEO_TEXT,
         background: NEO_CREAM,
-        border: '1px solid rgba(255,255,255,0.3)',
-        boxShadow: `6px 6px 16px ${NEO_DARK}, -5px -5px 14px rgba(255,255,255,0.8)`,
+        border: SURFACE_BORDER_STRONG,
+        boxShadow: CARD_SHADOW,
       }}
     >
       {children}
@@ -122,11 +149,11 @@ function SegmentedTabs<T extends string>({
 }) {
   return (
     <div
-      className="inline-flex items-center gap-1.5 rounded-[20px] p-1.5"
+      className="inline-flex items-center gap-1.5 rounded-[22px] p-1.5"
       style={{
-        background: NEO_BASE,
-        border: '2px solid rgba(255,255,255,0.2)',
-        boxShadow: '4px 4px 10px rgba(126,142,148,0.28), -4px -4px 10px rgba(255,255,255,0.76), inset 6px 6px 12px rgba(109,124,131,0.48), inset -6px -6px 12px rgba(185,206,214,0.38)',
+        background: NEO_PRESSED,
+        border: SURFACE_BORDER_STRONG,
+        boxShadow: INSET_SHADOW,
       }}
     >
       {items.map((item) => {
@@ -138,10 +165,11 @@ function SegmentedTabs<T extends string>({
             onClick={() => onChange(item)}
             className="rounded-[16px] px-4 py-2.5 text-[14px] font-bold transition-all"
             style={{
-              background: isActive ? NEO_CREAM : 'transparent',
-              color: isActive ? NEO_TEXT : '#61757C',
-              boxShadow: isActive ? '6px 6px 14px rgba(126,142,148,0.22), -4px -4px 12px rgba(255,255,255,0.8)' : 'none',
-              textShadow: isActive ? '1px 1px 0 rgba(255,255,255,0.24)' : '1px 1px 0 rgba(170,191,198,0.4)',
+              background: isActive ? ACCENT_SURFACE : 'transparent',
+              color: isActive ? ACCENT_TEXT : NEO_DIM,
+              boxShadow: isActive ? ACCENT_SHADOW : 'none',
+              border: isActive ? ACCENT_BORDER : '1px solid transparent',
+              textShadow: 'none',
             }}
           >
             {item}
@@ -170,14 +198,14 @@ function ShellCard({
       className={`rounded-[30px] p-7 ${className}`}
       style={{
         background: NEO_BASE,
-        border: '1px solid rgba(255,255,255,0.16)',
-        boxShadow: '18px 18px 36px rgba(126,142,148,0.28), -14px -14px 30px rgba(170,191,198,0.74), inset 1px 1px 0 rgba(255,255,255,0.24)',
+        border: SURFACE_BORDER,
+        boxShadow: SHELL_SHADOW,
       }}
     >
       <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <div className="text-[28px] font-black tracking-[-0.04em] text-[#0F172A]">{title}</div>
-          <div className="mt-2 max-w-[780px] text-[17px] leading-7 text-[#64748B]">{subtitle}</div>
+          <div className="text-[28px] font-black tracking-[-0.04em]" style={{ color: NEO_TEXT }}>{title}</div>
+          <div className="mt-2 max-w-[780px] text-[17px] leading-7" style={{ color: NEO_MUTED }}>{subtitle}</div>
         </div>
         {right}
       </div>
@@ -186,30 +214,43 @@ function ShellCard({
   )
 }
 
+// Emulating the premium edge dark neumorphism for KPIs across the board
 function SummaryCard({ label, value, note }: { label: string; value: string; note: string }) {
   return (
     <div
-      className="rounded-[28px] px-6 py-6"
+      className="rounded-[28px] px-6 py-6 transition-all duration-300 hover:-translate-y-1"
       style={{
-        background: NEO_BASE,
-        border: '1px solid rgba(255,255,255,0.12)',
-        boxShadow: '16px 16px 34px rgba(126,142,148,0.26), -12px -12px 26px rgba(170,191,198,0.72), inset 0 1px 0 rgba(255,255,255,0.24)',
+        background: ACCENT_SURFACE,
+        border: ACCENT_BORDER,
+        boxShadow: ACCENT_SHADOW,
       }}
     >
-      <div className="text-[12px] font-black uppercase tracking-[0.18em]" style={{ color: NEO_MUTED, textShadow: '1px 1px 0 rgba(170,191,198,0.48)' }}>{label}</div>
-      <div className="mt-4 text-[42px] font-black leading-none tracking-[-0.05em]" style={{ color: NEO_TEXT }}>{value}</div>
-      <div className="mt-3 text-[16px] leading-7" style={{ color: NEO_MUTED }}>{note}</div>
+      <div
+        className="inline-flex rounded-full px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.16em]"
+        style={{
+          color: ACCENT_MUTED,
+          background: 'rgba(255,255,255,0.08)',
+          border: '1px solid rgba(255,255,255,0.18)',
+          boxShadow: 'inset 1px 1px 0 rgba(255,255,255,0.18)',
+        }}
+      >
+        {label}
+      </div>
+      <div className="mt-4 text-[42px] font-black leading-none tracking-[-0.05em]" style={{ color: ACCENT_TEXT }}>{value}</div>
+      <div className="mt-3 text-[16px] leading-7" style={{ color: ACCENT_MUTED }}>{note}</div>
     </div>
   )
 }
 
-function StatusChip({ tone, children }: { tone: 'healthy' | 'watch' | 'critical'; children: ReactNode }) {
+function StatusChip({ tone, children }: { tone: 'healthy' | 'watch' | 'critical' | 'info'; children: ReactNode }) {
   const styles =
     tone === 'healthy'
-      ? { background: '#E7EFF2', border: '1px solid rgba(148,167,174,0.52)', color: NEO_ACTIVE }
+      ? { background: SIGNAL_HEALTHY_BG, border: '1px solid rgba(46,110,62,0.22)', color: SIGNAL_HEALTHY_TEXT }
+      : tone === 'info'
+      ? { background: SIGNAL_INFO_BG, border: '1px solid rgba(30,94,154,0.22)', color: SIGNAL_INFO_TEXT }
       : tone === 'watch'
-      ? { background: '#DBCFAC', border: '1px solid rgba(188,177,147,0.9)', color: '#5C4A2D' }
-      : { background: '#7E8E94', border: '1px solid rgba(126,142,148,0.9)', color: '#F8FAFC' }
+      ? { background: SIGNAL_WARN_BG, border: '1px solid rgba(158,112,0,0.22)', color: SIGNAL_WARN_TEXT }
+      : { background: SIGNAL_RISK_BG, border: '1px solid rgba(160,56,40,0.22)', color: SIGNAL_RISK_TEXT }
 
   return (
     <span className="inline-flex items-center rounded-full px-3 py-1.5 text-[12px] font-bold" style={styles}>
@@ -223,8 +264,9 @@ function MetricBar({ value, tone = 'blue' }: { value: number; tone?: 'blue' | 's
     <div
       className="h-3 w-full overflow-hidden rounded-full"
       style={{
-        background: NEO_BASE,
-        boxShadow: `inset 4px 4px 8px ${NEO_INSET_DARK}, inset -4px -4px 8px ${NEO_INSET_LIGHT}`,
+        background: NEO_PRESSED,
+        boxShadow: INSET_SHADOW,
+        border: SURFACE_BORDER_STRONG,
       }}
     >
       <div
@@ -233,9 +275,10 @@ function MetricBar({ value, tone = 'blue' }: { value: number; tone?: 'blue' | 's
           width: `${value}%`,
           background:
             tone === 'blue'
-              ? 'linear-gradient(90deg, #AABFC6 0%, #7E8E94 100%)'
-              : 'linear-gradient(90deg, #DDE7EB 0%, #94A7AE 100%)',
-          boxShadow: '0 6px 14px rgba(126,142,148,0.22)',
+              ? ACCENT_SURFACE
+              : `linear-gradient(90deg, #8E939E 0%, #727782 100%)`,
+          boxShadow: tone === 'blue' ? ACCENT_SHADOW : '6px 6px 14px rgba(100, 105, 122, 0.18)',
+          border: tone === 'blue' ? ACCENT_BORDER : 'none'
         }}
       />
     </div>
@@ -245,15 +288,23 @@ function MetricBar({ value, tone = 'blue' }: { value: number; tone?: 'blue' | 's
 function AIStrip({ children }: { children: ReactNode }) {
   return (
     <div
-      className="mb-6 rounded-[24px] px-5 py-4"
+      className="relative mb-6 overflow-hidden rounded-[24px] p-[2px] transition-all duration-300 hover:shadow-lg"
       style={{
-        background: NEO_BASE,
-        border: '1px solid rgba(255,255,255,0.12)',
-        boxShadow: `inset 6px 6px 12px ${NEO_INSET_DARK}, inset -6px -6px 12px ${NEO_INSET_LIGHT}`,
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.9) 0%, rgba(236,72,153,0.4) 50%, rgba(99,102,241,0.2) 100%)',
+        boxShadow: '0 12px 28px rgba(99,102,241,0.22), inset 1px 1px 0 rgba(255,255,255,0.9)',
       }}
     >
-      <div className="text-[12px] font-black uppercase tracking-[0.18em]" style={{ color: NEO_TEXT }}>AI execution note</div>
-      <div className="mt-2 text-[16px] leading-7" style={{ color: NEO_MUTED }}>{children}</div>
+      <div className="relative flex w-full flex-col gap-1 rounded-[22px] px-6 py-5 sm:flex-row sm:items-start" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f4f6f9 100%)' }}>
+        <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-[0_4px_12px_rgba(99,102,241,0.35)]" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', color: '#fff' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15 9L22 12L15 15L12 22L9 15L2 12L9 9L12 2Z"/></svg>
+        </div>
+        <div className="ml-1 sm:ml-3">
+          <div className="text-[11px] font-black uppercase tracking-[0.24em]" style={{ color: '#4f46e5' }}>Zord AI Readout</div>
+          <div className="mt-1 text-[16px] font-semibold leading-7" style={{ color: '#334155' }}>
+            {children}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -282,19 +333,19 @@ function PspHealthTable({ view }: { view: ProviderView }) {
         <tbody>
           {rows.map((row) => (
             <tr key={row.name}>
-              <td className="rounded-l-[22px] px-4 py-5" style={{ background: NEO_CREAM, borderTop: '1px solid rgba(255,255,255,0.34)', borderBottom: '1px solid rgba(255,255,255,0.34)', borderLeft: '1px solid rgba(255,255,255,0.34)', boxShadow: '8px 8px 18px rgba(126,142,148,0.12), -6px -6px 12px rgba(255,255,255,0.76)' }}>
+              <td className="rounded-l-[22px] px-4 py-5" style={{ background: NEO_CREAM, borderTop: SURFACE_BORDER, borderBottom: SURFACE_BORDER, borderLeft: SURFACE_BORDER, boxShadow: CARD_SHADOW }}>
                 <div className="text-[18px] font-bold" style={{ color: NEO_TEXT }}>{row.name}</div>
                 <div className="mt-2 text-[14px]" style={{ color: NEO_MUTED }}>{row.note}</div>
               </td>
-              <td className="px-4 py-5" style={{ background: NEO_CREAM, borderTop: '1px solid rgba(255,255,255,0.34)', borderBottom: '1px solid rgba(255,255,255,0.34)' }}>
+              <td className="px-4 py-5" style={{ background: NEO_CREAM, borderTop: SURFACE_BORDER, borderBottom: SURFACE_BORDER }}>
                 <StatusChip tone={row.status === 'Healthy' ? 'healthy' : row.status === 'Critical' ? 'critical' : 'watch'}>{row.status}</StatusChip>
               </td>
-              <td className="px-4 py-5" style={{ background: NEO_CREAM, borderTop: '1px solid rgba(255,255,255,0.34)', borderBottom: '1px solid rgba(255,255,255,0.34)' }}>
+              <td className="px-4 py-5" style={{ background: NEO_CREAM, borderTop: SURFACE_BORDER, borderBottom: SURFACE_BORDER }}>
                 <div className="text-[18px] font-bold" style={{ color: NEO_TEXT }}>{view === 'Latency' ? row.p95 : row.errorRate}</div>
               </td>
-              <td className="px-4 py-5 text-[17px] font-bold" style={{ background: NEO_CREAM, borderTop: '1px solid rgba(255,255,255,0.34)', borderBottom: '1px solid rgba(255,255,255,0.34)', color: NEO_TEXT }}>{row.webhookAccuracy}</td>
-              <td className="px-4 py-5 text-[16px]" style={{ background: NEO_CREAM, borderTop: '1px solid rgba(255,255,255,0.34)', borderBottom: '1px solid rgba(255,255,255,0.34)', color: NEO_MUTED }}>{row.route}</td>
-              <td className="rounded-r-[22px] px-4 py-5" style={{ background: NEO_CREAM, borderTop: '1px solid rgba(255,255,255,0.34)', borderBottom: '1px solid rgba(255,255,255,0.34)', borderRight: '1px solid rgba(255,255,255,0.34)' }}>
+              <td className="px-4 py-5 text-[17px] font-bold" style={{ background: NEO_CREAM, borderTop: SURFACE_BORDER, borderBottom: SURFACE_BORDER, color: NEO_TEXT }}>{row.webhookAccuracy}</td>
+              <td className="px-4 py-5 text-[16px]" style={{ background: NEO_CREAM, borderTop: SURFACE_BORDER, borderBottom: SURFACE_BORDER, color: NEO_MUTED }}>{row.route}</td>
+              <td className="rounded-r-[22px] px-4 py-5" style={{ background: NEO_CREAM, borderTop: SURFACE_BORDER, borderBottom: SURFACE_BORDER, borderRight: SURFACE_BORDER }}>
                 <MetricBar value={row.primaryBar} tone={row.tone as 'blue' | 'slate'} />
               </td>
             </tr>
@@ -312,16 +363,20 @@ export default function ExecutionPage() {
   const [routingView, setRoutingView] = useState<RoutingView>('Recommendations')
 
   return (
-    <DashboardLayout>
+    <DashboardLayout mainClassName="relative z-10 !px-2 md:!px-2">
       <div className="font-sans relative">
-        <div className="fixed inset-0 -z-10" style={{ background: EXECUTION_PAGE_BG }} />
-        <div className="fixed inset-0 -z-10" style={{ background: EXECUTION_PAGE_SPOTS }} />
+        <div className="pointer-events-none fixed inset-0 z-0" aria-hidden="true" style={{ background: EXECUTION_PAGE_BG }}>
+          <div className="absolute inset-0 bg-noise opacity-30" />
+          <div className="absolute inset-0" style={{ background: EXECUTION_PAGE_SPOTS }} />
+          <div className="absolute -left-20 top-24 h-72 w-72 rounded-full opacity-60" style={{ background: 'rgba(255,255,255,0.5)', filter: 'blur(120px)' }} />
+        </div>
 
+        <div className="relative z-10">
           <section className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <HeaderPill>Execution & Infra</HeaderPill>
-              <h1 className="mt-5 text-[42px] font-black leading-none tracking-[-0.05em] text-[#0F172A]">Provider health, rail reliability, and routing quality in one operator surface</h1>
-              <p className="mt-4 max-w-[980px] text-[18px] leading-8 text-[#64748B]">
+              <h1 className="mt-5 text-[42px] font-black leading-none tracking-[-0.05em]" style={{ color: NEO_TEXT }}>Provider health, rail reliability, and routing quality in one operator surface</h1>
+              <p className="mt-4 max-w-[980px] text-[18px] leading-8" style={{ color: NEO_MUTED }}>
                 This page is the live infrastructure layer for payout execution. It answers whether a provider is degrading, whether a rail is slowing down, and where routing logic should step in before money loss or support load spikes.
               </p>
             </div>
@@ -368,13 +423,13 @@ export default function ExecutionPage() {
                       className="rounded-[24px] p-5"
                       style={{
                         background: NEO_CREAM,
-                        border: '1px solid rgba(255,255,255,0.34)',
-                        boxShadow: '8px 8px 18px rgba(126,142,148,0.12), -6px -6px 12px rgba(255,255,255,0.76)',
+                        border: SURFACE_BORDER,
+                        boxShadow: CARD_SHADOW,
                       }}
                     >
                       <div className="flex items-center justify-between gap-4">
                         <div className="text-[18px] font-bold leading-7" style={{ color: NEO_TEXT }}>{alert.title}</div>
-                        <StatusChip tone={alert.severity === 'Critical' ? 'critical' : alert.severity === 'High' ? 'watch' : 'healthy'}>{alert.severity}</StatusChip>
+                        <StatusChip tone={alert.severity === 'Critical' ? 'critical' : alert.severity === 'High' ? 'watch' : 'info'}>{alert.severity}</StatusChip>
                       </div>
                       <div className="mt-3 text-[16px] leading-7" style={{ color: NEO_MUTED }}>{alert.detail}</div>
                     </div>
@@ -402,8 +457,8 @@ export default function ExecutionPage() {
                         className="rounded-[24px] p-5"
                         style={{
                           background: NEO_CREAM,
-                          border: '1px solid rgba(255,255,255,0.34)',
-                          boxShadow: '8px 8px 18px rgba(126,142,148,0.12), -6px -6px 12px rgba(255,255,255,0.76)',
+                          border: SURFACE_BORDER,
+                          boxShadow: CARD_SHADOW,
                         }}
                       >
                         <div className="flex items-start justify-between gap-4">
@@ -444,8 +499,8 @@ export default function ExecutionPage() {
                         className="rounded-[24px] p-5"
                         style={{
                           background: NEO_CREAM,
-                          border: '1px solid rgba(255,255,255,0.34)',
-                          boxShadow: '8px 8px 18px rgba(126,142,148,0.12), -6px -6px 12px rgba(255,255,255,0.76)',
+                          border: SURFACE_BORDER,
+                          boxShadow: CARD_SHADOW,
                         }}
                       >
                         <div className="flex items-center justify-between gap-4">
@@ -495,8 +550,8 @@ export default function ExecutionPage() {
                         className="rounded-[24px] p-5"
                         style={{
                           background: NEO_CREAM,
-                          border: '1px solid rgba(255,255,255,0.34)',
-                          boxShadow: '8px 8px 18px rgba(126,142,148,0.12), -6px -6px 12px rgba(255,255,255,0.76)',
+                          border: SURFACE_BORDER,
+                          boxShadow: CARD_SHADOW,
                         }}
                       >
                         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -535,8 +590,8 @@ export default function ExecutionPage() {
                         className="rounded-[24px] p-5"
                         style={{
                           background: NEO_CREAM,
-                          border: '1px solid rgba(255,255,255,0.34)',
-                          boxShadow: '8px 8px 18px rgba(126,142,148,0.12), -6px -6px 12px rgba(255,255,255,0.76)',
+                          border: SURFACE_BORDER,
+                          boxShadow: CARD_SHADOW,
                         }}
                       >
                         <div className="text-[12px] font-black uppercase tracking-[0.16em]" style={{ color: NEO_MUTED }}>{item.label}</div>
@@ -549,6 +604,7 @@ export default function ExecutionPage() {
               </ShellCard>
             </section>
           ) : null}
+        </div>
       </div>
     </DashboardLayout>
   )

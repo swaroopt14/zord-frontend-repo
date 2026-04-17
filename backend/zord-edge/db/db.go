@@ -34,12 +34,6 @@ func CreateTable() error {
 		return err
 	}
 
-	_, err = DB.Exec(`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS workspace_code TEXT;`)
-	if err != nil {
-		log.Fatal(err)
-		return err
-	}
-
 	if err := backfillWorkspaceCodes(); err != nil {
 		log.Fatal(err)
 		return err

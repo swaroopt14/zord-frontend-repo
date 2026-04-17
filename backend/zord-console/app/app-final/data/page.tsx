@@ -73,7 +73,7 @@ export default function DataPage() {
             </InfoStrip>
             <div className="space-y-4">
               {exportRows.map((row) => (
-                <div key={row.name} className="rounded-[24px] p-5" style={{ background: NEO_CREAM, border: '1px solid rgba(255,255,255,0.34)', boxShadow: '8px 8px 18px rgba(154,159,141,0.14), -6px -6px 12px rgba(255,255,255,0.62)' }}>
+                <div key={row.name} className="rounded-[24px] p-5" style={{ background: NEO_CREAM, border: '1px solid rgba(255,255,255,0.82)', boxShadow: '6px 6px 14px rgba(118,84,111,0.10), -4px -4px 10px rgba(255,255,255,0.72), inset 1px 1px 0 rgba(255,255,255,0.44)' }}>
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="text-[20px] font-black tracking-[-0.03em]" style={{ color: NEO_TEXT }}>{row.name}</div>
@@ -95,7 +95,7 @@ export default function DataPage() {
           <NeumoCard title="Reconciliation Reports" subtitle="Report layer for closure rate, variance, and evidence coverage so finance can close books faster and with less manual stitching.">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               {reconRows.map((row) => (
-                <div key={row.report} className="rounded-[24px] p-5" style={{ background: NEO_CREAM, border: '1px solid rgba(255,255,255,0.34)', boxShadow: '8px 8px 18px rgba(154,159,141,0.14), -6px -6px 12px rgba(255,255,255,0.62)' }}>
+                <div key={row.report} className="rounded-[24px] p-5" style={{ background: NEO_CREAM, border: '1px solid rgba(255,255,255,0.82)', boxShadow: '6px 6px 14px rgba(118,84,111,0.10), -4px -4px 10px rgba(255,255,255,0.72), inset 1px 1px 0 rgba(255,255,255,0.44)' }}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="text-[20px] font-black tracking-[-0.03em]" style={{ color: NEO_TEXT }}>{row.report}</div>
                     <StatusChip tone={row.status === 'Ready' ? 'healthy' : 'watch'}>{row.status}</StatusChip>
