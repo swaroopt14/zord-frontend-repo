@@ -1,7 +1,6 @@
 'use client'
 
 import Image from 'next/image'
-import { DM_Sans } from 'next/font/google'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Bar, Cell, ComposedChart, Line, ResponsiveContainer, XAxis, YAxis } from 'recharts'
@@ -10,11 +9,6 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { FinalLandingAssistantButton } from '@/components/landing-final/FinalLandingAssistantButton'
 import { FinalLandingNavbar } from '@/components/landing-final/FinalLandingNavbar'
 import { ZordLogo } from '@/components/ZordLogo'
-
-const dashboardFont = DM_Sans({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '700'],
-})
 
 type GlyphName =
   | 'arrow-right'
@@ -1689,6 +1683,7 @@ export function SolutionSection() {
 function ProductExperience() {
   const [activeView, setActiveView] = useState<(typeof switchboardViews)[number]['id']>('psp')
   const [activeDock, setActiveDock] = useState<(typeof dashboardDockItems)[number]['id']>('workspace')
+  const [selectedPromptSuggestion, setSelectedPromptSuggestion] = useState<string | null>(null)
   const activeDockItem = dashboardDockItems.find((item) => item.id === activeDock)!
   const activeLens = switchboardLensDashboard[activeView]
   const chartValues = activeLens.statBars
@@ -1759,10 +1754,28 @@ function ProductExperience() {
     if (!nextDock) return
     setActiveDock(nextDock.id)
     setActiveView(nextDock.defaultView)
+    setSelectedPromptSuggestion(null)
   }
   const isPromptSurface = activeDockItem.surfaceMode === 'prompt'
   const isWorkspacePromptSurface = activeDock === 'workspace'
   const isRecoveryConsoleSurface = activeDock === 'recoveries'
+  const activePromptQuestion = selectedPromptSuggestion ?? activeDockItem.promptIntro
+  const dockPathSegments = {
+    home: 'home-overview',
+    workspace: 'payout-command-view',
+    recoveries: 'recovery-console',
+    proof: 'proof-exports-desk',
+    grid: 'operations-grid',
+    banks: 'bank-exception-view',
+    sync: 'sync-console',
+  } as const
+  const activeViewSegment =
+    switchboardViews
+      .find((view) => view.id === activeView)
+      ?.label.toLowerCase()
+      .replace(/\s+/g, '-') ?? 'overview'
+  const activePromptSegment = activeDockItem.promptTabs[0]?.toLowerCase().replace(/\s+/g, '-') ?? 'overview'
+  const activeCommandPath = `zord.arealis.ai/${dockPathSegments[activeDock]}/${isPromptSurface ? activePromptSegment : activeViewSegment}`
   const periodOptions = [
     ['Week', false],
     ['Month', true],
@@ -1915,18 +1928,20 @@ function ProductExperience() {
           ) : null}
 
           <div className="inline-flex max-w-[28rem] rounded-[1.15rem] bg-[#eef1f5] px-6 py-4 text-[15px] text-[#111111]">
-            {activeDockItem.promptIntro}
+            {activePromptQuestion}
           </div>
           <div className="mt-2 text-[12px] text-[#8a8a86]">11:32 AM</div>
 
           <div className="mt-6 flex flex-wrap gap-2">
             {activeDockItem.promptSuggestions.map((suggestion) => (
-              <div
+              <button
                 key={`${activeDockItem.id}-${suggestion}`}
-                className="rounded-full border border-black/10 bg-white px-3 py-2 text-[12px] text-[#6f716d] shadow-[0_4px_12px_rgba(0,0,0,0.03)]"
+                type="button"
+                onClick={() => setSelectedPromptSuggestion(suggestion)}
+                className="rounded-full border border-black/10 bg-white px-3 py-2 text-[12px] text-[#6f716d] shadow-[0_4px_12px_rgba(0,0,0,0.03)] transition hover:border-[#4ADE80]/30 hover:text-[#111111]"
               >
                 {suggestion}
-              </div>
+              </button>
             ))}
           </div>
 
@@ -1991,7 +2006,7 @@ function ProductExperience() {
   )
 
   const workspacePromptPanel = (
-    <article className="flex min-h-[48rem] flex-col rounded-[1.8rem] border border-black/10 bg-white p-4 text-[#111111] shadow-[0_18px_40px_rgba(0,0,0,0.08)] sm:p-5">
+    <article className="flex min-h-[48rem] flex-col rounded-[1.85rem] border border-white/8 bg-[#111111] p-4 text-white shadow-[0_24px_56px_rgba(0,0,0,0.18)] sm:p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-wrap gap-2">
           {activeDockItem.promptTabs.map((tab, index) => (
@@ -2000,8 +2015,8 @@ function ProductExperience() {
               type="button"
               className={`rounded-full border px-4 py-2.5 text-[13px] font-medium transition ${
                 index === 0
-                  ? 'border-[#b7d9c2] bg-[#e7f8ed] text-[#111111]'
-                  : 'border-black/8 bg-[#f3f4f6] text-[#6c6f77]'
+                  ? 'border-white/14 bg-white/10 text-white'
+                  : 'border-white/10 bg-[#161616] text-white/58'
               }`}
             >
               {tab}
@@ -2011,49 +2026,49 @@ function ProductExperience() {
 
         <button
           type="button"
-          className="flex h-10 w-10 items-center justify-center rounded-[12px] border border-black/10 bg-white text-[#111111]"
+          className="flex h-10 w-10 items-center justify-center rounded-[12px] border border-white/10 bg-[#161616] text-white/70"
           aria-label="Workspace documents"
         >
           <Glyph name="document" className="h-[18px] w-[18px]" />
         </button>
       </div>
 
-      <div className="mt-5 flex flex-1 flex-col rounded-[1.5rem] border border-black/10 bg-[linear-gradient(180deg,#fbfbfc_0%,#f5f6f8_100%)] px-4 py-5 sm:px-5">
-        <div className="border-b border-black/8 pb-5">
+      <div className="mt-5 flex flex-1 flex-col rounded-[1.5rem] border border-white/8 bg-[#151515] px-4 py-5 sm:px-5">
+        <div className="border-b border-white/8 pb-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-[28rem]">
-              <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8a8a86]">
+              <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/32">
                 AI Intelligence Layer
               </div>
-              <div className="mt-2 text-[1.1rem] font-medium tracking-[-0.03em] text-[#111111]">
+              <div className="mt-2 text-[1.1rem] font-medium tracking-[-0.03em] text-white">
                 Route posture, owner handoff, and proof readiness in one reasoning layer.
               </div>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#4ADE80]/18 bg-[#4ADE80]/10 px-3 py-2 text-[12px] font-medium text-[#111111] shadow-[0_8px_24px_rgba(74,222,128,0.08)]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#4ADE80]/20 bg-[#4ADE80]/10 px-3 py-2 text-[12px] font-medium text-white shadow-[0_8px_24px_rgba(74,222,128,0.08)]">
               <span className="h-2.5 w-2.5 rounded-full bg-[#4ADE80]" />
               Live operating context
             </div>
           </div>
 
-          <div className="mt-5 rounded-[1.35rem] bg-[#eef1f5] p-4 sm:p-5">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#4ADE80]/12 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-[#23864b]">
+          <div className="mt-5 rounded-[1.35rem] border border-white/8 bg-[#1A1A1A] p-4 sm:p-5">
+            <div className="inline-flex items-center gap-2 rounded-full px-0 py-0 text-[11px] font-medium uppercase tracking-[0.16em] text-[#4ADE80]">
               <span className="h-2 w-2 rounded-full bg-[#4ADE80]" />
               Live reasoning prompt
             </div>
-            <div className="mt-4 max-w-[34rem] text-[1.08rem] leading-7 tracking-[-0.03em] text-[#111111]">
-              {activeDockItem.promptIntro}
+            <div className="mt-4 max-w-[34rem] text-[1.08rem] leading-7 tracking-[-0.03em] text-white">
+              {activePromptQuestion}
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3 text-[12px]">
-              <span className="text-[#23864b]">11:32 AM</span>
+              <span className="text-[#4ADE80]">11:32 AM</span>
               <span className="h-1 w-1 rounded-full bg-[#4ADE80]" />
-              <span className="max-w-[33rem] text-[#6f716d]">
+              <span className="max-w-[33rem] text-white/48">
                 Grounded on routed value, callback timing, bank-side movement, and export readiness already visible in the workspace.
               </span>
             </div>
           </div>
 
           <div className="mt-5">
-            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8a8a86]">
+            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/32">
               Suggested Questions
             </div>
             <div className="mt-3 flex flex-wrap gap-2.5">
@@ -2061,7 +2076,12 @@ function ProductExperience() {
                 <button
                   key={`workspace-prompt-suggestion-${suggestion}`}
                   type="button"
-                  className="rounded-full border border-black/8 bg-white px-4 py-2.5 text-[13px] text-[#5d6168] shadow-[0_8px_20px_rgba(0,0,0,0.03)] transition hover:border-[#4ADE80]/28 hover:text-[#111111]"
+                  onClick={() => setSelectedPromptSuggestion(suggestion)}
+                  className={`rounded-full border px-4 py-2.5 text-[13px] shadow-[0_8px_20px_rgba(0,0,0,0.14)] transition ${
+                    activePromptQuestion === suggestion
+                      ? 'border-[#4ADE80]/38 bg-[#171717] text-white'
+                      : 'border-white/10 bg-[#111111] text-white/78 hover:border-[#4ADE80]/32 hover:text-white'
+                  }`}
                 >
                   {suggestion}
                 </button>
@@ -2071,24 +2091,24 @@ function ProductExperience() {
         </div>
 
         <div className="mt-5 flex-1">
-          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#8a8a86]">
+          <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-white/32">
             Operator Modules
           </div>
           <div className="grid gap-3 md:grid-cols-2">
           {activeDockItem.promptTiles.map((tile) => (
             <article
               key={`workspace-tile-${tile.title}`}
-              className="rounded-[1.25rem] border border-black/10 bg-white px-5 py-5 shadow-[0_10px_24px_rgba(0,0,0,0.04)]"
+              className="rounded-[1.25rem] border border-white/8 bg-[#1B1B1B] px-5 py-5 shadow-[0_10px_24px_rgba(0,0,0,0.16)]"
             >
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#4ADE80]/14 text-[#4ADE80]">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#4ADE80]/12 text-[#4ADE80]">
                   <Glyph name={tile.icon} className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[1.05rem] font-medium tracking-[-0.03em] text-[#111111]">
+                  <div className="text-[1.05rem] font-medium tracking-[-0.03em] text-white">
                     {tile.title}
                   </div>
-                  <p className="mt-3 text-[13px] leading-6 text-[#6f716d]">
+                  <p className="mt-3 text-[13px] leading-6 text-white/48">
                     {tile.body}
                   </p>
                 </div>
@@ -2099,28 +2119,28 @@ function ProductExperience() {
         </div>
       </div>
 
-      <div className="mt-4 rounded-[1.35rem] border border-black/10 bg-white p-3 shadow-[0_8px_32px_rgba(0,0,0,0.06)]">
-        <div className="flex items-center gap-3 rounded-[1rem] border border-black/8 bg-[#f3f4f6] p-3">
+      <div className="mt-4 rounded-[1.35rem] bg-[#1F1F1F] p-3 shadow-[0_8px_32px_rgba(0,0,0,0.10)]">
+        <div className="flex items-center gap-3 rounded-[1rem] border border-white/8 bg-[#232323] p-3">
           <div className="flex h-14 w-14 items-center justify-center rounded-[0.85rem] bg-[#4ADE80] text-[#111111]">
             <Glyph name="zap" className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1 text-center">
-            <div className="text-[15px] text-[#111111]">Ask anything or search</div>
-            <div className="mt-1 text-[11px] text-[#7a7a76]">
+            <div className="text-[15px] text-white/90">Ask anything or search</div>
+            <div className="mt-1 text-[11px] text-white/42">
               Route posture, bank coordination, and proof readiness
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="flex h-12 w-12 items-center justify-center rounded-[0.85rem] border border-black/10 bg-white text-[#111111]"
+              className="flex h-12 w-12 items-center justify-center rounded-[0.85rem] border border-white/8 bg-transparent text-white"
               aria-label="Workspace help"
             >
               <span className="text-base font-medium">?</span>
             </button>
             <button
               type="button"
-              className="flex h-12 w-12 items-center justify-center rounded-[0.85rem] border border-black/10 bg-white text-[#111111]"
+              className="flex h-12 w-12 items-center justify-center rounded-[0.85rem] border border-white/8 bg-transparent text-white"
               aria-label="Workspace tools"
             >
               <Glyph name="grid" className="h-[18px] w-[18px]" />
@@ -2132,29 +2152,29 @@ function ProductExperience() {
   )
 
   const workspacePromptSurface = (
-    <div className="mt-8 grid items-stretch gap-4 xl:grid-cols-[1.76fr_1.48fr]">
-      <div className="grid gap-4 xl:grid-cols-[0.94fr_0.82fr]">
-        <article className="flex min-h-[33.5rem] flex-col justify-between rounded-[1.7rem] border border-[#c9d5e5] bg-[#d7e4f4] p-6 shadow-[0_12px_28px_rgba(0,0,0,0.05)]">
+    <div className="mt-8 grid items-stretch gap-4 xl:grid-cols-[1.78fr_1.46fr]">
+      <div className="grid gap-4 xl:grid-cols-[0.98fr_0.84fr]">
+        <article className="flex min-h-[33.5rem] flex-col justify-between rounded-[1.7rem] border border-[#cfdaea] bg-[#DDE8F8] p-6 shadow-[0_12px_28px_rgba(0,0,0,0.05)]">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="max-w-[11rem] text-[15px] font-medium leading-6 text-[#446ea7]">{activePromptSurface.heroLabel}</div>
-              <div className="mt-6 text-[4.2rem] font-light tracking-[-0.06em] text-[#0f1f40]">
+              <div className="max-w-[11rem] text-[11px] font-medium uppercase leading-5 tracking-[0.1em] text-[#5c7194]">{activePromptSurface.heroLabel}</div>
+              <div className="mt-6 text-[4.35rem] font-light tracking-[-0.06em] text-[#111111]">
                 {activePromptSurface.heroValue}
               </div>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white/55 text-[#5b76a1]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white/70 text-[#5b76a1]">
               <Glyph name="document" className="h-4 w-4" />
             </div>
           </div>
 
-          <div className="mt-12 flex items-end justify-start gap-[0.42rem]">
+          <div className="mt-10 flex items-end justify-start gap-[0.48rem]">
             {activePromptSurface.heroBars.map((height, index) => (
               <span
                 key={`workspace-bar-${activeDock}-${index}`}
-                className="w-[1.05rem] rounded-full"
+                className="w-[1rem] rounded-[0.55rem]"
                 style={{
-                  height: `${height * 0.92}rem`,
-                  background: index < 2 || index > 7 ? '#a9bfda' : '#355695',
+                  height: `${height * 1.08}rem`,
+                  background: index < 2 || index > 7 ? '#aac1de' : '#355695',
                 }}
               />
             ))}
@@ -2163,7 +2183,7 @@ function ProductExperience() {
 
         <div className="flex flex-col gap-4">
           <article className="rounded-[1.6rem] border border-black/10 bg-white p-5 shadow-[0_10px_24px_rgba(0,0,0,0.04)]">
-            <div className="text-[13px] font-medium uppercase tracking-[0.1em] text-[#9a9a95]">{activePromptSurface.listTitle}</div>
+            <div className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#9a9a95]">{activePromptSurface.listTitle}</div>
             <div className="mt-7 space-y-4">
               {activePromptSurface.listRows.map(([label, value]) => (
                 <div key={`workspace-list-${label}`}>
@@ -2187,7 +2207,7 @@ function ProductExperience() {
           </article>
 
           <article className="rounded-[1.6rem] border border-black/10 bg-white p-5 shadow-[0_10px_24px_rgba(0,0,0,0.04)]">
-            <div className="text-[13px] font-medium uppercase tracking-[0.1em] text-[#9a9a95]">{activePromptSurface.statTitle}</div>
+            <div className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#9a9a95]">{activePromptSurface.statTitle}</div>
             <div className="mt-5 text-[3.6rem] font-light tracking-[-0.06em] text-[#111111]">
               {activePromptSurface.statValue}
             </div>
@@ -2199,7 +2219,7 @@ function ProductExperience() {
               <article
                 key={`workspace-compare-${label}`}
                 className={`rounded-[1.45rem] border p-4 shadow-[0_10px_24px_rgba(0,0,0,0.04)] ${
-                  index === 0 ? 'border-black/10 bg-white' : 'border-[#c9d5e5] bg-white'
+                  index === 0 ? 'border-black/10 bg-white' : 'border-[#cfdaea] bg-[#DDE8F8]'
                 }`}
               >
                 <div className={`text-[13px] font-medium leading-5 ${index === 0 ? 'text-[#a1a19b]' : 'text-[#446ea7]'}`}>
@@ -2854,7 +2874,7 @@ function ProductExperience() {
                 </div>
                 <div className="hidden items-center gap-3 rounded-full bg-white/[0.12] px-4 py-2 text-sm text-white/78 md:flex">
                   <span className="h-2 w-2 rounded-full bg-white/80" />
-                  <span>zord.arealis.ai/payout-command-view/overview</span>
+                  <span>{activeCommandPath}</span>
                 </div>
               </div>
 
@@ -2865,7 +2885,7 @@ function ProductExperience() {
               </div>
             </div>
 
-            <div className={`${dashboardFont.className} p-4 sm:p-5 lg:p-6`}>
+            <div className="p-4 sm:p-5 lg:p-6">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="text-[15px] font-medium tracking-[-0.02em] text-[#111111]">Zord</div>
