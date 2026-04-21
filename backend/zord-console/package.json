@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node scripts/dev-single-process.mjs",
     "dev:fresh": "node scripts/dev-single-process.mjs --fresh",
+    "dev:url": "node scripts/print-dev-url.mjs",
     "dev:next": "next dev -p 3000",
     "build": "next build && node scripts/prepare-standalone-assets.mjs",
     "start": "next start",

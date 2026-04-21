@@ -157,7 +157,7 @@ function findFirstAvailablePort(startingPort, attempts = 10) {
   return null
 }
 
-async function stopStaleConsoleServers() {
+function collectProjectListeners() {
   const processMap = new Map()
   for (const targetPort of portsToClean) {
     for (const pid of getPidsListeningOnPort(targetPort)) {
@@ -167,7 +167,11 @@ async function stopStaleConsoleServers() {
     }
   }
 
-  const projectProcesses = [...processMap.values()].filter(isProjectProcess)
+  return [...processMap.values()].filter(isProjectProcess)
+}
+
+async function stopStaleConsoleServers() {
+  const projectProcesses = collectProjectListeners()
 
   for (const processInfo of projectProcesses) {
     try {
@@ -179,7 +183,7 @@ async function stopStaleConsoleServers() {
   }
 
   if (projectProcesses.length === 0) {
-    return
+    return []
   }
 
   for (const targetPort of portsToClean) {
@@ -204,6 +208,8 @@ async function stopStaleConsoleServers() {
 
     await waitForPortToClear(targetPort, 1000)
   }
+
+  return collectProjectListeners()
 }
 
 function resolvePort() {
@@ -236,7 +242,13 @@ function resolvePort() {
 }
 
 async function main() {
-  await stopStaleConsoleServers()
+  const remainingProjectListeners = await stopStaleConsoleServers()
+  if (remainingProjectListeners.length > 0) {
+    const details = remainingProjectListeners.map(describeProcess).join('\n[dev]   ')
+    throw new Error(
+      `could not stop one or more zord-console dev processes.\n[dev]   ${details}\n[dev] refusing to clean caches while a stale process is still serving files because that can cause _next/static 404 errors. stop these processes manually, then run dev:fresh again.`
+    )
+  }
 
   if (shouldClean) {
     cleanCaches()
